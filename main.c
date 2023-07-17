@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <arpa/inet.h>
 #include <assert.h>
 #include <errno.h>
@@ -28,10 +29,11 @@ struct ip_struct {
 typedef  struct ip_struct ip_port_t;
 
 
-static ip_port_t *ip_port_t_alloc(void) {
+static ip_port_t *pepa_ip_port_t_alloc(void)
+{
 	ip_port_t *ip = malloc(sizeof(ip_port_t));
 	if (NULL == ip) {
-		printf("Can't allocate\n");
+		DE("Can't allocate\n");
 		return (NULL);
 	}
 
@@ -39,9 +41,10 @@ static ip_port_t *ip_port_t_alloc(void) {
 	return (ip);
 }
 
-static void ip_port_t_release(ip_port_t *ip) {
+static void pepa_ip_port_t_release(ip_port_t *ip)
+{
 	if (NULL == ip) {
-		printf("Arg is NULL\n");
+		DE("Arg is NULL\n");
 		return;
 	}
 
@@ -60,7 +63,7 @@ static void pepa_show_help(void)
 		   "--in   | -i - input file, means the file pepa will listenm read from and send to socket\n");
 }
 
-long int string_to_int_strict(char *s, int *err)
+long int pepa_string_to_int_strict(char *s, int *err)
 {
 	char     *endptr;
 	long int res;
@@ -91,43 +94,93 @@ long int string_to_int_strict(char *s, int *err)
 }
 
 /* This parses a string containing an IP:PORT, create and returns a struct */
-static ip_port_t *arguments_parse_local_ip(char *argument)
+static ip_port_t *pepa_parse_ip_string(char *argument)
 {
 	ip_port_t *ip        = NULL;
 	int       _err       = 0;
 	char      *colon_ptr = NULL;
 
-	ip = ip_port_t_alloc();
-	if (NULL == ip) {
-		DE("Could nor allocate struct, exit\n");
-		abort();
-	}
+	TESTP_ASSERT(argument);
+
+	ip = pepa_ip_port_t_alloc();
+	TESTP_ASSERT(ip);
 
 	colon_ptr = index(argument, ':');
 
 	if (NULL == colon_ptr) {
 		DE("Can not find : between IP and PORT: IP:PORT\n");
-		ip_port_t_release(ip);
+		pepa_ip_port_t_release(ip);
 		return NULL;
 	}
 
 	*colon_ptr = '\0';
 
 	strncpy(ip->ip, argument, ((IP_LEN - 1)));
-	ip->port = string_to_int_strict(colon_ptr + 1, &_err);
+	ip->port = pepa_string_to_int_strict(colon_ptr + 1, &_err);
 
 	if (_err) {
 		DE("Can't convert port value from string to int: %s\n", colon_ptr);
-		ip_port_t_release(ip);
+		pepa_ip_port_t_release(ip);
 		return NULL;
 	}
 
 	return ip;
 }
 
+/**
+ * @author Sebastian Mountaniol (7/17/23)
+ * @brief Open an IN file for read
+ * @param char* file_name File / Pipe name to open
+ * @return FILE File descriptor on success, NULL on an error
+ * @details THe file must exists
+ */
+static FILE *pepa_open_pipe_in(char *file_name)
+{
+	TESTP_ASSERT(file_name);
+	FILE *fd = fopen(file_name, "r");
+	if (NULL == fd) {
+		DE(">>> Can not open file: %s", strerror(errno));
+	}
+	TESTP_ASSERT_MES(fd, "Can not open IN file");
+	return fd;
+}
+
+/**
+ * @author Sebastian Mountaniol (7/17/23)
+ * @brief Open a file for OUT, i.e. to write from socket 
+ * @param char _file_name File name to open. 
+ * @return FILE File descriptor or NULL on an error
+ * @details FIle MUST exist, not created! Also, the content of
+ *  		the file will not be trunkated, i.e. opened in "a"
+ *  		mode. It is up to end user to decide either the file
+ *  		should be cleaned before a writing will start
+ */
+static FILE *pepa_open_file_out(char *file_name)
+{
+	TESTP_ASSERT(file_name);
+	FILE *fd = fopen(file_name, "a");
+	if (NULL == fd) {
+		DE(">>> Can not open file: %s", strerror(errno));
+	}
+	TESTP_ASSERT_MES(fd, "Can not open OUT file");
+	return fd;
+}
 
 int main(int argi, char *argv[])
 {
+	/* IP address to connect to a server */
+	ip_port_t *ip     = NULL;
+	/* File descriptor of IN file, i.e., a file to read from */
+	FILE      *fd_out = NULL;
+	/* File descriptor of OUT file, i.e., a file write to */
+	FILE      *fd_in  = NULL;
+
+	/* We need at least 6 params : -- addr "address:port" -i "input_file" -o "output_file" */
+	if (argi < 6) {
+		printf("ERROR: At least 3 arguments expected:\n");
+		pepa_show_help();
+		exit(0);
+	}
 
 	/* Long options. Address should be given in form addr:port*/
 	static struct option long_options[] = {
@@ -145,10 +198,17 @@ int main(int argi, char *argv[])
 	while ((opt = getopt_long(argi, argv, ":a:o:i:h", long_options, &option_index)) != -1) {
 		switch (opt) {
 		case 'a': /* Address to connect to */
+			ip = pepa_parse_ip_string(optarg);
+			TESTP_ASSERT(ip);
+			DD("Addr OK: |%s| : |%d|\n", ip->ip, ip->port);
 			break;
 		case 'o': /* Output file - write received from socket */
+			fd_out = pepa_open_file_out(optarg);
+			TESTP_ASSERT_MES(fd_out, "Can not open OUT file");
 			break;
 		case 'i': /* Input file - read and send to socket */
+			fd_in = pepa_open_pipe_in(optarg);
+			TESTP_ASSERT_MES(fd_in, "Can not open IN file");
 			break;
 		case 'h': /* Show help */
 			pepa_show_help();
@@ -157,9 +217,15 @@ int main(int argi, char *argv[])
 			printf("Unknown argument: %c\n", opt);
 			pepa_show_help();
 			exit(1);
-
 		}
 	}
+
+	/* Test that all needed arguments are accepted.
+	   We need IP + PORT, file_in and file_out */
+
+	TESTP_ASSERT_MES(ip, "No IP + PORT");
+	TESTP_ASSERT_MES(fd_in, "No in file");
+	TESTP_ASSERT_MES(fd_out, "No out file");
 
 }
 
