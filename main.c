@@ -275,6 +275,17 @@ int pepa_copy_fd_to_fd(int fd_from, int fd_to)
 	return accum;
 }
 
+
+/* File descriptor of IN file, i.e., a file to read from */
+int fd_out  = -1;
+/* File descriptor of OUT file, i.e., a file write to */
+int fd_in   = -1;
+
+/* File descriptor on an opened socket */
+int fd_sock = -1;
+
+char *file_name = NULL;
+
 /**
  * @author Sebastian Mountaniol (7/18/23)
  * @brief This function is a loop, where all file descriptors
@@ -284,7 +295,7 @@ int pepa_copy_fd_to_fd(int fd_from, int fd_to)
  * @param FILE* file_out
  * @details 
  */
-void pepa_merry_go_round(const int sckt, const int fd_in, const int fd_out)
+void pepa_merry_go_round(const int sckt, int _fd_in, const int _fd_out)
 {
 	fd_set         rfds;
 
@@ -295,9 +306,20 @@ void pepa_merry_go_round(const int sckt, const int fd_in, const int fd_out)
 	uint64_t       accum_from_sock = 0;
 	uint64_t       accum_to_sock   = 0;
 
-	const int      max_fd          = MAX(sckt, fd_in);
+	const int      max_fd          = MAX(sckt, _fd_in);
 
 	while (1) {
+
+		if (-1 == fcntl(_fd_in, F_GETFL)) {
+			fd_in = pepa_open_pipe_in(file_name);
+			if (fd_in < 0) {
+				DE("Can not reopen IN file\n");
+				perror("Can not reopen IN file: ");
+				abort();
+			}
+			_fd_in = fd_in;
+		}
+
 		/* Set the FIFO signal fd into select set */
 		FD_ZERO(&rfds);
 		FD_SET(max_fd, &rfds);
@@ -334,7 +356,7 @@ void pepa_merry_go_round(const int sckt, const int fd_in, const int fd_out)
 			DD("Received something on socket\n");
 
 			/* Read from socket, write to fd_write */
-			const int32_t rc_copy = pepa_copy_fd_to_fd(sckt, fd_out);
+			const int32_t rc_copy = pepa_copy_fd_to_fd(sckt, _fd_out);
 			if (rc_copy < 0) {
 				/* something is wrong is there */
 				abort();
@@ -346,11 +368,11 @@ void pepa_merry_go_round(const int sckt, const int fd_in, const int fd_out)
 		}
 
 		/* Is there anything on fd_read ? */
-		if (FD_ISSET(fd_in, &rfds)) {
+		if (FD_ISSET(_fd_in, &rfds)) {
 
 			DD("Received something on FD IN\n");
 			/* Read from IN pipe, write to socket */
-			const int32_t rc_copy = pepa_copy_fd_to_fd(fd_in, sckt);
+			const int32_t rc_copy = pepa_copy_fd_to_fd(_fd_in, sckt);
 			if (rc_copy < 0) {
 				/* something is wrong is there */
 				abort();
@@ -368,13 +390,7 @@ void pepa_merry_go_round(const int sckt, const int fd_in, const int fd_out)
 }
 
 
-/* File descriptor of IN file, i.e., a file to read from */
-int fd_out  = -1;
-/* File descriptor of OUT file, i.e., a file write to */
-int fd_in   = -1;
 
-/* File descriptor on an opened socket */
-int fd_sock = -1;
 
 void bye(void)
 {
@@ -435,6 +451,7 @@ int main(int argi, char *argv[])
 			break;
 		case 'i': /* Input file - read and send to socket */
 			fd_in = pepa_open_pipe_in(optarg);
+			file_name = strdup(optarg);
 			if (fd_in < 0) {
 				DE("Can not open IN file\n");
 				abort();
