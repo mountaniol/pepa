@@ -192,7 +192,17 @@ static int pepa_connect_to_server(ip_port_t *ip)
 	memset(&s_addr, 0, sizeof(s_addr));
 	s_addr.sin_family = (sa_family_t)AF_INET;
 
-	inet_pton(AF_INET, ip->ip, &s_addr.sin_addr);
+	const int convert_rc = inet_pton(AF_INET, ip->ip, &s_addr.sin_addr);
+	if (0 == convert_rc) {
+		DE("The string is not a valid IP address: |%s|\n", ip->ip);
+		return -3;
+	}
+
+	if (convert_rc < 0) {
+		DE("Could not convert string addredd |%s| to binary\n", ip->ip);
+		return -4;
+	}
+
 	s_addr.sin_port = htons(ip->port);
 
 	if ((sock = socket(PF_INET, SOCK_STREAM, 0)) < 0) {
@@ -225,13 +235,17 @@ int pepa_copy_fd_to_fd(int fd_from, int fd_to)
 	int     accum              = 0;
 	do {
 		rc_read = read(fd_from, buf, COPY_BUF_SIZE);
+
 		if (rc_read < 0) {
 			perror("Can not read from file descriptor: ");
 			break;
 		}
 
+		DD("Copied from IN to buf: %d bytes\n", rc_read);
+
 		if (0 == rc_read) {
-			continue;
+			DE("Got 0 bytes, return");
+			break;
 		}
 
 		const int rc_write = write(fd_to, buf, rc_read);
@@ -240,10 +254,13 @@ int pepa_copy_fd_to_fd(int fd_from, int fd_to)
 			abort();
 		}
 
+		DD("Copied from buf to OUT: %d bytes\n", rc_write);
+
 		accum += rc_write;
 
 
 	} while (rc_read > 0);
+
 	return accum;
 }
 
@@ -259,13 +276,13 @@ int pepa_copy_fd_to_fd(int fd_from, int fd_to)
 void pepa_merry_go_round(const int sckt, const int fd_in, const int fd_out)
 {
 	fd_set         rfds;
-	
+
 	/* Select related variables */
 	struct timeval tv;
-	int            retval = -1;
-	
+	int            retval          = -1;
+
 	uint64_t       accum_from_sock = 0;
-	uint64_t       accum_to_sock = 0;
+	uint64_t       accum_to_sock   = 0;
 
 	const int      max_fd          = MAX(sckt, fd_in);
 
@@ -279,6 +296,8 @@ void pepa_merry_go_round(const int sckt, const int fd_in, const int fd_out)
 		tv.tv_usec = 0;
 
 		/* Wait a signal from the second side of the FIFO */
+
+		DD("Going to wait on select() for 5 seconds\n");
 
 		retval = select(max_fd + 1, &rfds, NULL, NULL, &tv);
 
@@ -301,6 +320,7 @@ void pepa_merry_go_round(const int sckt, const int fd_in, const int fd_out)
 
 		/* Is there anything on socket? */
 		if (FD_ISSET(sckt, &rfds)) {
+			DD("Received something on socket\n");
 
 			/* Read from socket, write to fd_write */
 			const int32_t rc_copy = pepa_copy_fd_to_fd(sckt, fd_out);
@@ -309,21 +329,28 @@ void pepa_merry_go_round(const int sckt, const int fd_in, const int fd_out)
 				abort();
 			}
 
+			DD("Copied from socket to FD OUT: %d bytes\n", rc_copy);
+
 			accum_from_sock += rc_copy;
 		}
 
 		/* Is there anything on fd_read ? */
 		if (FD_ISSET(fd_in, &rfds)) {
+
+			DD("Received something on FD IN\n");
 			/* Read from IN pipe, write to socket */
 			const int32_t rc_copy = pepa_copy_fd_to_fd(fd_in, sckt);
 			if (rc_copy < 0) {
 				/* something is wrong is there */
 				abort();
 			}
+
+			DD("Copied from FD OUT to socket: %d bytes\n", rc_copy);
+
 			accum_to_sock += rc_copy;
 		}
 
-		DDD("SOCK BYTES: FROM SOCK: %lu, TO SOCK: %lu\n", accum_from_sock, accum_to_sock);
+		DD("SOCK BYTES: FROM SOCK: %lu, TO SOCK: %lu\n", accum_from_sock, accum_to_sock);
 
 		/* We are done, continue */
 	}
@@ -406,7 +433,6 @@ int main(int argi, char *argv[])
 		abort();
 	}
 
-	pepa_ip_port_t_release(ip);
 
 	if (fd_out < 0) {
 		DE("Can not open OUT file\n");
@@ -417,6 +443,13 @@ int main(int argi, char *argv[])
 		DE("Can not open OUT file\n");
 		abort();
 	}
+
+	DD("Ready to go:\n"
+	   "IP is: %s, PORT is %d\n"
+	   "FD SOCK: %d, FD IN: %d, FD OUT: %d\n",
+	   ip->ip, ip->port, fd_sock, fd_in, fd_out);
+
+	pepa_ip_port_t_release(ip);
 
 	pepa_merry_go_round(fd_sock, fd_in, fd_out);
 	return 0;
