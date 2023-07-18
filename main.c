@@ -17,10 +17,15 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <sys/param.h>
+#include <sys/select.h>
 #include "debug.h"
 
 /* Max length of string IP address */
 #define IP_LEN   (24)
+
+/* Size of buffer used to copy from fd to fd*/
+#define COPY_BUF_SIZE (128)
 
 struct ip_struct {
 	char ip[IP_LEN];
@@ -131,17 +136,17 @@ static ip_port_t *pepa_parse_ip_string(char *argument)
  * @author Sebastian Mountaniol (7/17/23)
  * @brief Open an IN file for read
  * @param char* file_name File / Pipe name to open
- * @return FILE File descriptor on success, NULL on an error
+ * @return int File descriptor on success, NULL on an error
  * @details THe file must exists
  */
-static FILE *pepa_open_pipe_in(char *file_name)
+static int pepa_open_pipe_in(char *file_name)
 {
 	TESTP_ASSERT(file_name);
-	FILE *fd = fopen(file_name, "r");
-	if (NULL == fd) {
+	int fd = open(file_name, O_RDONLY | O_CLOEXEC);
+	if (fd < 0) {
 		DE(">>> Can not open file: %s", strerror(errno));
+		return -1;
 	}
-	TESTP_ASSERT_MES(fd, "Can not open IN file");
 	return fd;
 }
 
@@ -149,21 +154,177 @@ static FILE *pepa_open_pipe_in(char *file_name)
  * @author Sebastian Mountaniol (7/17/23)
  * @brief Open a file for OUT, i.e. to write from socket 
  * @param char _file_name File name to open. 
- * @return FILE File descriptor or NULL on an error
+ * @return int File descriptor or -1 on an error
  * @details FIle MUST exist, not created! Also, the content of
  *  		the file will not be trunkated, i.e. opened in "a"
  *  		mode. It is up to end user to decide either the file
  *  		should be cleaned before a writing will start
  */
-static FILE *pepa_open_file_out(char *file_name)
+static int pepa_open_file_out(char *file_name)
 {
 	TESTP_ASSERT(file_name);
-	FILE *fd = fopen(file_name, "a");
-	if (NULL == fd) {
+	int fd = open(file_name, O_WRONLY | O_CLOEXEC);
+	if (fd < 0) {
 		DE(">>> Can not open file: %s", strerror(errno));
+		return -1;
 	}
-	TESTP_ASSERT_MES(fd, "Can not open OUT file");
 	return fd;
+}
+
+/**
+ * @author Sebastian Mountaniol (7/17/23)
+ * @brief Open TCP connection to a remote server AND connect to
+ * @param ip_port_t* ip  A structure containing ip (as a string)
+ *  			   and a port (as an integer)
+ * 
+ * @return int Opened socket; a negative on an error
+ * @details If the function can not open a socket, it returns
+ *  		-1. If this function open a socket but cannot
+ *  		connect to the remote server, it closes the socket
+ *  		returns -2. If the socket opened AND connected, it
+ *  		returns the socket descriptor, which is >= 0
+ */
+static int pepa_connect_to_server(ip_port_t *ip)
+{
+	struct sockaddr_in s_addr;
+	int                sock;
+
+	memset(&s_addr, 0, sizeof(s_addr));
+	s_addr.sin_family = (sa_family_t)AF_INET;
+
+	inet_pton(AF_INET, ip->ip, &s_addr.sin_addr);
+	s_addr.sin_port = htons(ip->port);
+
+	if ((sock = socket(PF_INET, SOCK_STREAM, 0)) < 0) {
+		DE("could not create socket\n");
+		return (-1);
+	}
+
+	if (connect(sock, (struct sockaddr *)&s_addr, (socklen_t)sizeof(s_addr)) < 0) {
+		DE("could not connect to server\n");
+		close(sock);
+		return (-2);
+	}
+
+	return (sock);
+}
+
+/**
+ * @author Sebastian Mountaniol (7/18/23)
+ * @brief Read from file desctiptor, and write to another file
+ *  	  descriptor 
+ * @param int fd_from File descriptor to read from
+ * @param int fd_to  File descriptor to write to 
+ * @return int Number of processes bytes
+ * @details 
+ */
+int pepa_copy_fd_to_fd(int fd_from, int fd_to)
+{
+	uint8_t buf[COPY_BUF_SIZE];
+	int     rc_read            = 0;
+	int     accum              = 0;
+	do {
+		rc_read = read(fd_from, buf, COPY_BUF_SIZE);
+		if (rc_read < 0) {
+			perror("Can not read from file descriptor: ");
+			break;
+		}
+
+		if (0 == rc_read) {
+			continue;
+		}
+
+		const int rc_write = write(fd_to, buf, rc_read);
+		if (rc_write != rc_read) {
+			DE("Could not write the same amount of bytes: read %u, wrote %u\n", rc_read, rc_write);
+			abort();
+		}
+
+		accum += rc_write;
+
+
+	} while (rc_read > 0);
+	return accum;
+}
+
+/**
+ * @author Sebastian Mountaniol (7/18/23)
+ * @brief This function is a loop, where all file descriptors
+ *  	  are listened, and messages moved between them.
+ * @param ip_port_t* ip      
+ * @param FILE* file_in 
+ * @param FILE* file_out
+ * @details 
+ */
+void pepa_merry_go_round(const int sckt, const int fd_read, const int fd_write)
+{
+	fd_set         rfds;
+	
+	/* Select related variables */
+	struct timeval tv;
+	int            retval;
+	
+	uint64_t       accum_from_sock;
+	uint64_t       accum_to_sock;
+
+	const int      max_fd          = MAX(sckt, fd_read);
+
+	while (1) {
+		/* Set the FIFO signal fd into select set */
+		FD_ZERO(&rfds);
+		FD_SET(max_fd, &rfds);
+
+		/* Wait 5 seconds */
+		tv.tv_sec = 5;
+		tv.tv_usec = 0;
+
+		/* Wait a signal from the second side of the FIFO */
+
+		retval = select(max_fd + 1, &rfds, NULL, NULL, &tv);
+
+		/* nothing to read */
+		if (retval == 0) {
+			continue;
+		}
+
+		/* The only case when select() returns -1 and it is legal, it is a signal;
+		 * we ignore signals and continue select() */
+		if ((retval == -1) && (errno == EINTR)) {
+			continue;
+		}
+
+		/* Any other case the select() returns -1, we have to stop */
+		if (retval == -1) {
+			perror("select()");
+			abort();
+		}
+
+		/* Is there anything on socket? */
+		if (FD_ISSET(sckt, &rfds)) {
+
+			/* Read from socket, write to fd_write */
+			const int32_t rc_copy = pepa_copy_fd_to_fd(sckt, fd_write);
+			if (rc_copy < 0) {
+				/* something is wrong is there */
+				abort();
+			}
+
+			accum_from_sock += rc_copy;
+		}
+
+		/* Is there anything on fd_read ? */
+		if (FD_ISSET(fd_read, &rfds)) {
+			/* Read from IN pipe, write to socket */
+			const int32_t rc_copy = pepa_copy_fd_to_fd(fd_read, sckt);
+			if (rc_copy < 0) {
+				/* something is wrong is there */
+				abort();
+			}
+			accum_to_sock += rc_copy;
+		}
+
+		/* We are done, continue */
+	}
 }
 
 int main(int argi, char *argv[])
@@ -171,9 +332,11 @@ int main(int argi, char *argv[])
 	/* IP address to connect to a server */
 	ip_port_t *ip     = NULL;
 	/* File descriptor of IN file, i.e., a file to read from */
-	FILE      *fd_out = NULL;
+	int       fd_out  = -1;
 	/* File descriptor of OUT file, i.e., a file write to */
-	FILE      *fd_in  = NULL;
+	int       fd_in   = -1;
+
+	int       fd_sock = -1;
 
 	/* We need at least 6 params : -- addr "address:port" -i "input_file" -o "output_file" */
 	if (argi < 6) {
@@ -201,14 +364,21 @@ int main(int argi, char *argv[])
 			ip = pepa_parse_ip_string(optarg);
 			TESTP_ASSERT(ip);
 			DD("Addr OK: |%s| : |%d|\n", ip->ip, ip->port);
+
 			break;
 		case 'o': /* Output file - write received from socket */
 			fd_out = pepa_open_file_out(optarg);
-			TESTP_ASSERT_MES(fd_out, "Can not open OUT file");
+			if (fd_out < 0) {
+				DE("Can not open OUT file\n");
+				abort();
+			}
 			break;
 		case 'i': /* Input file - read and send to socket */
 			fd_in = pepa_open_pipe_in(optarg);
-			TESTP_ASSERT_MES(fd_in, "Can not open IN file");
+			if (fd_in < 0) {
+				DE("Can not open IN file\n");
+				abort();
+			}
 			break;
 		case 'h': /* Show help */
 			pepa_show_help();
@@ -224,8 +394,28 @@ int main(int argi, char *argv[])
 	   We need IP + PORT, file_in and file_out */
 
 	TESTP_ASSERT_MES(ip, "No IP + PORT");
-	TESTP_ASSERT_MES(fd_in, "No in file");
-	TESTP_ASSERT_MES(fd_out, "No out file");
 
+	fd_sock = pepa_connect_to_server(ip);
+
+	if (fd_sock < 0) {
+		DE("Can connect to server\n");
+		abort();
+	}
+
+
+	if (fd_out < 0) {
+		DE("Can not open OUT file\n");
+		abort();
+	}
+
+	if (fd_in < 0) {
+		DE("Can not open OUT file\n");
+		abort();
+	}
+
+	fd_sock = pepa_connect_to_server(ip);
+
+	pepa_merry_go_round(fd_sock, fd_in, fd_out);
+	return 0;
 }
 
