@@ -2,7 +2,7 @@
 #CFLAGS=-Wall -Wextra -rdynamic -O2
 
 #GCC=clang-10
-GCC=gcc-10
+GCC=gcc
 CFLAGS=-Wall -Wextra -O2
 #CFLAGS=-Wall -Wextra -O2
 DEBUG=-DDEBUG3

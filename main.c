@@ -356,17 +356,35 @@ void pepa_merry_go_round(const int sckt, const int fd_in, const int fd_out)
 	}
 }
 
+
+/* File descriptor of IN file, i.e., a file to read from */
+int fd_out  = -1;
+/* File descriptor of OUT file, i.e., a file write to */
+int fd_in   = -1;
+
+/* File descriptor on an opened socket */
+int fd_sock = -1;
+
+void bye(void)
+{
+	if (fd_out >= 0) {
+		close(fd_out);
+	}
+
+	if (fd_in >= 0) {
+		close(fd_in);
+	}
+	if (fd_sock >= 0) {
+		close(fd_sock);
+	}
+}
+
 int main(int argi, char *argv[])
 {
 	/* IP address to connect to a server */
 	ip_port_t *ip     = NULL;
-	/* File descriptor of IN file, i.e., a file to read from */
-	int       fd_out  = -1;
-	/* File descriptor of OUT file, i.e., a file write to */
-	int       fd_in   = -1;
 
-	/* File descriptor on an opened socket */
-	int       fd_sock = -1;
+	atexit(bye);
 
 	/* We need at least 6 params : -- addr "address:port" -i "input_file" -o "output_file" */
 	if (argi < 6) {
