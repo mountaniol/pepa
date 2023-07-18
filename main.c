@@ -192,29 +192,40 @@ static int pepa_connect_to_server(ip_port_t *ip)
 	memset(&s_addr, 0, sizeof(s_addr));
 	s_addr.sin_family = (sa_family_t)AF_INET;
 
+	DD("1\n");
+
 	const int convert_rc = inet_pton(AF_INET, ip->ip, &s_addr.sin_addr);
 	if (0 == convert_rc) {
 		DE("The string is not a valid IP address: |%s|\n", ip->ip);
 		return -3;
 	}
 
+	DD("2\n");
+
 	if (convert_rc < 0) {
 		DE("Could not convert string addredd |%s| to binary\n", ip->ip);
 		return -4;
 	}
+	DD("3\n");
 
 	s_addr.sin_port = htons(ip->port);
+
+	DD("4\n");
 
 	if ((sock = socket(PF_INET, SOCK_STREAM, 0)) < 0) {
 		DE("could not create socket\n");
 		return (-1);
 	}
 
+	DD("5\n");
+
 	if (connect(sock, (struct sockaddr *)&s_addr, (socklen_t)sizeof(s_addr)) < 0) {
 		DE("could not connect to server\n");
 		close(sock);
 		return (-2);
 	}
+
+	DD("6\n");
 
 	return (sock);
 }
@@ -420,6 +431,7 @@ int main(int argi, char *argv[])
 				DE("Can not open OUT file\n");
 				abort();
 			}
+			DD("Got FD OUT - ok\n");
 			break;
 		case 'i': /* Input file - read and send to socket */
 			fd_in = pepa_open_pipe_in(optarg);
@@ -427,6 +439,7 @@ int main(int argi, char *argv[])
 				DE("Can not open IN file\n");
 				abort();
 			}
+			DD("Got FD IN - ok\n");
 			break;
 		case 'h': /* Show help */
 			pepa_show_help();
@@ -450,6 +463,8 @@ int main(int argi, char *argv[])
 		pepa_ip_port_t_release(ip);
 		abort();
 	}
+
+	DD("Connected to the server - OK\n");
 
 
 	if (fd_out < 0) {
