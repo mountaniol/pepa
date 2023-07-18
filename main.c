@@ -256,18 +256,18 @@ int pepa_copy_fd_to_fd(int fd_from, int fd_to)
  * @param FILE* file_out
  * @details 
  */
-void pepa_merry_go_round(const int sckt, const int fd_read, const int fd_write)
+void pepa_merry_go_round(const int sckt, const int fd_in, const int fd_out)
 {
 	fd_set         rfds;
 	
 	/* Select related variables */
 	struct timeval tv;
-	int            retval;
+	int            retval = -1;
 	
-	uint64_t       accum_from_sock;
-	uint64_t       accum_to_sock;
+	uint64_t       accum_from_sock = 0;
+	uint64_t       accum_to_sock = 0;
 
-	const int      max_fd          = MAX(sckt, fd_read);
+	const int      max_fd          = MAX(sckt, fd_in);
 
 	while (1) {
 		/* Set the FIFO signal fd into select set */
@@ -303,7 +303,7 @@ void pepa_merry_go_round(const int sckt, const int fd_read, const int fd_write)
 		if (FD_ISSET(sckt, &rfds)) {
 
 			/* Read from socket, write to fd_write */
-			const int32_t rc_copy = pepa_copy_fd_to_fd(sckt, fd_write);
+			const int32_t rc_copy = pepa_copy_fd_to_fd(sckt, fd_out);
 			if (rc_copy < 0) {
 				/* something is wrong is there */
 				abort();
@@ -313,15 +313,17 @@ void pepa_merry_go_round(const int sckt, const int fd_read, const int fd_write)
 		}
 
 		/* Is there anything on fd_read ? */
-		if (FD_ISSET(fd_read, &rfds)) {
+		if (FD_ISSET(fd_in, &rfds)) {
 			/* Read from IN pipe, write to socket */
-			const int32_t rc_copy = pepa_copy_fd_to_fd(fd_read, sckt);
+			const int32_t rc_copy = pepa_copy_fd_to_fd(fd_in, sckt);
 			if (rc_copy < 0) {
 				/* something is wrong is there */
 				abort();
 			}
 			accum_to_sock += rc_copy;
 		}
+
+		DDD("SOCK BYTES: FROM SOCK: %lu, TO SOCK: %lu\n", accum_from_sock, accum_to_sock);
 
 		/* We are done, continue */
 	}
@@ -336,6 +338,7 @@ int main(int argi, char *argv[])
 	/* File descriptor of OUT file, i.e., a file write to */
 	int       fd_in   = -1;
 
+	/* File descriptor on an opened socket */
 	int       fd_sock = -1;
 
 	/* We need at least 6 params : -- addr "address:port" -i "input_file" -o "output_file" */
@@ -398,10 +401,12 @@ int main(int argi, char *argv[])
 	fd_sock = pepa_connect_to_server(ip);
 
 	if (fd_sock < 0) {
-		DE("Can connect to server\n");
+		DE("Can connect to server : |%s| |%d|\n", ip->ip, ip->port);
+		pepa_ip_port_t_release(ip);
 		abort();
 	}
 
+	pepa_ip_port_t_release(ip);
 
 	if (fd_out < 0) {
 		DE("Can not open OUT file\n");
@@ -412,8 +417,6 @@ int main(int argi, char *argv[])
 		DE("Can not open OUT file\n");
 		abort();
 	}
-
-	fd_sock = pepa_connect_to_server(ip);
 
 	pepa_merry_go_round(fd_sock, fd_in, fd_out);
 	return 0;
