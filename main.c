@@ -142,11 +142,13 @@ static ip_port_t *pepa_parse_ip_string(char *argument)
 static int pepa_open_pipe_in(char *file_name)
 {
 	TESTP_ASSERT(file_name);
-	int fd = open(file_name, O_RDONLY | O_CLOEXEC);
+	int fd = open(file_name, O_RDWR | O_CLOEXEC);
 	if (fd < 0) {
 		DE(">>> Can not open file: %s", strerror(errno));
 		return -1;
 	}
+
+	DD("Opened FILE IN: %d\n", fd);
 	return fd;
 }
 
