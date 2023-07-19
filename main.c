@@ -21,6 +21,8 @@
 #include <sys/select.h>
 #include "debug.h"
 
+
+
 /* Max length of string IP address */
 #define IP_LEN   (24)
 
@@ -33,6 +35,17 @@ struct ip_struct {
 };
 typedef  struct ip_struct ip_port_t;
 
+/**** GLOBAL FILE DESCRIPTORS *****/
+/* File descriptor of IN file, i.e., a file to read from */
+int  fd_out     = -1;
+/* File descriptor of OUT file, i.e., a file write to */
+int  fd_in      = -1;
+
+/* File descriptor on an opened socket */
+int  fd_sock    = -1;
+
+
+char *file_name_fifo = NULL;
 
 static ip_port_t *pepa_ip_port_t_alloc(void)
 {
@@ -142,13 +155,16 @@ static ip_port_t *pepa_parse_ip_string(char *argument)
 static int pepa_open_pipe_in(char *file_name)
 {
 	TESTP_ASSERT(file_name);
-	int fd = open(file_name, O_RDWR | O_CLOEXEC);
+	int fd = open(file_name, O_RDONLY | O_CLOEXEC);
+	// int fd = open(file_name, O_RDONLY | O_NONBLOCK);
+	DD("Opening FD IN\n");
+	//int fd = open(file_name, O_RDWR | O_NONBLOCK);
 	if (fd < 0) {
 		DE(">>> Can not open file: %s", strerror(errno));
 		return -1;
 	}
 
-	DD("Opened FILE IN: %d\n", fd);
+	DD("Opened FILE IN: %s : %d\n", file_name, fd);
 	return fd;
 }
 
@@ -277,54 +293,57 @@ int pepa_copy_fd_to_fd(int fd_from, int fd_to)
 	return accum;
 }
 
-
-/* File descriptor of IN file, i.e., a file to read from */
-int fd_out  = -1;
-/* File descriptor of OUT file, i.e., a file write to */
-int fd_in   = -1;
-
-/* File descriptor on an opened socket */
-int fd_sock = -1;
-
-char *file_name = NULL;
-
 /**
- * @author Sebastian Mountaniol (7/18/23)
- * @brief This function is a loop, where all file descriptors
- *  	  are listened, and messages moved between them.
- * @param ip_port_t* ip      
- * @param FILE* file_in 
- * @param FILE* file_out
+ * @author Sebastian Mountaniol (7/19/23)
+ * @brief Read from FIFO, write to socket
+ * @param void* arg   
+ * @return void* 
  * @details 
  */
-void pepa_merry_go_round(const int sckt, int _fd_in, const int _fd_out)
+void *pepa_merry_go_round_fifo(__attribute__((unused)) void *arg)
+{
+	uint64_t       accum_to_sock   = 0;
+
+	while (1) {
+		if (fd_in > 0){
+			close(fd_in);
+		}
+
+		fd_in = pepa_open_pipe_in(file_name_fifo);
+		if (fd_in < 0) {
+			usleep(100);
+			continue;
+		}
+
+		int rc = pepa_copy_fd_to_fd(fd_in, fd_sock);
+		if (rc < 0) {
+			DE("Error on writing from FIFO to sock\n");
+			continue;
+		}
+
+		accum_to_sock+= rc;
+	} // while
+}
+
+/**
+ * @author Sebastian Mountaniol (7/19/23)
+ * @brief Read from socket, write to output file
+ * @param void* arg   
+ * @return void* 
+ * @details 
+ */
+void *pepa_merry_go_round_sock(__attribute__((unused)) void *arg)
 {
 	fd_set         rfds;
 
-	/* Select related variables */
+/* Select related variables */
 	struct timeval tv;
 	int            retval          = -1;
-
 	uint64_t       accum_from_sock = 0;
-	uint64_t       accum_to_sock   = 0;
-
-	const int      max_fd          = MAX(sckt, _fd_in);
-
+	
 	while (1) {
-
-		if (-1 == fcntl(_fd_in, F_GETFL)) {
-			fd_in = pepa_open_pipe_in(file_name);
-			if (fd_in < 0) {
-				DE("Can not reopen IN file\n");
-				perror("Can not reopen IN file: ");
-				abort();
-			}
-			_fd_in = fd_in;
-		}
-
-		/* Set the FIFO signal fd into select set */
 		FD_ZERO(&rfds);
-		FD_SET(max_fd, &rfds);
+		FD_SET(fd_sock, &rfds);
 
 		/* Wait 5 seconds */
 		tv.tv_sec = 5;
@@ -334,65 +353,45 @@ void pepa_merry_go_round(const int sckt, int _fd_in, const int _fd_out)
 
 		DD("Going to wait on select() for 5 seconds\n");
 
-		retval = select(max_fd + 1, &rfds, NULL, NULL, &tv);
+		retval = select(fd_sock + 1, &rfds, NULL, NULL, &tv);
 
 		/* nothing to read */
 		if (retval == 0) {
+			DD("select() returned 0 - contunie\n");
 			continue;
 		}
 
 		/* The only case when select() returns -1 and it is legal, it is a signal;
 		 * we ignore signals and continue select() */
 		if ((retval == -1) && (errno == EINTR)) {
+			DD("select() returned an error - interrupt\n");
+			perror("select error: ");
 			continue;
 		}
 
 		/* Any other case the select() returns -1, we have to stop */
 		if (retval == -1) {
-			perror("select()");
+			perror("select() : ");
+			DD("select() returned an error\n");
 			abort();
 		}
 
 		/* Is there anything on socket? */
-		if (FD_ISSET(sckt, &rfds)) {
+		if (FD_ISSET(fd_sock, &rfds)) {
 			DD("Received something on socket\n");
 
 			/* Read from socket, write to fd_write */
-			const int32_t rc_copy = pepa_copy_fd_to_fd(sckt, _fd_out);
+			const int32_t rc_copy = pepa_copy_fd_to_fd(fd_sock, fd_out);
 			if (rc_copy < 0) {
 				/* something is wrong is there */
 				abort();
 			}
 
 			DD("Copied from socket to FD OUT: %d bytes\n", rc_copy);
-
 			accum_from_sock += rc_copy;
-		}
-
-		/* Is there anything on fd_read ? */
-		if (FD_ISSET(_fd_in, &rfds)) {
-
-			DD("Received something on FD IN\n");
-			/* Read from IN pipe, write to socket */
-			const int32_t rc_copy = pepa_copy_fd_to_fd(_fd_in, sckt);
-			if (rc_copy < 0) {
-				/* something is wrong is there */
-				abort();
-			}
-
-			DD("Copied from FD OUT to socket: %d bytes\n", rc_copy);
-
-			accum_to_sock += rc_copy;
-		}
-
-		DD("SOCK BYTES: FROM SOCK: %lu, TO SOCK: %lu\n", accum_from_sock, accum_to_sock);
-
-		/* We are done, continue */
-	}
+		} // if
+	} // while
 }
-
-
-
 
 void bye(void)
 {
@@ -408,10 +407,10 @@ void bye(void)
 	}
 }
 
-int main(int argi, char *argv[])
+int       main(int argi, char *argv[])
 {
 	/* IP address to connect to a server */
-	ip_port_t *ip     = NULL;
+	ip_port_t *ip  = NULL;
 
 	atexit(bye);
 
@@ -452,13 +451,9 @@ int main(int argi, char *argv[])
 			DD("Got FD OUT - ok\n");
 			break;
 		case 'i': /* Input file - read and send to socket */
-			fd_in = pepa_open_pipe_in(optarg);
-			file_name = strdup(optarg);
-			if (fd_in < 0) {
-				DE("Can not open IN file\n");
-				abort();
-			}
-			DD("Got FD IN - ok\n");
+			// fd_in = pepa_open_pipe_in(optarg);
+			file_name_fifo = strdup(optarg);
+			DD("Got FD IN file name - ok\n");
 			break;
 		case 'h': /* Show help */
 			pepa_show_help();
@@ -485,13 +480,7 @@ int main(int argi, char *argv[])
 
 	DD("Connected to the server - OK\n");
 
-
 	if (fd_out < 0) {
-		DE("Can not open OUT file\n");
-		abort();
-	}
-
-	if (fd_in < 0) {
 		DE("Can not open OUT file\n");
 		abort();
 	}
@@ -503,7 +492,15 @@ int main(int argi, char *argv[])
 
 	pepa_ip_port_t_release(ip);
 
-	pepa_merry_go_round(fd_sock, fd_in, fd_out);
+// 	pepa_merry_go_round(fd_sock, fd_in, fd_out);
+	pthread_t round_sock;
+	pthread_t round_fifo;
+
+	pthread_create(&round_sock, NULL, pepa_merry_go_round_sock, NULL);
+	pthread_create(&round_fifo, NULL, pepa_merry_go_round_fifo, NULL);
+	while (1) {
+		sleep(60);
+	}
 	return 0;
 }
 

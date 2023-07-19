@@ -22,7 +22,7 @@ PEPA_T=pepa
 all: pepa
 
 pepa: $(PEPA_O)
-	$(GCC) $(CFLAGS) -ggdb $(DEBUG) $(PEPA_O) -o $(PEPA_T)
+	$(GCC) $(CFLAGS) -ggdb $(DEBUG) $(PEPA_O) -o $(PEPA_T) -lpthread
 
 clean:
 	rm -f $(PEPA_T) $(PEPA_O)
