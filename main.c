@@ -19,21 +19,11 @@
 #include <unistd.h>
 #include <sys/param.h>
 #include <sys/select.h>
+
 #include "debug.h"
-
-
-
-/* Max length of string IP address */
-#define IP_LEN   (24)
-
-/* Size of buffer used to copy from fd to fd*/
-#define COPY_BUF_SIZE (128)
-
-struct ip_struct {
-	char ip[IP_LEN];
-	int  port;
-};
-typedef  struct ip_struct ip_port_t;
+#include "pepa_config.h"
+#include "pepa_ip_struct.h"
+#include "pepa_core.h"
 
 /**** GLOBAL FILE DESCRIPTORS *****/
 /* File descriptor of IN file, i.e., a file to read from */
@@ -43,7 +33,6 @@ int  fd_in      = -1;
 
 /* File descriptor on an opened socket */
 int  fd_sock    = -1;
-
 
 char *file_name_fifo = NULL;
 
@@ -70,7 +59,6 @@ static void pepa_ip_port_t_release(ip_port_t *ip)
 	memset(ip, 0, sizeof(ip_port_t));
 	free(ip);
 }
-
 
 static void pepa_show_help(void)
 {
