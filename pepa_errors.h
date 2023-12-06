@@ -1,0 +1,22 @@
+#ifndef _PEPA_ERRORS_H__
+#define _PEPA_ERRORS_H__
+
+typedef enum {
+	PEPA_ERR_OK = 0,
+	PEPA_ERR_NULL_POINTER,
+
+	/* Core related errors */
+
+	PEPA_ERR_INIT_MITEX,
+	PEPA_ERR_DESTROY_MITEX,
+	PEPA_ERR_CORE_CREATE,
+	PEPA_ERR_CORE_DESTROY,
+
+	/* Network related errors */
+	PEPA_ERR_INVALID_ADDRESS,
+	PEPA_ERR_ADDRESS_FORMAT,
+	PEPA_ERR_SOCKET_CREATION,
+	PEPA_ERR_SOCK_CONNECT,
+} pepa_error_t;
+
+#endif /* _PEPA_ERRORS_H__ */

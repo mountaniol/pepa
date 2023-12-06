@@ -24,6 +24,7 @@
 #include "pepa_config.h"
 #include "pepa_ip_struct.h"
 #include "pepa_core.h"
+#include "pepa_errors.h"
 
 /**** GLOBAL FILE DESCRIPTORS *****/
 /* File descriptor of IN file, i.e., a file to read from */
@@ -95,7 +96,7 @@ long int pepa_string_to_int_strict(char *s, int *err)
 		return -3;
 	}
 
-	*err = 0;
+	*err = PEPA_ERR_OK;
 	return res;
 }
 
@@ -190,7 +191,7 @@ static int pepa_open_file_out(char *file_name)
  *  		returns -2. If the socket opened AND connected, it
  *  		returns the socket descriptor, which is >= 0
  */
-static int pepa_connect_to_server(ip_port_t *ip)
+static int pepa_connect_to_shva(ip_port_t *ip)
 {
 	struct sockaddr_in s_addr;
 	int                sock;
@@ -203,14 +204,14 @@ static int pepa_connect_to_server(ip_port_t *ip)
 	const int convert_rc = inet_pton(AF_INET, ip->ip, &s_addr.sin_addr);
 	if (0 == convert_rc) {
 		DE("The string is not a valid IP address: |%s|\n", ip->ip);
-		return -3;
+		return (-PEPA_ERR_INVALID_ADDRESS);
 	}
 
 	DD("2\n");
 
 	if (convert_rc < 0) {
 		DE("Could not convert string addredd |%s| to binary\n", ip->ip);
-		return -4;
+		return (-PEPA_ERR_ADDRESS_FORMAT);
 	}
 	DD("3\n");
 
@@ -220,7 +221,7 @@ static int pepa_connect_to_server(ip_port_t *ip)
 
 	if ((sock = socket(PF_INET, SOCK_STREAM, 0)) < 0) {
 		DE("could not create socket\n");
-		return (-1);
+		return (-PEPA_ERR_SOCKET_CREATION);
 	}
 
 	DD("5\n");
@@ -228,11 +229,10 @@ static int pepa_connect_to_server(ip_port_t *ip)
 	if (connect(sock, (struct sockaddr *)&s_addr, (socklen_t)sizeof(s_addr)) < 0) {
 		DE("could not connect to server\n");
 		close(sock);
-		return (-2);
+		return (-PEPA_ERR_SOCK_CONNECT);
 	}
 
 	DD("6\n");
-
 	return (sock);
 }
 
@@ -458,7 +458,7 @@ int       main(int argi, char *argv[])
 
 	TESTP_ASSERT_MES(ip, "No IP + PORT");
 
-	fd_sock = pepa_connect_to_server(ip);
+	fd_sock = pepa_connect_to_shva(ip);
 
 	if (fd_sock < 0) {
 		DE("Can connect to server : |%s| |%d|\n", ip->ip, ip->port);

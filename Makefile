@@ -8,24 +8,22 @@ CFLAGS=-Wall -Wextra -O2
 DEBUG=-DDEBUG3
 #CFLAGS += -fanalyzer
 
-#GCCVERSION=$(shell gcc -dumpversion | sed -e 's/\.\([0-9][0-9]\)/\1/g' -e 's/\.\([0-9]\)/0\1/g' -e 's/^[0-9]\{3,4\}$/&00/')
-
-#ifeq "$(GCCVERSION)" "10"
-#	CFLAGS += --fanalyzer
-#endif
-
-# client daemon
-
-PEPA_O=main.o
+PEPA_O=main.o pepa_core.o pepa_server.o
 PEPA_T=pepa
+BUFT_AR=buf_t/buf_t.a
 
 all: pepa
 
-pepa: $(PEPA_O)
-	$(GCC) $(CFLAGS) -ggdb $(DEBUG) $(PEPA_O) -o $(PEPA_T) -lpthread
+pepa: buf_t $(PEPA_O)
+	$(GCC) $(CFLAGS) -ggdb $(DEBUG) $(PEPA_O) $(BUFT_AR) -o $(PEPA_T) -lpthread
+
+.PHONY:buf_t
+buf_t:
+	make -C buf_t
 
 clean:
 	rm -f $(PEPA_T) $(PEPA_O)
+	make -C buf_t clean
 
 %.o:%.c
 	@echo "|>" $@...
