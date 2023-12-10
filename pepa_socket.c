@@ -4,6 +4,7 @@
 #include <pthread.h>
 #include <syslog.h>
 #include <unistd.h> /* For read() */
+#include <sys/eventfd.h> /* For eventfd */
 
 #include <errno.h>
 #include "pepa_socket.h"
@@ -85,6 +86,8 @@ static int pepa_open_socket(struct sockaddr_in *s_addr, buf_t *ip_address, int p
 	int rc   = PEPA_ERR_OK;
 	int sock;
 
+	DD("Open Socket: starting for %s:%d, num of clients: %d\n", ip_address->data, port, num_of_clients);
+
 	if (NULL == s_addr) {
 		syslog(LOG_ERR, "Can't allocate socket: %s\n", strerror(errno));
 		perror("Can't allocate socket");
@@ -96,12 +99,16 @@ static int pepa_open_socket(struct sockaddr_in *s_addr, buf_t *ip_address, int p
 	s_addr->sin_family = (sa_family_t)AF_INET;
 	s_addr->sin_port = htons(port);
 
+	DD("Open Socket: Port is %d\n", port);
+
 	if (NULL == ip_address || NULL == ip_address->data) {
+		DD("Open Socket: not specified address, use INADDR_ANY\n");
 		s_addr->sin_addr.s_addr = htonl(INADDR_ANY);
 	} else {
 		//s_addr->sin_addr.s_addr = inet_addr(ip_address->data);
 		const int inet_aton_rc = inet_aton(ip_address->data, &s_addr->sin_addr);
-
+		
+		DD("Open Socket: specified address, use %s\n", ip_address->data);
 		/* Warning: inet_aton() returns 1 on success */
 		if (1 != inet_aton_rc) {
 			DE("Could not convert string address to in_addr_t\n");
@@ -110,6 +117,7 @@ static int pepa_open_socket(struct sockaddr_in *s_addr, buf_t *ip_address, int p
 		}
 	}
 
+	DD("Open Socket: Going to create coscket for %ss\n", ip_address->data);
 	sock = socket(PF_INET, SOCK_STREAM, 0);
 	if (sock  < 0) {
 		syslog(LOG_ERR, "could not create listen socket: %s\n", strerror(errno));
@@ -406,6 +414,21 @@ static pepa_in_thread_fds_t *pepa_in_thread_fds_t_alloc(void)
 		return (NULL);
 	}
 
+	/* We need the event fd to signalize between IN and Acceptor threads about new connection accepted */
+	fds->event_fd = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
+	/* -1 returned in case the eventfd can not be created */
+	if (-1 == fds->event_fd) {
+		DE("Could not open eventfd\n");
+		int rc = buf_free(fds->buf_fds);
+		if (BUFT_OK != rc) {
+			DE("Could not release buf_t; possible memory leak\n");
+		}
+		free(fds);
+		DE("Could not open eventfd");
+		PEPA_TRY_ABORT();
+		return (NULL);
+	}
+
 	return (fds);
 }
 
@@ -416,6 +439,8 @@ static void pepa_in_thread_fds_t_release(pepa_in_thread_fds_t *fds)
 		PEPA_TRY_ABORT();
 		return;
 	}
+
+	close(fds->event_fd);
 
 	int rc = sem_destroy(&fds->buf_fds_mutex);
 	if (0 != rc) {
@@ -438,33 +463,117 @@ static void pepa_in_thread_fds_t_release(pepa_in_thread_fds_t *fds)
 	free(fds);
 }
 
-int pepa_buf_fds_find_max(buf_t *buf)
+static int pepa_acceptor_event_on(pepa_in_thread_fds_t *fds)
 {
-	int max         = 0;
-	int index;
-	int buf_members = buf_arr_get_members_count(buf);
+	uint64_t val = 1;
+	int      rc;
 
-	if (buf_members < 0) {
-		DE("Can not get count of buf array\n");
+	/* Set event */
+	do {
+		rc = write(fds->event_fd, &val, sizeof(val));
+		if (EAGAIN == rc) {
+			DD("Write to eventfd returned EAGAIN\n");
+		}
+	} while (EAGAIN == rc);
+
+	return PEPA_ERR_OK;
+}
+
+static void pepa_acceptor_event_off(pepa_in_thread_fds_t *fds)
+{
+	uint64_t val           = 1;
+	__attribute__((unused))int      rc;
+
+	/* Set event */
+	rc = read(fds->event_fd, &val, sizeof(val));
+}
+
+/**
+ * @author Sebastian Mountaniol (12/10/23)
+ * @brief This function wait for event from acceptor. When event
+ *  	  received, it returns PEPA_ERR_OK_OK status
+ * @param pepa_in_thread_fds_t* fds   Pointer to structure
+ *  						  containing the event fd
+ * @param size_t sec   How many seconds to wait
+ * @param size_t usec  How many ms to wait
+ * @return int PEPA_ERR_OK if event happened; 1 if event not
+ *  	   happened and it exits by timeout; A negative value on
+ *  	   error
+ */
+int pepa_wait_for_signal_from_acceptor(pepa_in_thread_fds_t *fds, size_t sec, size_t usec)
+{
+	/* Select related variables */
+	fd_set         rfds;
+	struct timeval tv;
+	int            retval;
+
+	do {
+		FD_ZERO(&rfds);
+		FD_SET(fds->event_fd, &rfds);
+
+		/* Init the timer to wait user specified time */
+		tv.tv_sec = sec;
+		tv.tv_usec = usec;
+
+		/* Wait a signal in the read set */
+		retval = select(fds->event_fd + 1, &rfds, NULL, NULL, &tv);
+
+		/* Timeout */
+		if (retval == 0) {
+			return 1;
+		}
+
+		/* A signal interrupted us */
+		if ((retval == -1) && (errno == EINTR)) {
+			continue;
+		}
+
+		/* Another error, not interrupt - we can not continue */
+		if (retval == -1) {
+			return -1;
+		}
+
+		/* This is absolutely unaceptable situation, and means we have some
+		 * serious bug - this should not happen: we know that we have one
+		   file descriptor, and the event must be there and only there  */
+		if (!FD_ISSET(fds->event_fd, &rfds)) {
+			DE("Something bad happened");
+		}
+
+		/* We ignore signals */
+	} while (retval < 1);
+
+	if (retval == -1) {
+		return retval;
+	}
+
+	/* We know that there is a buffer,
+	   we get signal when the FIFO is empty and the first buffer inserted */
+	if (FD_ISSET(fds->event_fd, &rfds)) {
+		return PEPA_ERR_OK;
+	}
+
+	return 1;
+}
+
+int pepa_merge_buffers(buf_t *buf_dst, pepa_in_thread_fds_t *fds)
+{
+	int rc;
+	/* Lock sempaphore: we don't want Acceptor touch the buffer during the merge  */
+	sem_wait(&fds->buf_fds_mutex);
+	rc = buf_arr_merge(buf_dst, fds->buf_fds);
+
+	/* Unlock sempaphore */
+	sem_post(&fds->buf_fds_mutex);
+
+	if (PEPA_ERR_OK != rc) {
+		DE("Could not merge buffers!\n");
 		PEPA_TRY_ABORT();
 		return -1;
 	}
 
-	for (index = 0; index < buf_members; index++) {
-		int *mem_ptr = buf_arr_get_member_ptr(buf, index);
-		if (*mem_ptr > max) {
-			max = *mem_ptr;
-		}
-	}
+	return PEPA_ERR_OK;
 
-	return max;
-}
-
-static void set_buf_flag(pepa_in_thread_fds_t *fds, int val)
-{
-	sem_wait(&fds->buf_fds_mutex);
-	fds->buf_changed_flag = val;
-	sem_post(&fds->buf_fds_mutex);
 }
 
 /**
@@ -474,7 +583,7 @@ static void set_buf_flag(pepa_in_thread_fds_t *fds, int val)
  *  	  array.
  * @param void* arg   Structure pepa_in_thread_fds_t which
  *  		  created in IN thread ans shared between IN and
- *  		  Acceptor; this structure contains array of
+  *  		  Acceptor; this structure contains array of
  *  		  accepted  file descriptors
  * @return void* 
  * @details We need this Acceptor thread because accept() call
@@ -487,31 +596,42 @@ void *pepa_in_thread_acceptor(void *arg)
 {
 	pepa_in_thread_fds_t *fds         = (pepa_in_thread_fds_t *)arg;
 
+	TESTP(fds, NULL);
+
 	DDD("Thread Acceptor: Starting the thread\n");
 	while (1) {
 		struct sockaddr addr;
 		socklen_t       addrlen = sizeof(struct sockaddr);
+		DDD("Thread Acceptor: Entering accept()\n");
 		int             fd      = accept(fds->socket, (struct sockaddr *)&addr, &addrlen);
+		DDD("Thread Acceptor: Exit from accept(), got fd: %d\n", fd);
 
 		/* If something went wrong, analyze the error and decide what to do */
 		if (fd < 0) {
-			DE("Could not accept incoming connection\n");
+			DE("Thread Acceptor: Could not accept incoming connection; ignoting it\n");
 			continue;
 		}
 
+		DDD("Thread Acceptor: Going to add the new fd %d to the shared buffer\n", fd);
 		sem_wait(&fds->buf_fds_mutex);
 		int rc = buf_arr_add(fds->buf_fds, &fd);
-		fds->buf_changed_flag++;
 		sem_post(&fds->buf_fds_mutex);
+
 		if (BUFT_OK != rc) {
-			DE("Thread Acceptor: Could not set new member in buffer array\n");
+			DE("Thread Acceptor: Could not set new member (fd: %d) in buffer array\n", fd);
 			PEPA_TRY_ABORT();
 		}
 
-		DDD("Thread Acceptor: Added the new fd into array: %d\n", fd);
+		DDD("Thread Acceptor: Added the new fd %d to the shared buffer\n", fd);
+
+		/* Send signal to the IN thread that new file dscriptors are ready */
+		DDD("Thread Acceptor: Goinf to turn on the event fd\n");
+		pepa_acceptor_event_on(fds);
+		DDD("Thread Acceptor: Turned on the event fd\n");
+		
 	} /* while (1) */
 
-	DDD("Thread Acceptor: Finishing the thread\n");
+	DE("Thread Acceptor: Finishing the thread; should never be here\n");
 	pthread_exit(NULL);
 }
 
@@ -527,8 +647,10 @@ void *pepa_in_thread_acceptor(void *arg)
  */
 void *pepa_in_thread(__attribute__((unused))void *arg)
 {
+	int                  rc;
+	buf_t                *buf_local_fds        = NULL;
 	struct sockaddr_in   s_addr;
-	pepa_in_thread_fds_t *fds            = pepa_in_thread_fds_t_alloc();
+	pepa_in_thread_fds_t *acceptror_shared            = pepa_in_thread_fds_t_alloc();
 	pthread_t            acceptor_thread;
 	x_connect_t          *xconn          = NULL;
 
@@ -547,8 +669,8 @@ void *pepa_in_thread(__attribute__((unused))void *arg)
 	/* TODO: Make it configurable */
 
 	DDD("Thread IN: Going to created IN socket\n");
-	fds->socket = pepa_open_socket(&s_addr, core->in_thread.ip_string, core->in_thread.port_int, 1024);
-	if (fds->socket < 0) {
+	acceptror_shared->socket = pepa_open_socket(&s_addr, core->in_thread.ip_string, core->in_thread.port_int, core->in_thread.clients);
+	if (acceptror_shared->socket < 0) {
 		DE("Thread IN: Can not create SHVA socket\n");
 		PEPA_TRY_ABORT();
 		pthread_exit(NULL);
@@ -558,7 +680,7 @@ void *pepa_in_thread(__attribute__((unused))void *arg)
 
 	DDD("Thread IN: Going to create the Acceptor thread\n");
 	/* Create an additional thread to accept new connections */
-	const int acceptor_rc = pthread_create(&acceptor_thread, NULL, pepa_in_thread_acceptor, (void *)fds);
+	const int acceptor_rc = pthread_create(&acceptor_thread, NULL, pepa_in_thread_acceptor, (void *)acceptror_shared);
 	if (0 != acceptor_rc) {
 		DE("Thread IN: Could not create the acceptor thread, terminating");
 		PEPA_TRY_ABORT();
@@ -570,12 +692,30 @@ void *pepa_in_thread(__attribute__((unused))void *arg)
 	/* Now run the loop until we have the first IN socket connected  */
 
 	DDD("Thread IN: Going to wait for the first IN connection\n");
-	while (0 == fds->buf_changed_flag) {
-		usleep(10);
+	do {
+		rc = pepa_wait_for_signal_from_acceptor(acceptror_shared, 10, 0);
+	} while (PEPA_ERR_OK != rc);
+
+	/* Test what happened? */
+
+	if (rc < 0) {
+		DE("Thread IN: Error happened when waited signal from Acceptor\n");
+		PEPA_TRY_ABORT();
+		pthread_exit(NULL);
 	}
 
 	DDD("Thread IN: The first IN connection detected\n");
 
+	/* Allocate local array buffer */
+	buf_local_fds = buf_array(sizeof(int), 0);
+	if (NULL == buf_local_fds) {
+		DE("Thread IN: Can not allocate buf_t\n");
+		PEPA_TRY_ABORT();
+		pthread_exit(NULL);
+	}
+
+
+	/* Prepare the xconn structure: we always copy to shava socket */
 	xconn = x_connect_t_alloc(core->shva_thread.fd, 0, X_BUF_SIZE);
 	if (NULL == xconn) {
 		DE("Thread IN: Can not create x_connect_t structure\n");
@@ -595,13 +735,18 @@ void *pepa_in_thread(__attribute__((unused))void *arg)
 		tv.tv_sec = 0;
 		tv.tv_usec = 5;
 
+		/* Merge buffers before we started:
+		   local buffer of file descriptors with buffer managed by the Acceptor */
+		rc = pepa_merge_buffers(buf_local_fds, acceptror_shared);
+
+		if (PEPA_ERR_OK != rc) {
+			DE("Could not merge buffers\n");
+			PEPA_TRY_ABORT();
+			pthread_exit(NULL);
+		}
+
 		/* Clear select set */
 		FD_ZERO(&read_set);
-
-		/* TODO: Text error */
-		/* Reset 'new file descriptor added' flag */
-		set_buf_flag(fds, 0);
-
 
 		/*** Sockets set ***/
 
@@ -609,23 +754,20 @@ void *pepa_in_thread(__attribute__((unused))void *arg)
 		 * This array is shared between this thread and Acceptor thread.
 		   The Acceptror thread accepts connections and add them into this array */
 
-		/* Lock array while in this operation */
-		sem_wait(&fds->buf_fds_mutex);
-		fd_members = buf_arr_get_members_count(fds->buf_fds);
+		fd_members = buf_arr_get_members_count(buf_local_fds);
 		for (index = 0; fd_members; index++) {
-			int *fd = buf_arr_get_member_ptr(fds->buf_fds, index);
+			int *fd = buf_arr_get_member_ptr(buf_local_fds, index);
 			FD_SET(*fd, &read_set);
 			if (fd_max < *fd) {
 				fd_max = *fd;
 			}
 		}
 
-		/* Unlock the array */
-		sem_post(&fds->buf_fds_mutex);
+		/* Add event fd into the set */
+		FD_SET(acceptror_shared->event_fd, &read_set);
 
-		/* Now run in this loop until a file descriptor not changed;
-		 * we run it for very short time of 5 ms, and then we start another loop.
-		   We do it to be able react fastly for new incoming connection added in acceptor */
+		fd_max = PEPA_MAX(acceptror_shared->event_fd, fd_max);
+
 		do {
 			int rc = select(fd_max + 1, &read_set, NULL, NULL, &tv);
 
@@ -634,10 +776,23 @@ void *pepa_in_thread(__attribute__((unused))void *arg)
 				continue;
 			}
 
-			fd_members = buf_arr_get_members_count(fds->buf_fds);
+			/* If we got signal from Acceptor, we need to get new file descriptors;
+			   we just start over */
+			if (FD_ISSET(acceptror_shared->event_fd, &read_set)) {
+				/* Reset the event fd, we got the signal, thank you */
+				pepa_acceptor_event_off(acceptror_shared);
+				break;
+			}
+
+			fd_members = buf_arr_get_members_count(buf_local_fds);
+
+			/* If buffer of file descriptors is empty, we just break the loop */
+			if (0 == fd_members) {
+				break;
+			}
 
 			for (index = 0; index < fd_members; index++) {
-				int *fd = buf_arr_get_member_ptr(fds->buf_fds, index);
+				int *fd = buf_arr_get_member_ptr(buf_local_fds, index);
 
 				/* If current file descriptor was not changed, continue */
 				if (!FD_ISSET(*fd, &read_set)) {
@@ -648,6 +803,8 @@ void *pepa_in_thread(__attribute__((unused))void *arg)
 				xconn->fd_src = *fd;
 
 				int rc = pepa_copy_between_sockects_execute(xconn, X_CONN_COPY_RIGHT);
+
+				/* If everithing allright, continue to the next file descriptor */
 				if (PEPA_ERR_OK == rc) {
 					continue;
 				}
@@ -655,12 +812,9 @@ void *pepa_in_thread(__attribute__((unused))void *arg)
 				/* Can not read from the file descriptor; probably it was closed */
 				if (PEPA_ERR_SOCKET_READ_CLOSED == rc) {
 					/* Remove the socket */
-					sem_wait(&fds->buf_fds_mutex);
-					rc = buf_arr_rm(fds->buf_fds, index);
+					rc = buf_arr_rm(buf_local_fds, index);
 					/* And close the socket file descriptor */
 					close(*fd);
-					fds->buf_changed_flag++;
-					sem_post(&fds->buf_fds_mutex);
 
 					if (BUFT_OK != rc) {
 						DE("Could not remove member from the buf array\n");
@@ -672,7 +826,7 @@ void *pepa_in_thread(__attribute__((unused))void *arg)
 			/* Data is ready on the src file descriptor:
 			   read it from the left fd, write to the right: the RIGHT direction */
 
-		} while (fds->buf_changed_flag < 1);
+		} while (buf_arr_get_members_count(buf_local_fds) > 0);
 	}
 
 
@@ -823,6 +977,23 @@ void *pepa_shva_socket_thread(__attribute__((unused))void *arg)
 	pthread_exit(NULL);
 }
 
+static void pepa_print_pthread_create_error(int rc)
+{
+	switch (rc) {
+	case EAGAIN:
+		DE("Insufficient resources to create another thread\n");
+		break;
+	case EINVAL:
+		DE("Invalid settings in attr\n");
+		break;
+	case EPERM:
+		DE("No permission to set the scheduling policy and parameters specified in attr\n");
+		break;
+	default:
+		DE("You should never see this message: error code %d\n", rc);
+	}
+}
+
 int pepa_start_threads(void)
 {
 	pepa_core_t *core = pepa_get_core();
@@ -831,25 +1002,24 @@ int pepa_start_threads(void)
 	int         rc    = pthread_create(&core->shva_thread.thread_id, NULL, pepa_shva_socket_thread, NULL);
 	if (0 == rc) {
 		DDD("SHVA thread is started\n");
-		return PEPA_ERR_OK;
+	} else {
+		pepa_print_pthread_create_error(rc);
+		return -1;
 	}
 
-	switch (rc) {
-	case EAGAIN:
-		DE("Insufficient resources to create another thread\n");
+	usleep(500);
+
+	/* For debug only */
+	DDD("Starting IN thread\n");
+	rc = pthread_create(&core->in_thread.thread_id, NULL, pepa_in_thread, NULL);
+
+	if (0 == rc) {
+		DDD("IN thread is started\n");
+	} else {
+		pepa_print_pthread_create_error(rc);
 		return -1;
-	case EINVAL:
-		DE("Invalid settings in attr\n");
-		return -1;
-	case EPERM:
-		DE("No permission to set the scheduling policy and parameters specified in attr\n");
-		return -1;
-	default:
-		DE("You should never see this message: error code %d\n", rc);
 	}
 
-	/* Should never be here */
-	DE("You should never see this message: error code %d\n", rc);
 	return rc;
 }
 

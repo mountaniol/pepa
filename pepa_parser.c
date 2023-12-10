@@ -205,9 +205,17 @@ int pepa_parse_arguments(int argi, char *argv[])
 			DD("OUT Addr OK: |%s| : |%d|\n", core->in_thread.ip_string->data, core->in_thread.port_int);
 			break;
 		case 'n':
-			DD("-n not implemented yet\n");
+		{
+			int err;
+			core->in_thread.clients = pepa_string_to_int_strict(optarg, &err);
+			if (err < 0) {
+				DE("Could not parse number of client: %s\n", optarg);
+				abort();
+			}
+			DD("Number of client of IN socket: %d\n", core->in_thread.clients);
+		}
 			break;
-		case 'a': 
+		case 'a':
 			/* Set abort flag*/
 			core->abort_flag = 1;
 			break;

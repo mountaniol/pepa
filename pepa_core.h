@@ -100,6 +100,7 @@ typedef struct {
 	int  fd; /**< File descriptor of socket, i.e., a socket to read from */
 	buf_t *ip_string; /**< IP of the OUT socket  */
 	int port_int; /**< Port the OUT socket  */
+	int clients; /**< Number of clients on this socket */
 } thread_vars_t;
 
 /**

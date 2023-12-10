@@ -297,6 +297,45 @@ ret_t buf_arr_add_members(buf_t *buf, const void *new_data_ptr, const buf_s32_t 
 	return BUFT_OK;
 }
 
+/* Add all members from 'arr_from' to 'arr_to'; the source is emptied after the operation */
+ret_t buf_arr_merge(buf_t *buf_dst, buf_t *buf_src)
+{
+	TESTP(buf_dst, -BUFT_NULL_POINTER);
+	TESTP(buf_src, -BUFT_NULL_POINTER);
+
+	buf_s32_t buf_src_member_size = buf_arr_get_member_size(buf_src);
+	buf_s32_t buf_dst_member_size = buf_arr_get_member_size(buf_dst);
+	buf_s32_t buf_src_count = buf_arr_get_members_count(buf_src);
+	
+	/* Both buffers must be compatible */
+	if (buf_src_member_size != buf_dst_member_size) {
+		DE("Can not copy from buf arr to buf array: member size is differ: %d != %d\n",
+		   buf_src_member_size, buf_dst_member_size);
+	}
+
+	/* If buf_src is empty, we have nothing to do */
+	if (buf_src_count < 1) {
+		return BUFT_OK;
+	}
+
+	int rc = buf_arr_add_members(buf_dst, buf_get_data_ptr(buf_src), buf_src_count);
+	if (rc != BUFT_OK) {
+		DE("Could not copy from src buffer to dst buffer: %s\n", buf_error_code_to_string(rc));
+		TRY_ABORT();
+		return rc;
+	}
+
+	/* Clean the src buffer, remove its internal buffer; the flags and type are safe */
+	rc = buf_arr_clean(buf_src);
+	if (BUFT_OK != rc) {
+		DE("Could not copy from src buffer to dst buffer: %s\n", buf_error_code_to_string(rc));
+		TRY_ABORT();
+		return rc;
+	}
+
+	return BUFT_OK;
+}
+
 ret_t buf_arr_add_memory(buf_t *buf, /*@temp@*//*@in@*/const char *new_data, const buf_s64_t size)
 {
 	/* The size of memory can not be less than size of array member */
@@ -491,7 +530,8 @@ ret_t buf_arr_clean(/*@temp@*//*@in@*//*@special@*/buf_t *buf)
 	rc = buf_is_change_allowed(buf);
 
 	if (BUFT_OK != rc) {
-		DE("Buffer manipulation is not allowed, the buffer is immutable or locked\n");
+		DE("Buffer manipulation is not allowed, the buffer is immutable or locked: %s\n",
+		   buf_error_code_to_string(rc));
 		TRY_ABORT();
 		return rc;
 	}
@@ -500,10 +540,13 @@ ret_t buf_arr_clean(/*@temp@*//*@in@*//*@special@*/buf_t *buf)
 		/* Security: zero memory before it freed */
 		memset(buf->data, 0, buf_get_room_count(buf));
 		free(buf->data);
+		buf->data = NULL;
 	}
 
-	if (BUFT_OK != buf_set_room_count(buf, 0)) {
-		DE("Can not set a new value to the buffer\n");
+	rc = buf_set_room_count(buf, 0);
+	if (BUFT_OK != rc) {
+		DE("Can not set a new value to the buffer: %s\n", 
+		   buf_error_code_to_string(rc));
 		return (-BUFT_SET_ROOM_SIZE);
 	}
 

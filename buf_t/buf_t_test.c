@@ -34,7 +34,7 @@ buf_t *allocate_buf(const buf_s64_t sz, const int test_num, const char *from_fun
 	buf_t *buf = buf_new(sz);
 	if (NULL == buf) {
 		DE("Cant allocate buf size: %ld / from %s +%d", sz, from_func, line);
-		PFAIL("Cant allocate buf",test_num);
+		PFAIL("Cant allocate buf", test_num);
 		abort();
 	}
 
@@ -63,77 +63,53 @@ void free_buf(buf_t *buf, const int test_num, const char *from_func, const int l
 /**** Function tests ****/
 #if 0 /* SEB */
 
-void test_func_(int test_num){
-}
+void test_func_(int test_num){}
 
-void test_func_buf_get_data_ptr(int test_num){
-}
+void test_func_buf_get_data_ptr(int test_num){}
 
-void test_func_buf_data_is_null(int test_num){
-}
+void test_func_buf_data_is_null(int test_num){}
 
-void test_func_buf_is_valid(int test_num){
-}
+void test_func_buf_is_valid(int test_num){}
 
-void test_func_buf_to_data(int test_num){
-}
+void test_func_buf_to_data(int test_num){}
 
-void test_func_buf_clean(int test_num){
-}
-void test_func_buf_add_room(int test_num){
-}
-void test_func_buf_test_room(int test_num){
-}
+void test_func_buf_clean(int test_num){}
+void test_func_buf_add_room(int test_num){}
+void test_func_buf_test_room(int test_num){}
 
-void test_func_buf_set_used(int test_num){
-}
+void test_func_buf_set_used(int test_num){}
 
-void test_func_buf_inc_used(int test_num){
-}
+void test_func_buf_inc_used(int test_num){}
 
-void test_func_buf_dec_used(int test_num){
-}
+void test_func_buf_dec_used(int test_num){}
 
-void test_func_buf_room(int test_num){
-}
+void test_func_buf_room(int test_num){}
 
-void test_func_buf_set_room(int test_num){
-}
+void test_func_buf_set_room(int test_num){}
 
-void test_func_buf_inc_room(int test_num){
-}
+void test_func_buf_inc_room(int test_num){}
 
-void test_func_buf_dec_room(int test_num){
-}
+void test_func_buf_dec_room(int test_num){}
 
-void test_func_buf_pack(int test_num){
-}
+void test_func_buf_pack(int test_num){}
 
-void test_func_buf_is_change_allowed(int test_num){
-}
+void test_func_buf_is_change_allowed(int test_num){}
 
-void test_func_buf_lock(int test_num){
-}
+void test_func_buf_lock(int test_num){}
 
-void test_func_buf_set_canary(int test_num){
-}
+void test_func_buf_set_canary(int test_num){}
 
-void test_func_buf_force_canary(int test_num){
-}
+void test_func_buf_force_canary(int test_num){}
 
-void test_func_buf_test_canary(int test_num){
-}
+void test_func_buf_test_canary(int test_num){}
 
-void test_func_buf_get_canary(int test_num){
-}
+void test_func_buf_get_canary(int test_num){}
 
-void test_func_buf_detect_used(int test_num){
-}
+void test_func_buf_detect_used(int test_num){}
 #endif
 
 #if 0 /* SEB */
-void test_func_(int test_num){
-}
+void test_func_(int test_num){}
 #endif
 
 
@@ -554,7 +530,7 @@ void test_buf_pack(int test_num)
 
 	PSTEP("Allocated buffer");
 
-	_buf_data = calloc(256,1 );
+	_buf_data = calloc(256, 1);
 	if (NULL == _buf_data) {
 		PFAIL("Can't allocate a buffer", test_num);
 		abort();
@@ -976,6 +952,125 @@ void test_buf_array_allocate_add_remove(int test_num, int num_of_elements)
 	PSUCCESS("Add and remove members to the array buffer", test_num);
 }
 
+
+void test_buf_array_merger(int test_num, int num_of_elements)
+{
+	buf_t *buf_src = NULL;
+	buf_t *buf_dst = NULL;
+	int rc;
+
+	PSPLITTER();
+
+	PSTART("Merge array buffers", test_num);
+	buf_src = buf_array(sizeof(int), num_of_elements);
+	if (NULL == buf_src) {
+		PFAIL("Cant allocate buf array", test_num);
+		abort();
+	}
+
+	buf_dst = buf_array(sizeof(int), num_of_elements);
+	if (NULL == buf_dst) {
+		PFAIL("Cant allocate buf array", test_num);
+		abort();
+	}
+
+	PSTEP("Buffer array allocated");
+
+	/* Add element to buffer up to num_of_elements*/
+	int counter;
+
+	for (counter = 0; counter < num_of_elements; counter++) {
+		ret_t rc = buf_arr_add(buf_dst, &counter);
+		if (BUFT_OK != rc) {
+			printf("Failed to add an element, counter = %d\n", counter);
+			PFAIL("Array buffer, adding member", test_num);
+		}
+	}
+
+	for (counter = num_of_elements; counter < num_of_elements * 2; counter++) {
+		ret_t rc = buf_arr_add(buf_src, &counter);
+		if (BUFT_OK != rc) {
+			printf("Failed to add an element, counter = %d\n", counter);
+			PFAIL("Array buffer, adding member", test_num);
+		}
+	}
+
+	PSTEP("Added memebers to bot buffers");
+
+	if (buf_data_is_null(buf_src) == BUFT_YES) {
+		printf("Array size src buffer: data == NULL (%p)\n", buf_get_data_ptr(buf_src));
+		PFAIL("Array src buffer, buf_data_is_null(buf) == YES", test_num);
+		abort();
+	}
+
+	if (buf_data_is_null(buf_dst) == BUFT_YES) {
+		printf("Array size dst buffer: data == NULL (%p)\n", buf_get_data_ptr(buf_dst));
+		PFAIL("Array dst  buffer, buf_data_is_null(buf) == YES", test_num);
+		abort();
+	}
+
+
+	PSTEP("buf->data != NULL");
+
+	if (buf_arr_get_members_count(buf_src) != num_of_elements) {
+		printf("Array size src buffer: number of members is (%d), expected (%d)\n",
+			   buf_arr_get_members_count(buf_src), num_of_elements);
+		PFAIL("Array src buffer, wrong number of elements", test_num);
+		abort();
+	}
+
+	if (buf_arr_get_members_count(buf_dst) != num_of_elements) {
+		printf("Array size dst buffer: number of members is (%d), expected (%d)\n",
+			   buf_arr_get_members_count(buf_dst), num_of_elements);
+		PFAIL("Array dst buffer, wrong number of elements", test_num);
+		abort();
+	}
+
+	PSTEP("Tested: buf_arr_members(buf_dst) == num_of_elements");
+
+	/* Remove element by element */
+
+	rc = buf_arr_merge(buf_dst, buf_src);
+	if (BUFT_OK != rc) {
+		printf("Failed buf_arr_merge, returned error: %s\n", buf_error_code_to_string(rc));
+		PFAIL("Merge function failed", test_num);
+		abort();
+	}
+
+	PSTEP("Tested: Merged buffers");
+
+	/* Test buffers content */
+
+	if (0 != buf_arr_get_members_count(buf_src)) {
+		printf("Buf src is > 0 (%d), expected 0: ", buf_arr_get_members_count(buf_src));
+		PFAIL("Src buffer is not empty", test_num);
+		abort();
+	}
+
+	if ((num_of_elements * 2) != buf_arr_get_members_count(buf_dst)) {
+		DE("Buf dst wrong count: expected %d, but it is %d \n",
+		   (counter * 2), buf_arr_get_members_count(buf_src));
+		PFAIL("Dst buffer wrong count", test_num);
+		abort();
+	}
+
+
+	/* Text elements */
+	for (counter = 0; counter < num_of_elements * 2; counter++) {
+		int *tmp = buf_arr_get_member_ptr(buf_dst, counter);
+		if (*tmp != counter) {
+			printf("Element %d is wrong: expected value %d, but it is %d\n",
+				   counter, counter, *tmp);
+			PFAIL("Elements check failed", test_num);
+		}
+	}
+
+	free_buf(buf_src, test_num, __func__, __LINE__);
+	free_buf(buf_dst, test_num, __func__, __LINE__);
+	PSTEP("Released buf");
+	PSUCCESS("Add and remove members to the array buffer", test_num);
+}
+
 int main(void)
 {
 	/* Abort on any error */
@@ -1010,6 +1105,10 @@ int main(void)
 	test_buf_array_allocate_add_remove(1, 1);
 	test_buf_array_allocate_add_remove(2, 10);
 	test_buf_array_allocate_add_remove(3, 1000);
+
+	test_buf_array_merger(1, 1);
+	test_buf_array_merger(1, 10);
+	test_buf_array_merger(1, 1000);
 
 	PSUCCESS("All tests passed, good work!", 0);
 	buf_t_stats_print();

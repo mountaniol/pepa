@@ -21,9 +21,9 @@ typedef enum {
 } x_conn_direction_t;
 
 typedef struct {
+	int event_fd; /**< This is a socket to signal between IN and Acceptro threads */
 	buf_t * buf_fds; /**< Array of IN sockets file descriptors; only  */
 	sem_t buf_fds_mutex; /**< A semaphor used to sync the core struct between multiple threads */
-	int buf_changed_flag;
 	struct sockaddr_in   s_addr;
 	int socket; /** < Socket to accept new connections */
 } pepa_in_thread_fds_t;

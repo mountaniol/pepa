@@ -167,12 +167,12 @@ ret_t buf_str_add_buf(/*@in@*//*@temp@*/buf_t *buf_to, buf_t *buf_from)
 	return buf_str_add(buf_to, buf_from->data, buf_from->used);
 }
 
-#define GO_RIGHT (0)
-#define GO_LEFT (1)
+#if 0 /* SEB */
+	#define GO_RIGHT (0)
+	#define GO_LEFT (1)
 /* Reimplemented as binary search */
-ret_t buf_str_detect_used(/*@in@*//*@temp@*/buf_t *buf)
-{
-	int       step                 = 0;
+ret_t buf_str_detect_used(/*@in@*//*@temp@*/buf_t *buf){
+	buf_s64_t       step                 = 0;
 	buf_s64_t calculated_used_size = 0;
 	T_RET_ABORT(buf, -BUFT_NULL_POINTER);
 
@@ -186,24 +186,31 @@ ret_t buf_str_detect_used(/*@in@*//*@temp@*/buf_t *buf)
 	buf_s64_t room_size = buf_get_room_count(buf);
 
 	/* If the buf is empty - return with error */
+	if (room_size < 0) {
+		DE("Buffer is invalid, the room size is negative: %ld\n", room_size);
+		TRY_ABORT();
+		return (-ECANCELED);
+	}
+
+	/* If the buf is empty - return with error */
 	if (0 == room_size) {
 		DE("Tryed to detect used in an empty buffer\n");
 		return (-ECANCELED);
 	}
 
 	/* Changed to 1 when the search completed */
-	char      completed      = 0;
+	char      completed   = 0;
 
 	/* Where we go next, left  or righ? */
-	char      go_next        = GO_RIGHT;
+	char      go_next     = GO_RIGHT;
 
 	/* We start from the beginning of the buffer */
-	buf_s64_t next_offset    = 0;
+	buf_s64_t next_offset = 0;
 
 	do {
 		step++;
 
-		DD("Step %d, offset %ld, should go: %s\n", step, next_offset, (GO_RIGHT == go_next) ? "right":"left");;
+		DD("Step %ld, offset %ld, should go: %s\n", step, next_offset, (GO_RIGHT == go_next) ? "right" : "left");;
 
 		/* We increase or decrease the go_next offset, every step the increase/decrease is smaller and smaller */
 		if (GO_RIGHT == go_next) {
@@ -211,6 +218,8 @@ ret_t buf_str_detect_used(/*@in@*//*@temp@*/buf_t *buf)
 		} else {
 			next_offset -= room_size / (step * 2);
 		}
+
+		DDD(" Starting step %ld, next_offset: %ld\n", step, next_offset);
 
 		/*** CASE 1: The current offset is 0 byte;  we should go left */
 
@@ -240,7 +249,7 @@ ret_t buf_str_detect_used(/*@in@*//*@temp@*/buf_t *buf)
 			/* We found that this is \0 after the last character */
 			calculated_used_size = next_offset + 1;
 			completed = 1;
-			DD("Found the end, size: %ld, %X %X\n",calculated_used_size, *(buf_data + next_offset), *(buf_data + next_offset + 1));
+			DD("Found the end, size: %ld, %X %X\n", calculated_used_size, *(buf_data + next_offset), *(buf_data + next_offset + 1));
 			break;
 		}
 
@@ -262,17 +271,18 @@ ret_t buf_str_detect_used(/*@in@*//*@temp@*/buf_t *buf)
 		return (-BUFT_BAD);
 	}
 
-	DD("Found used count in %d steps\n", step);
+	DD("Found used count in %ld steps\n", step);
 	return (BUFT_OK);
 }
 
 /* We don't need it anymore */
-#undef GO_RIGHT
-#undef GO_LEFT
+	#undef GO_RIGHT
+	#undef GO_LEFT
+#endif
 
 /* TODO: Make it logarithmoc search */
-#if 0 /* SEB */
-ret_t buf_str_detect_used_old(/*@in@*//*@temp@*/buf_t *buf){
+#if 1 /* SEB */
+ret_t buf_str_detect_used(/*@in@*//*@temp@*/buf_t *buf){
 	char      *_buf_data;
 	buf_s64_t calculated_used_size;
 	T_RET_ABORT(buf, -BUFT_NULL_POINTER);

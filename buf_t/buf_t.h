@@ -3,8 +3,13 @@
 
 #include <stddef.h>
 #include <sys/types.h>
+//#include "buf_t_errors.h"
+//#include "buf_t_types.h"
+//#include "buf_t_structs.h"
+//#include "buf_t_array.h"
 #include "se_debug.h"
 #include "se_tests.h"
+//#define BUF_DEBUG
 #define BUF_NOISY
 
 /* For uint32_t / uint8_t */
@@ -98,15 +103,15 @@ extern int bug_get_abort_flag(void);
 
 /****************************** STRUCTS ******************************/
 
-typedef struct array {
+typedef struct {
 	buf_s32_t size;
 	buf_s32_t members;
 } arr_used_t;
 
-typedef struct head_tail_struct {
-	buf_circ_usize_t head;
-	buf_circ_usize_t tail;
-} head_tail_t;
+typedef struct {
+	buf_s32_t head; /* Index of the head element */
+	buf_s32_t tail; /* Index of the tail element */
+} circ_buf_t;
 
 /* Simple struct to hold a buffer / string and its size / lenght */
 
@@ -117,7 +122,7 @@ struct buf_t_struct {
 	   THe used size can be less than allocated, i.e., 'used' <= 'used' */
 	union {
 		buf_s64_t used;           	/* For string and raw buf: used size */
-		head_tail_t ht;             /* For cirrcular buffer: head and tail of the circular buffer */
+		circ_buf_t circ;            /* For cirrcular buffer: circ buffer is fixed size, ->room can not be changed */
 		arr_used_t arr;				/* For array: how many members in arr and a member size */
 	};
 	buf_t_flags_t flags;        /* Buffer flags. Optional. We may use it as we wish. */
@@ -137,7 +142,7 @@ struct buf_t_struct {
 	buf_s64_t room;           /* Allocated size */
 	union {
 		buf_s64_t used;           	/* For string and raw buf: used size */
-		head_tail_t ht;             /* For cirrcular buffer: head and tail of the circular buffer */
+		circ_buf_t ht;             /* For cirrcular buffer: head and tail of the circular buffer */
 		arr_used_t arr;				/* For array: how many members in arr and a member size */
 	};
 	buf_t_type_t type;        /* Buffer type. Optional. We may use it as we wish. */
@@ -1200,6 +1205,18 @@ __attribute__((warn_unused_result))
 extern ret_t buf_arr_add_members(buf_t *buf, const void *new_data_ptr, const buf_s32_t num_of_new_members);
 
 /**
+ * @author Sebastian Mountaniol (12/10/23)
+ * @brief Merge buf src into buf_dst. All members are moved,
+ *  	  ro dst, the src buffer is cleaned.
+ * @param buf_t* buf_dst Buffer to move to
+ * @param buf_t* buf_src Buffer to move from
+ * @return ret_t BUFT_OK on succes, a negative value on error
+ * @details The buffers must hole mmebers of the same size, else
+ *  		an error returned.
+ */
+extern ret_t buf_arr_merge(buf_t *buf_dst, buf_t *buf_src);
+
+/**
  * @brief Add new members as a memory with size, not number of
  *  	  members
  * @param buf_t* buf     Buffer to add new mebers as a memory
@@ -1293,13 +1310,23 @@ extern ret_t buf_arr_member_copy(buf_t *buf, const buf_s32_t member_index, void 
 
 /**
  * @brief Clean the array buffer; the allocated memory is
- *  	  released.
+ *  	  released. The buffer flags are not affected! Use
+ *  	  buf_arr_reset to clean and reser flags.
  * @param buf_t* buf   Buffer to clean
- * @return ret_t BUFT_OK on success, a gegative error code on an
+ * @return ret_t BUFT_OK on success, a negative error code on an
  *  	   error
  */
 __attribute__((warn_unused_result))
 extern ret_t buf_arr_clean(/*@temp@*//*@in@*//*@special@*/buf_t *buf);
+
+/**
+ * @brief Clean the buffer, remove memory and reset flags.
+ *  	  The type is not affected.
+ * @param buf_t* buf   Buffer to reset
+ * @return ret_t BUFT_OK on success, a negative status on error 
+ * @details 
+ */
+extern ret_t buf_arr_reset(/*@temp@*//*@in@*//*@special@*/buf_t *buf);
 
 /* Additional defines */
 #ifdef BUF_DEBUG
