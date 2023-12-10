@@ -2,8 +2,11 @@
 #include <stdio.h>
 #include <semaphore.h>
 #include <string.h>
+#include <unistd.h>
+
 #include "pepa_core.h"
 #include "pepa_errors.h"
+#include "pepa_debug.h"
 #include "buf_t/se_debug.h"
 
 static pepa_core_t *g_pepa_core = NULL;
@@ -28,6 +31,7 @@ static int pepa_core_sem_init(pepa_core_t *core)
 	if (0 != sem_rc) {
 		DE("Could not init mutex\n");
 		perror("sem init failure: ");
+		PEPA_TRY_ABORT();
 		return (-PEPA_ERR_INIT_MITEX);
 	}
 
@@ -51,6 +55,7 @@ static int pepa_core_sem_destroy(pepa_core_t *core)
 	if (0 != sem_rc) {
 		DE("Could not destroy mutex\n");
 		perror("sem destroy failure: ");
+		PEPA_TRY_ABORT();
 		return (-PEPA_ERR_DESTROY_MITEX);
 	}
 	return PEPA_ERR_OK;
@@ -75,7 +80,7 @@ static void pepa_core_set_default_values(pepa_core_t *core)
  */
 static pepa_core_t *pepa_create_core_t(void)
 {
-	int rc;
+	int         rc;
 
 	pepa_core_t *core = malloc(sizeof(pepa_core_t));
 	TESTP_ASSERT(core, "Can not create core");
@@ -84,13 +89,9 @@ static pepa_core_t *pepa_create_core_t(void)
 	if (rc) {
 		DE("Could not init mutex - returning NULL\n");
 		free(core);
+		PEPA_TRY_ABORT();
 		return NULL;
 	}
-
-	rc = pthread_cond_init(&core->shva_thread.thread_condition, NULL);
-	rc = pthread_cond_init(&core->in_thread.thread_condition, NULL);
-	rc = pthread_cond_init(&core->out_thread.thread_condition, NULL);
-
 	return core;
 }
 
@@ -111,6 +112,7 @@ static int pepa_clean_core_t(pepa_core_t *core)
 	const int sem_rc = pepa_core_sem_destroy(core);
 	if (0 != sem_rc) {
 		DE("Could not destroy mutex\n");
+		PEPA_TRY_ABORT();
 		return (sem_rc);
 	}
 	pepa_core_set_default_values(core);
@@ -131,10 +133,47 @@ static int pepa_clean_core_t(pepa_core_t *core)
  */
 static int pepa_destroy_core_t(pepa_core_t *core)
 {
+	int       rc;
 	const int clean_rc = pepa_clean_core_t(core);
 	if (0 != clean_rc) {
 		DE("Could not clean core - return error\n");
 		return clean_rc;
+	}
+
+	if (core->shva_thread.ip_string) {
+		rc = buf_free(core->shva_thread.ip_string);
+		if (BUFT_OK != rc) {
+			DE("Could not free buf_t\n");
+			PEPA_TRY_ABORT();
+		}
+	}
+
+	if (core->shva_thread.fd > 0) {
+		close(core->shva_thread.fd);
+	}
+
+	if (core->in_thread.ip_string) {
+		rc = buf_free(core->in_thread.ip_string);
+		if (BUFT_OK != rc) {
+			DE("Could not free buf_t\n");
+			PEPA_TRY_ABORT();
+		}
+	}
+
+	if (core->in_thread.fd > 0) {
+		close(core->in_thread.fd);
+	}
+
+	if (core->out_thread.ip_string) {
+		rc = buf_free(core->out_thread.ip_string);
+		if (BUFT_OK != rc) {
+			DE("Could not free buf_t\n");
+			PEPA_TRY_ABORT();
+		}
+	}
+
+	if (core->out_thread.fd > 0) {
+		close(core->out_thread.fd);
 	}
 
 	/* Clean the core before release it, secure reasons */
@@ -150,6 +189,7 @@ int pepa_core_init(void)
 	g_pepa_core = pepa_create_core_t();
 	if (NULL == g_pepa_core) {
 		DE("Can not create core\n");
+		PEPA_TRY_ABORT();
 		return (-PEPA_ERR_CORE_CREATE);
 	}
 	return PEPA_ERR_OK;
@@ -159,12 +199,12 @@ int pepa_core_finish(void)
 {
 	if (NULL == g_pepa_core) {
 		DE("Can not destroy core, it is NULL already!\n");
+		PEPA_TRY_ABORT();
 		return (-PEPA_ERR_CORE_DESTROY);
 	}
 
 	return pepa_destroy_core_t(g_pepa_core);
 }
-
 
 pepa_core_t *pepa_get_core(void)
 {
@@ -179,6 +219,7 @@ int pepa_core_lock(void)
 	sem_getvalue(&g_pepa_core->mutex, &rc);
 	if (rc > 1) {
 		DE("Semaphor count is too high: %d > 1\n", rc);
+		PEPA_TRY_ABORT();
 		abort();
 	}
 
@@ -187,6 +228,7 @@ int pepa_core_lock(void)
 	if (0 != rc) {
 		DE("Can't wait on semaphore; abort\n");
 		perror("Can't wait on semaphore; abort");
+		PEPA_TRY_ABORT();
 		abort();
 	}
 
@@ -200,6 +242,7 @@ int pepa_core_unlock(void)
 	sem_getvalue(&g_pepa_core->mutex, &rc);
 	if (rc > 0) {
 		DE("Tried to unlock not locked left semaphor\n\r");
+		PEPA_TRY_ABORT();
 		abort();
 	}
 
@@ -207,12 +250,21 @@ int pepa_core_unlock(void)
 	rc = sem_post(&g_pepa_core->mutex);
 	if (0 != rc) {
 		DE("Can't unlock semaphore: abort\n");
-		   perror("Can't unlock semaphore: abort");
-		   abort();
+		perror("Can't unlock semaphore: abort");
+		PEPA_TRY_ABORT();
+		abort();
 	}
 
 	return PEPA_ERR_OK;
 }
 
 
+int pepa_if_abort()
+{
+	if (NULL == g_pepa_core) {
+		return 0;
+	}
+
+	return g_pepa_core->abort_flag;
+}
 

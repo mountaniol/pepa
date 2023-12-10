@@ -9,6 +9,7 @@
 #include "pepa_socket.h"
 #include "pepa_errors.h"
 #include "pepa_core.h"
+#include "pepa_debug.h"
 #include "buf_t/buf_t.h"
 #include "buf_t/se_debug.h"
 
@@ -31,12 +32,14 @@ static x_connect_t *x_connect_t_alloc(int fd_src, int fd_dst, size_t buf_size)
 	x_connect_t *xconn = calloc(sizeof(x_connect_t), 1);
 	if (NULL == xconn) {
 		DE("Can't allocate\n");
+		PEPA_TRY_ABORT();
 		return (NULL);
 	}
 
 	xconn->buf = buf_new(buf_size);
 	if (NULL == xconn->buf) {
 		DE("Can not allocate buf_t\n");
+		PEPA_TRY_ABORT();
 		free(xconn);
 		return NULL;
 	}
@@ -51,12 +54,14 @@ static void x_connect_t_release(x_connect_t *xconn)
 {
 	if (NULL == xconn) {
 		DE("Arg is NULL\n");
+		PEPA_TRY_ABORT();
 		return;
 	}
 
 	const int rc = buf_free(xconn->buf);
 	if (BUFT_OK != rc) {
 		DE("Can not release buf_t object\n");
+		PEPA_TRY_ABORT();
 	}
 
 	/* Secure way: clear memory before release it */
@@ -83,6 +88,7 @@ static int pepa_open_socket(struct sockaddr_in *s_addr, buf_t *ip_address, int p
 	if (NULL == s_addr) {
 		syslog(LOG_ERR, "Can't allocate socket: %s\n", strerror(errno));
 		perror("Can't allocate socket");
+		PEPA_TRY_ABORT();
 		return (-PEPA_ERR_NULL_POINTER);
 	}
 
@@ -99,6 +105,7 @@ static int pepa_open_socket(struct sockaddr_in *s_addr, buf_t *ip_address, int p
 		/* Warning: inet_aton() returns 1 on success */
 		if (1 != inet_aton_rc) {
 			DE("Could not convert string address to in_addr_t\n");
+			PEPA_TRY_ABORT();
 			return (-PEPA_ERR_CONVERT_ADDR);
 		}
 	}
@@ -107,6 +114,7 @@ static int pepa_open_socket(struct sockaddr_in *s_addr, buf_t *ip_address, int p
 	if (sock  < 0) {
 		syslog(LOG_ERR, "could not create listen socket: %s\n", strerror(errno));
 		perror("could not create listen socket");
+		PEPA_TRY_ABORT();
 		return (-PEPA_ERR_SOCKET_CREATION);
 	}
 
@@ -115,6 +123,7 @@ static int pepa_open_socket(struct sockaddr_in *s_addr, buf_t *ip_address, int p
 		syslog(LOG_ERR, "Can't bind: %s\n", strerror(errno));
 		perror("Can't bind");
 		close(sock);
+		PEPA_TRY_ABORT();
 		return (-PEPA_ERR_SOCKET_BIND);
 	}
 
@@ -123,6 +132,7 @@ static int pepa_open_socket(struct sockaddr_in *s_addr, buf_t *ip_address, int p
 		syslog(LOG_ERR, "could not set SERVER_CLIENTS: %s\n", strerror(errno));
 		perror("could not set SERVER_CLIENTS");
 		close(sock);
+		PEPA_TRY_ABORT();
 		return (-PEPA_ERR_SOCKET_LISTEN);
 	}
 
@@ -150,6 +160,7 @@ static int pepa_open_shava_connection(void)
 	const int convert_rc = inet_pton(AF_INET, core->shva_thread.ip_string->data, &s_addr.sin_addr);
 	if (0 == convert_rc) {
 		DE("The string is not a valid IP address: |%s|\n", core->shva_thread.ip_string->data);
+		PEPA_TRY_ABORT();
 		return (-PEPA_ERR_CONVERT_ADDR);
 	}
 
@@ -157,17 +168,19 @@ static int pepa_open_shava_connection(void)
 
 	if (convert_rc < 0) {
 		DE("Could not convert string addredd |%s| to binary\n", core->shva_thread.ip_string->data);
+		PEPA_TRY_ABORT();
 		return (-PEPA_ERR_CONVERT_ADDR);
 	}
 	DD("3\n");
 
 	// s_addr.sin_port = htons(ip->port);
-	s_addr.sin_port = htons(core->shva_thread.port);
+	s_addr.sin_port = htons(core->shva_thread.port_int);
 
 	DD("4\n");
 
 	if ((sock = socket(PF_INET, SOCK_STREAM, 0)) < 0) {
 		DE("could not create socket\n");
+		PEPA_TRY_ABORT();
 		return (-PEPA_ERR_SOCKET_CREATION);
 	}
 
@@ -176,6 +189,7 @@ static int pepa_open_shava_connection(void)
 	if (connect(sock, (struct sockaddr *)&s_addr, (socklen_t)sizeof(s_addr)) < 0) {
 		DE("could not connect to server\n");
 		close(sock);
+		PEPA_TRY_ABORT();
 		return (-PEPA_ERR_SOCK_CONNECT);
 	}
 
@@ -374,6 +388,7 @@ static pepa_in_thread_fds_t *pepa_in_thread_fds_t_alloc(void)
 	if (NULL == fds->buf_fds) {
 		DE("Can not allocate buf_t\n");
 		free(fds);
+		PEPA_TRY_ABORT();
 		return NULL;
 	}
 
@@ -387,6 +402,7 @@ static pepa_in_thread_fds_t *pepa_in_thread_fds_t_alloc(void)
 			DE("Could not release buf_t; possible memory leak\n");
 		}
 		free(fds);
+		PEPA_TRY_ABORT();
 		return (NULL);
 	}
 
@@ -397,6 +413,7 @@ static void pepa_in_thread_fds_t_release(pepa_in_thread_fds_t *fds)
 {
 	if (NULL == fds) {
 		DE("Arg is NULL\n");
+		PEPA_TRY_ABORT();
 		return;
 	}
 
@@ -404,6 +421,7 @@ static void pepa_in_thread_fds_t_release(pepa_in_thread_fds_t *fds)
 	if (0 != rc) {
 		DE("Could not destroy mutex\n");
 		perror("sem destroy failure: ");
+		PEPA_TRY_ABORT();
 		return;
 	}
 
@@ -411,6 +429,7 @@ static void pepa_in_thread_fds_t_release(pepa_in_thread_fds_t *fds)
 		rc = buf_free(fds->buf_fds);
 		if (BUFT_OK != rc) {
 			DE("Could not destroy buf_t, memory leas is possible\n");
+			PEPA_TRY_ABORT();
 		}
 	}
 
@@ -427,6 +446,7 @@ int pepa_buf_fds_find_max(buf_t *buf)
 
 	if (buf_members < 0) {
 		DE("Can not get count of buf array\n");
+		PEPA_TRY_ABORT();
 		return -1;
 	}
 
@@ -449,15 +469,25 @@ static void set_buf_flag(pepa_in_thread_fds_t *fds, int val)
 
 /**
  * @author Sebastian Mountaniol (12/9/23)
- * @brief This thrad sitting on accept(), ceate a new sockets,
- *  	  and adds them to the array.
- * @param void* arg   
+ * @brief This thread waiting on IN socket accept(),
+ *  	  create a new sockets, and adds them to the shared
+ *  	  array.
+ * @param void* arg   Structure pepa_in_thread_fds_t which
+ *  		  created in IN thread ans shared between IN and
+ *  		  Acceptor; this structure contains array of
+ *  		  accepted  file descriptors
  * @return void* 
- * @details 
+ * @details We need this Acceptor thread because accept() call
+ *  		is blocking. So we need to accept new socket and
+ *  		also transfer data from IN sockets to SHVA server.
+ *  		This thread accepts sockets, when IN thread it data
+ *  		transfering thread.
  */
 void *pepa_in_thread_acceptor(void *arg)
 {
 	pepa_in_thread_fds_t *fds         = (pepa_in_thread_fds_t *)arg;
+
+	DDD("Thread Acceptor: Starting the thread\n");
 	while (1) {
 		struct sockaddr addr;
 		socklen_t       addrlen = sizeof(struct sockaddr);
@@ -474,10 +504,15 @@ void *pepa_in_thread_acceptor(void *arg)
 		fds->buf_changed_flag++;
 		sem_post(&fds->buf_fds_mutex);
 		if (BUFT_OK != rc) {
-			DE("Could not set new member in buffer array\n");
-			abort();
+			DE("Thread Acceptor: Could not set new member in buffer array\n");
+			PEPA_TRY_ABORT();
 		}
+
+		DDD("Thread Acceptor: Added the new fd into array: %d\n", fd);
 	} /* while (1) */
+
+	DDD("Thread Acceptor: Finishing the thread\n");
+	pthread_exit(NULL);
 }
 
 /**
@@ -497,32 +532,58 @@ void *pepa_in_thread(__attribute__((unused))void *arg)
 	pthread_t            acceptor_thread;
 	x_connect_t          *xconn          = NULL;
 
+	DDD("Thread IN: Detaching\n");
 	if (0 != pthread_detach(pthread_self())) {
 		DE("Thread: can't detach myself\n");
 		perror("Thread: can't detach myself");
+		PEPA_TRY_ABORT();
 		abort();
 	}
+
+	DDD("Thread IN: Detached\n");
 
 	pepa_core_t *core     = pepa_get_core();
 
 	/* TODO: Make it configurable */
-	fds->socket = pepa_open_socket(&s_addr, core->in_thread.ip_string, core->in_thread.port, 1024);
+
+	DDD("Thread IN: Going to created IN socket\n");
+	fds->socket = pepa_open_socket(&s_addr, core->in_thread.ip_string, core->in_thread.port_int, 1024);
 	if (fds->socket < 0) {
-		DE("Can not create SHVA socket\n");
+		DE("Thread IN: Can not create SHVA socket\n");
+		PEPA_TRY_ABORT();
 		pthread_exit(NULL);
 	}
 
+	DDD("Thread IN: Created the IN socket\n");
+
+	DDD("Thread IN: Going to create the Acceptor thread\n");
 	/* Create an additional thread to accept new connections */
-	pthread_create(&acceptor_thread, NULL, pepa_in_thread_acceptor, (void *)fds);
+	const int acceptor_rc = pthread_create(&acceptor_thread, NULL, pepa_in_thread_acceptor, (void *)fds);
+	if (0 != acceptor_rc) {
+		DE("Thread IN: Could not create the acceptor thread, terminating");
+		PEPA_TRY_ABORT();
+		pthread_exit(NULL);
+	}
+
+	DDD("Thread IN: The Acceptor thread is created\n");
 
 	/* Now run the loop until we have the first IN socket connected  */
 
+	DDD("Thread IN: Going to wait for the first IN connection\n");
 	while (0 == fds->buf_changed_flag) {
 		usleep(10);
 	}
 
-	xconn = x_connect_t_alloc(core->shva_thread.fd, 0, X_BUF_SIZE);
+	DDD("Thread IN: The first IN connection detected\n");
 
+	xconn = x_connect_t_alloc(core->shva_thread.fd, 0, X_BUF_SIZE);
+	if (NULL == xconn) {
+		DE("Thread IN: Can not create x_connect_t structure\n");
+		PEPA_TRY_ABORT();
+		pthread_exit(NULL);
+	}
+
+	DDD("Thread IN: Starting infinite select loop()\n");
 	/* Here: we have at least one IN socket connected */
 	while (1) {
 		int            index;
@@ -534,13 +595,22 @@ void *pepa_in_thread(__attribute__((unused))void *arg)
 		tv.tv_sec = 0;
 		tv.tv_usec = 5;
 
+		/* Clear select set */
 		FD_ZERO(&read_set);
 
 		/* TODO: Text error */
 		/* Reset 'new file descriptor added' flag */
 		set_buf_flag(fds, 0);
 
-		/* Sockets set */
+
+		/*** Sockets set ***/
+
+		/* Read all members in the file descriptors array, and set them into selct set;
+		 * This array is shared between this thread and Acceptor thread.
+		   The Acceptror thread accepts connections and add them into this array */
+
+		/* Lock array while in this operation */
+		sem_wait(&fds->buf_fds_mutex);
 		fd_members = buf_arr_get_members_count(fds->buf_fds);
 		for (index = 0; fd_members; index++) {
 			int *fd = buf_arr_get_member_ptr(fds->buf_fds, index);
@@ -550,7 +620,12 @@ void *pepa_in_thread(__attribute__((unused))void *arg)
 			}
 		}
 
-		/* Now run in this loop until a file descriptor not changed */
+		/* Unlock the array */
+		sem_post(&fds->buf_fds_mutex);
+
+		/* Now run in this loop until a file descriptor not changed;
+		 * we run it for very short time of 5 ms, and then we start another loop.
+		   We do it to be able react fastly for new incoming connection added in acceptor */
 		do {
 			int rc = select(fd_max + 1, &read_set, NULL, NULL, &tv);
 
@@ -589,6 +664,7 @@ void *pepa_in_thread(__attribute__((unused))void *arg)
 
 					if (BUFT_OK != rc) {
 						DE("Could not remove member from the buf array\n");
+						PEPA_TRY_ABORT();
 						abort();
 					}
 				}
@@ -599,7 +675,9 @@ void *pepa_in_thread(__attribute__((unused))void *arg)
 		} while (fds->buf_changed_flag < 1);
 	}
 
-	return NULL;
+
+	DDD("Thread IN: Finishing the thread\n");
+	pthread_exit(NULL);
 }
 
 /**
@@ -618,27 +696,30 @@ void *pepa_shva_socket_thread(__attribute__((unused))void *arg)
 {
 	struct sockaddr_in s_addr;
 
+	DDD("Thread SHVA: Detaching\n");
 	if (0 != pthread_detach(pthread_self())) {
-		DE("Thread: can't detach myself\n");
-		perror("Thread: can't detach myself");
+		DE("Thread SHVA: can't detach myself\n");
+		perror("Thread SHVA: can't detach myself");
+		PEPA_TRY_ABORT();
 		abort();
 	}
 
-	pepa_core_t *core   = pepa_get_core();
+	DDD("Thread SHVA: Detached\n");
 
-	/* When this thread started, the 'out' socket should be opened already */
-	if (core->out_thread.fd < 0) {
-		DE("OUT socket is not acive - terminating SHVA thread\n");
-		pthread_exit(NULL);
-	}
+	pepa_core_t *core   = pepa_get_core();
 
 	/* 1. Create OUT socket */
 
-	const int   out_socket = pepa_open_socket(&s_addr, core->out_thread.ip_string, core->out_thread.port, 1);
+
+	DDD("Thread SHVA: Going to create out socket\n");
+	const int   out_socket = pepa_open_socket(&s_addr, core->out_thread.ip_string, core->out_thread.port_int, 1);
 	if (out_socket < 0) {
 		DE("Can not create SHVA socket\n");
+		PEPA_TRY_ABORT();
 		pthread_exit(NULL);
 	}
+
+	DDD("Thread SHVA: Out socket created\n");
 
 	/* 2. Wait until the OUT is connected */
 
@@ -647,24 +728,36 @@ void *pepa_shva_socket_thread(__attribute__((unused))void *arg)
 
 	/* This is the main loop of this thread */
 
+
+	DDD("Thread SHVA: Waiting for OUT incoming connection\n");
 	while (1) {
 		while (core->out_thread.fd < 0) {
 			int       error_action = PEPA_ERR_OK;
 
 			socklen_t addrlen      = sizeof(struct sockaddr);
+
+			DDD("Thread SHVA: Starting OUT 'accept' waiting\n");
 			core->out_thread.fd = accept(out_socket, (struct sockaddr *)&s_addr, &addrlen);
+			DDD("Thread SHVA: Accepted OUT connection\n");
 
 			/* If something went wrong, analyze the error and decide what to do */
 			if (core->out_thread.fd < 0) {
+				DE("Thread SHVA: Some error happend regarding accepting WAITING connection\n");
 				error_action = pepa_analyse_accept_error(errno);
 			}
 
 			if (error_action < 0) {
+				DE("Thread SHVA: An error occured, can not continue: %s\n", pepa_error_code_to_str(error_action));
+				PEPA_TRY_ABORT();
 				pthread_exit(NULL);
 			}
+
+			DDD("Thread SHVA: Contunue OUT connection waiting loop\n");
 		}
 
 		/* 4. Connect to SHVA server */
+		DDD("Thread SHVA: Finished with OUT: there is connection\n");
+		DDD("Thread SHVA: Going to create SHVA socket\n");
 		core->shva_thread.fd = pepa_open_shava_connection();
 
 		if (core->shva_thread.fd < 0) {
@@ -675,32 +768,94 @@ void *pepa_shva_socket_thread(__attribute__((unused))void *arg)
 			continue;
 		}
 
-		/* Here we can start transfer SHVA -> OUT; before we do it, we start IN thread */
-		pthread_create(&core->in_thread.thread_id, NULL, pepa_in_thread, NULL);
+		DDD("Thread SHVA: Created SHVA socket\n");
 
+		/* Here we can start transfer SHVA -> OUT; before we do it, we start IN thread */
+		DDD("Thread SHVA: Going to start the IN thread\n");
+		const int in_create_rc = pthread_create(&core->in_thread.thread_id, NULL, pepa_in_thread, NULL);
+		if (0 != in_create_rc) {
+			DE("Something wrong witb IN thread, not created; terminate here");
+			perror("Can not create IN thread: ");
+			pthread_exit(NULL);
+		}
+
+		DDD("Thread SHVA: Created the IN thread\n");
+
+		DDD("Thread SHVA: Starting copy_between_sockects loop\n");
 		int rc = pepa_copy_between_sockects(core->shva_thread.fd, core->out_thread.fd);
 
 		if (PEPA_ERR_OK != rc) {
-			DE("An error heppened: %s\n", pepa_error_code_to_str(rc));
+			DE("Thread SHVA: An error happened in copy_between_sockects loop: %s\n", pepa_error_code_to_str(rc));
+			PEPA_TRY_ABORT();
 			break;
 		}
 
 		/* Else, if no critical error, we should reselt all and start over */
 
 		/* Ternimate IN thread */
-		pthread_cancel(core->in_thread.thread_id);
+
+		DDD("Thread SHVA: Going to stop the IN thread\n");
+		const int in_calncel_rc = pthread_cancel(core->in_thread.thread_id);
+		if (0 != in_calncel_rc) {
+			DE("Thread SHVA: Error happened on stopping the IN thread");
+		} else {
+			DDD("Thread SHVA: The IN thread stopped\n");
+		}
 
 		/* TODO: Close IN descriptors ??? */
 
 		/* Terminate SHVA connection */
+
+		DDD("Thread SHVA: Going to close the SHVA socket\n");
 		close(core->shva_thread.fd);
 		core->shva_thread.fd = -1;
+		DDD("Thread SHVA: The SHVA socket is closed\n");
 
 		/* Terminate OUT connection */
+		DDD("Thread SHVA: Going to close the OUT socket\n");
 		close(core->out_thread.fd);
 		core->out_thread.fd = -1;
+		DDD("Thread SHVA: The IN socket is closed\n");
 	} /* While (1) */
 
+
+	DDD("Thread SHVA: Exiting the SHVA thread\n");
 	pthread_exit(NULL);
+}
+
+int pepa_start_threads(void)
+{
+	pepa_core_t *core = pepa_get_core();
+	/* Start SHVA thread */
+	DDD("Starting SHVA thread\n");
+	int         rc    = pthread_create(&core->shva_thread.thread_id, NULL, pepa_shva_socket_thread, NULL);
+	if (0 == rc) {
+		DDD("SHVA thread is started\n");
+		return PEPA_ERR_OK;
+	}
+
+	switch (rc) {
+	case EAGAIN:
+		DE("Insufficient resources to create another thread\n");
+		return -1;
+	case EINVAL:
+		DE("Invalid settings in attr\n");
+		return -1;
+	case EPERM:
+		DE("No permission to set the scheduling policy and parameters specified in attr\n");
+		return -1;
+	default:
+		DE("You should never see this message: error code %d\n", rc);
+	}
+
+	/* Should never be here */
+	DE("You should never see this message: error code %d\n", rc);
+	return rc;
+}
+
+int pepa_stop_threads(void)
+{
+	/* TODO */
+	return -1;
 }
 

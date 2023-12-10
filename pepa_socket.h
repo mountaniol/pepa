@@ -21,11 +21,29 @@ typedef enum {
 } x_conn_direction_t;
 
 typedef struct {
-	buf_t * buf_fds; /**< Array of IN sockets file descriptors */
+	buf_t * buf_fds; /**< Array of IN sockets file descriptors; only  */
 	sem_t buf_fds_mutex; /**< A semaphor used to sync the core struct between multiple threads */
 	int buf_changed_flag;
 	struct sockaddr_in   s_addr;
 	int socket; /** < Socket to accept new connections */
 } pepa_in_thread_fds_t;
 
+/**
+ * @author Sebastian Mountaniol (12/10/23)
+ * @brief Start threads / state machine 
+ * @return int PEPA_ERR_OK on success, a negative value on an
+ *  	   error
+ */
+int pepa_start_threads(void);
+
+/**
+ * @author Sebastian Mountaniol (12/10/23)
+ * @brief Stop threads, close all file descriptors et cetera;
+ *  	  not implemented for today 
+ * @param  void  
+ * @return int PEPA_ERR_OK on success, a negative value on an
+ *  	   error
+ * @details 
+ */
+int pepa_stop_threads(void);
 #endif /* _PEPA_SOCKET_H__ */

@@ -95,16 +95,11 @@ pepa_state_sig_t;
 typedef struct {
 	/* Thread related */
 	pthread_t thread_id; /**< UD of thread */
-	pthread_cond_t thread_condition; /**< Condition the thread wait for */
-	int condition_value; /**< Signla sent to this thread */
-
-	buf_t *buf_in_fd;
 
 	/* Cosket related */
-	int  fd; /**< File descriptor of IN socket, i.e., a socket to read from */
+	int  fd; /**< File descriptor of socket, i.e., a socket to read from */
 	buf_t *ip_string; /**< IP of the OUT socket  */
-	int port; /**< Port the OUT socket  */
-	buf_t *fd_arr;
+	int port_int; /**< Port the OUT socket  */
 } thread_vars_t;
 
 /**
@@ -122,6 +117,7 @@ typedef struct {
 	thread_vars_t shva_thread;
 	thread_vars_t in_thread;
 	thread_vars_t out_thread;
+	int abort_flag;
 } pepa_core_t;
 
 /**
@@ -134,6 +130,15 @@ typedef struct {
  *  		case.
  */
 int pepa_core_init(void);
+
+/**
+ * @author Sebastian Mountaniol (12/10/23)
+ * @brief Destroy core structure
+ * @param  void  
+ * @return int 0 on success
+ * @details 
+ */
+int pepa_core_finish(void);
 
 /* Get pointer to codre */
 /**
@@ -181,4 +186,13 @@ void pepa_set_state(int state);
  */
 int pepa_get_state(void);
 
+/**
+ * @author Sebastian Mountaniol (12/10/23)
+ * @brief Return abort flag; if core is not inited yet,
+ *  	  always return NO (0)
+ * @param  void  
+ * @return int Abort flag
+ * @details 
+ */
+int pepa_if_abort(void);
 #endif /* _PEPA_CORE_H_ */

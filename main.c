@@ -25,7 +25,10 @@
 #include "pepa_ip_struct.h"
 #include "pepa_core.h"
 #include "pepa_errors.h"
+#include "pepa_parser.h"
+#include "pepa_socket.h"
 
+#if 0 /* SEB */
 /**** GLOBAL FILE DESCRIPTORS *****/
 /* File descriptor of IN file, i.e., a file to read from */
 int  fd_out     = -1;
@@ -191,8 +194,7 @@ static int pepa_open_file_out(char *file_name)
  *  		returns -2. If the socket opened AND connected, it
  *  		returns the socket descriptor, which is >= 0
  */
-static int pepa_connect_to_shva(ip_port_t *ip)
-{
+static int pepa_connect_to_shva(ip_port_t *ip){
 	struct sockaddr_in s_addr;
 	int                sock;
 
@@ -380,112 +382,53 @@ void *pepa_merry_go_round_sock(__attribute__((unused)) void *arg)
 		} // if
 	} // while
 }
+#endif
 
 void bye(void)
 {
-	if (fd_out >= 0) {
-		close(fd_out);
-	}
+	pepa_core_t *core = pepa_get_core();
+	pthread_cancel(core->shva_thread.thread_id);
+	pthread_cancel(core->out_thread.thread_id);
 
-	if (fd_in >= 0) {
-		close(fd_in);
-	}
-	if (fd_sock >= 0) {
-		close(fd_sock);
-	}
+	/* This function closes all descriptors,
+	   frees all buffers and also frees core struct */
+	pepa_core_finish();
 }
 
 int       main(int argi, char *argv[])
 {
-	/* IP address to connect to a server */
-	ip_port_t *ip  = NULL;
-
+	int rc;
 	atexit(bye);
 
-	/* We need at least 6 params : -- addr "address:port" -i "input_file" -o "output_file" */
-	if (argi < 6) {
-		printf("ERROR: At least 3 arguments expected:\n");
-		pepa_show_help();
-		exit(0);
-	}
-
-	/* Long options. Address should be given in form addr:port*/
-	static struct option long_options[] = {
-		/* These options set a flag. */
-		{"help",             no_argument,            0, 'h'},
-		{"addr",             required_argument,      0, 'a'},
-		{"out",              required_argument,       0, 'o'},
-		{"in",               required_argument,      0, 'i'},
-		{0, 0, 0, 0}
-	};
-
-
-	int                  opt;
-	int                  option_index   = 0;
-	while ((opt = getopt_long(argi, argv, ":a:o:i:h", long_options, &option_index)) != -1) {
-		switch (opt) {
-		case 'a': /* Address to connect to */
-			ip = pepa_parse_ip_string(optarg);
-			TESTP_ASSERT(ip, "ip is NULL");
-			DD("Addr OK: |%s| : |%d|\n", ip->ip, ip->port);
-
-			break;
-		case 'o': /* Output file - write received from socket */
-			fd_out = pepa_open_file_out(optarg);
-			if (fd_out < 0) {
-				DE("Can not open OUT file\n");
-				abort();
-			}
-			DD("Got FD OUT - ok\n");
-			break;
-		case 'i': /* Input file - read and send to socket */
-			// fd_in = pepa_open_pipe_in(optarg);
-			file_name_fifo = strdup(optarg);
-			DD("Got FD IN file name - ok\n");
-			break;
-		case 'h': /* Show help */
-			pepa_show_help();
-			break;
-		default:
-			printf("Unknown argument: %c\n", opt);
-			pepa_show_help();
-			exit(1);
-		}
-	}
-
-	/* Test that all needed arguments are accepted.
-	   We need IP + PORT, file_in and file_out */
-
-	TESTP_ASSERT(ip, "No IP + PORT");
-
-	fd_sock = pepa_connect_to_shva(ip);
-
-	if (fd_sock < 0) {
-		DE("Can connect to server : |%s| |%d|\n", ip->ip, ip->port);
-		pepa_ip_port_t_release(ip);
+	DDD("Going to init core\n");
+	rc = pepa_core_init();
+	if (PEPA_ERR_OK != rc) {
+		DE("Can not init core\n");
 		abort();
 	}
+	DDD("Core inited\n");
 
-	DD("Connected to the server - OK\n");
 
-	if (fd_out < 0) {
-		DE("Can not open OUT file\n");
-		abort();
+	DDD("Going to parse arguments\n");
+	rc = pepa_parse_arguments(argi, argv);
+	if (rc < 0) {
+		DE(" Could not parse arguments\n");
+		exit (-11);
 	}
 
-	DD("Ready to go:\n"
-	   "IP is: %s, PORT is %d\n"
-	   "FD SOCK: %d, FD IN: %d, FD OUT: %d\n",
-	   ip->ip, ip->port, fd_sock, fd_in, fd_out);
+	DDD("Arguments parsed\n");
 
-	pepa_ip_port_t_release(ip);
 
-// 	pepa_merry_go_round(fd_sock, fd_in, fd_out);
-	pthread_t round_sock;
-	pthread_t round_fifo;
+	DDD("Going to start threads\n");
+	rc = pepa_start_threads();
+	if (rc < 0) {
+		DE("Could not start threads\n");
+		exit (-11);
+	}
 
-	pthread_create(&round_sock, NULL, pepa_merry_go_round_sock, NULL);
-	pthread_create(&round_fifo, NULL, pepa_merry_go_round_fifo, NULL);
+	DDD("Threads are started\n");
+
+
 	while (1) {
 		sleep(60);
 	}
