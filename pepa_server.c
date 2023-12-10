@@ -11,6 +11,8 @@
 #include <errno.h>
 
 #include "pepa_core.h"
+#include "buf_t/se_debug.h"
+#if 0 /* SEB */
 
 static int running = 0;
 static int delay = 1;
@@ -21,8 +23,7 @@ static int pid_fd = -1;
 static char *app_name = NULL;
 static FILE *log_stream;
 
-void pepa_handle_signal(int sig)
-{
+void pepa_handle_signal(int sig){
 	if (sig == SIGINT) {
 		fprintf(log_stream, "Debug: stopping daemon ...\n");
 		/* Unlock and close lockfile */
@@ -44,8 +45,7 @@ void pepa_handle_signal(int sig)
 	}
 }
 
-static void daemonize(void)
-{
+static void daemonize(void){
 	pid_t pid = 0;
 	int   fd;
 
@@ -120,6 +120,7 @@ static void daemonize(void)
 }
 
 
-int pepa_open_in_listening_sock(pepa_core_t *core)
-{ }
+int pepa_open_in_listening_sock(pepa_core_t *core){
+}
+#endif
 

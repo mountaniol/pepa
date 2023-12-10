@@ -2,13 +2,18 @@
 #CFLAGS=-Wall -Wextra -rdynamic -O2
 
 #GCC=clang-10
-GCC=gcc
+#GCC=gcc
+GCC=gcc-10
 CFLAGS=-Wall -Wextra -O2
 #CFLAGS=-Wall -Wextra -O2
 DEBUG=-DDEBUG3
+# Static GCC-10 analyzer
 #CFLAGS += -fanalyzer
 
-PEPA_O=main.o pepa_core.o pepa_server.o
+# Clang static analyzer
+#CFLAGS += -Xfanalyzer
+
+PEPA_O=main.o pepa_core.o pepa_server.o pepa_socket.o pepa_errors.o
 PEPA_T=pepa
 BUFT_AR=buf_t/buf_t.a
 

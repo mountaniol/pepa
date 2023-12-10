@@ -2,7 +2,10 @@
 #define _PEPA_CORE_H_
 
 #include <semaphore.h>
+#include <pthread.h>
 #include <stdint.h>
+
+#include "buf_t/buf_t.h"
 
 /**
  * @author Sebastian Mountaniol (7/20/23)
@@ -22,17 +25,103 @@ typedef enum in_and_out_mode {
 } in_out_mode_t;
 
 /**
+ * @author Sebastian Mountaniol (12/7/23)
+ * @brief These PEPA_ST_* values describe the state machine
+ *  	  states of PEPA-NG. 
+ * @details Here is the explanation of each state, signals of
+ *          transition from state to state and actions:
+ *
+ * PEPA_ST_DISCONNECTED:
+ * This state is the initial state. All sockets are down.
+ * The PEPA-NG waits until the OUT socket is up, which means,
+ * a remote client is connected. When it happens, PEPA makes
+ * transition to the next state, CONNECTING
+ *
+ * PEPA_ST_CONNECTING:
+ * In this state, PEPA starts a connection to the SHVA server.
+ * When the connection is established, PEPA makes the transition to the
+ * state ESTABLISHED.
+ * If the connection to SHVA can not be established, PEPA closes the
+ * OUT connection, and make the transition to the DISCONNECTED
+ * state.
+ *
+ * PEPA_ST_ESTABLISHED:
+ * In this state, PEPA is waiting for an IN connection.
+ * It also passes all packets from SHVA to the OUT socket.
+ * When the first IN connection is established, it makes the transition
+ * to OPERATING state.
+ *
+ * In case of OUT or SHVA socket, it closes all sockets and makes
+ * transition to DISCONNECTED state.
+ *
+ * PEPA_ST_OPERATING:
+ * This is the main state where PEPA should be all the time.
+ * All connections are established.
+ * Packets from SHVA are being transferred to OUT.
+ * Packets from multiple IN sockets are being transferred to SHVA.
+ *
+ * All IN connection could be closed; in this case PEPA makes
+ * transition to ESTABLISHED.
+ *
+ * If any of the SHVA or OUT sockets is closed, PEPA closes another
+ * socket (either SHVA or OUT, which of them is still opened)
+ * and made the transition to an INTERMEDIATE state.
+ *
+ * PEPA_ST_COLLAPSE: This is the state when there is no
+ * connection to SHVA and OUT, but IN sockets are still alive.
+ * In this state, PEPS closes all IN sockets and makes a
+ * transition to the DISCONNECTED state.
+ */
+typedef enum {
+	PEPA_ST_FAIL = 1,
+	PEPA_ST_DISCONNECTED, /**< Initial state: all sockets are down */
+	PEPA_ST_CONNECTING, /**< OUT connection established */
+	PEPA_ST_ESTABLISHED, /**< SHVA connection established */
+	PEPA_ST_OPERATING, /**< IN connection stablished */
+	PEPA_ST_COLLAPSE /**< SHVA failed; IN connections are still established */
+} pepa_state_t;
+
+typedef enum {
+	PEPA_SIG_OUT_CLOSED = 1, /**< OUT socket is closed */
+	PEPA_SIG_SHVA_CLOSED, /**< SHVA socket is closed */
+	PEPA_SIG_ALL_IN_CLOSED, /**< All INsockets are closed */
+	PEPA_SIG_OUT_CONNECTED, /**< OUT socket connected */
+	PEPA_SIG_SHVA_CONNECTED, /**< SHVA connection is established */
+	PEPA_SIG_ALL_IN_OPENED, /**< At least one IN socket is connected */
+	PEPA_SIG_FAIL, /**< Could not execute a critical operation, like opening socket; state machine should transit to FAIL */
+}
+pepa_state_sig_t;
+
+typedef struct {
+	/* Thread related */
+	pthread_t thread_id; /**< UD of thread */
+	pthread_cond_t thread_condition; /**< Condition the thread wait for */
+	int condition_value; /**< Signla sent to this thread */
+
+	buf_t *buf_in_fd;
+
+	/* Cosket related */
+	int  fd; /**< File descriptor of IN socket, i.e., a socket to read from */
+	buf_t *ip_string; /**< IP of the OUT socket  */
+	int port; /**< Port the OUT socket  */
+	buf_t *fd_arr;
+} thread_vars_t;
+
+/**
  * @author Sebastian Mountaniol (7/20/23)
- * @brief THis structure unites all variables and file
+ * @brief This structure unites all variables and file
  *  	  descriptors. It configured on the start and then
  *  	  passed to all threads.
  * @details 
  */
 typedef struct {
-	sem_t mutex; /**< A semaphor used to sync the struct between multiple threads */
-	int  fd_out; /**< File descriptor of IN socket, i.e., a socket to read from */
-	int  fd_in; /**< File descriptor of OUT socket, i.e., a socket write to*/
-	int  fd_shva; /**< File descriptor of the SHVA opened socket, i.e. external server */
+	sem_t mutex; /**< A semaphor used to sync the core struct between multiple threads */
+
+	int state; /**< This is state machine status */
+
+	thread_vars_t shva_thread;
+	thread_vars_t in_thread;
+	thread_vars_t out_thread;
 } pepa_core_t;
 
 /**
@@ -66,7 +155,7 @@ pepa_core_t *pepa_get_core(void);
  *  		It will wait on semaphore until the sem taken.
  * @todo Should it be void?
  */
-int pepa_lock_core(void);
+int pepa_core_lock(void);
 
 /**
  * @author Sebastian Mountaniol (12/6/23)
@@ -75,45 +164,21 @@ int pepa_lock_core(void);
  * @details This function should never fail.
  * @todo Should it be void?
  */
-int pepa_unlock_core(void);
-
-/**
- * @author Sebastian Mountaniol (12/6/23)
- * @brief Set new value to SHVA file descriptor
- * @param int fd    New SHVA file descriptor to set
- * @details This operation does not lock the core. The core MUST
- *  		be locked when this function is called.
- */
-void pepa_core_set_shva_fd(int fd);
-
-/**
- * @author Sebastian Mountaniol (12/6/23)
- * @brief Set new value of the OUT file descriptor
- * @param int fd    New OUT file descriptor to set
- * @details This operation does not lock the core. The core must
- *  		be locked when this function s called.
- */
-void pepa_core_set_out_fd(int fd);
+int pepa_core_unlock(void);
 
 
 /**
- * @author Sebastian Mountaniol (12/6/23)
- * @brief Get SHVA file descriptor
- * @return int File descriptor
- * @details This operation does not lock the core. The core MUST
- *  		be locked all time the file descriptor in use. If fd
- *  		< 0, it means the socked is closed
+ * @author Sebastian Mountaniol (12/7/23)
+ * @brief Set new state
+ * @param int state State to set
  */
-int pepa_core_get_shva_fd(void);
+void pepa_set_state(int state);
 
 /**
- * @author Sebastian Mountaniol (12/6/23)
- * @brief Get value of the OUT file descriptor
- * @return int File descriptor
- * @details This operation does not lock the core. The core MUST
- *  		be locked all time the file descriptor in use. If fd
- *  		< 0, it means the socked is closed
+ * @author Sebastian Mountaniol (12/7/23)
+ * @brief Get current state
+ * @return int Current state
  */
-int pepa_core_get_out_fd(void);
+int pepa_get_state(void);
 
 #endif /* _PEPA_CORE_H_ */

@@ -20,7 +20,7 @@
 #include <sys/param.h>
 #include <sys/select.h>
 
-#include "debug.h"
+#include "buf_t/se_debug.h"
 #include "pepa_config.h"
 #include "pepa_ip_struct.h"
 #include "pepa_core.h"
@@ -107,10 +107,10 @@ static ip_port_t *pepa_parse_ip_string(char *argument)
 	int       _err       = 0;
 	char      *colon_ptr = NULL;
 
-	TESTP_ASSERT(argument);
+	TESTP_ASSERT(argument, "NULL argument");
 
 	ip = pepa_ip_port_t_alloc();
-	TESTP_ASSERT(ip);
+	TESTP_ASSERT(ip, "ip is NULL");
 
 	colon_ptr = index(argument, ':');
 
@@ -143,7 +143,7 @@ static ip_port_t *pepa_parse_ip_string(char *argument)
  */
 static int pepa_open_pipe_in(char *file_name)
 {
-	TESTP_ASSERT(file_name);
+	TESTP_ASSERT(file_name, "file_name is NULL");
 	int fd = open(file_name, O_RDONLY | O_CLOEXEC);
 	// int fd = open(file_name, O_RDONLY | O_NONBLOCK);
 	DD("Opening FD IN\n");
@@ -169,7 +169,7 @@ static int pepa_open_pipe_in(char *file_name)
  */
 static int pepa_open_file_out(char *file_name)
 {
-	TESTP_ASSERT(file_name);
+	TESTP_ASSERT(file_name, "file_name is NULL");
 	int fd = open(file_name, O_WRONLY | O_APPEND | O_CLOEXEC);
 	if (fd < 0) {
 		DE(">>> Can not open file: %s", strerror(errno));
@@ -204,14 +204,14 @@ static int pepa_connect_to_shva(ip_port_t *ip)
 	const int convert_rc = inet_pton(AF_INET, ip->ip, &s_addr.sin_addr);
 	if (0 == convert_rc) {
 		DE("The string is not a valid IP address: |%s|\n", ip->ip);
-		return (-PEPA_ERR_INVALID_ADDRESS);
+		return (-PEPA_ERR_CONVERT_ADDR);
 	}
 
 	DD("2\n");
 
 	if (convert_rc < 0) {
 		DE("Could not convert string addredd |%s| to binary\n", ip->ip);
-		return (-PEPA_ERR_ADDRESS_FORMAT);
+		return (-PEPA_ERR_CONVERT_ADDR);
 	}
 	DD("3\n");
 
@@ -426,7 +426,7 @@ int       main(int argi, char *argv[])
 		switch (opt) {
 		case 'a': /* Address to connect to */
 			ip = pepa_parse_ip_string(optarg);
-			TESTP_ASSERT(ip);
+			TESTP_ASSERT(ip, "ip is NULL");
 			DD("Addr OK: |%s| : |%d|\n", ip->ip, ip->port);
 
 			break;
@@ -456,7 +456,7 @@ int       main(int argi, char *argv[])
 	/* Test that all needed arguments are accepted.
 	   We need IP + PORT, file_in and file_out */
 
-	TESTP_ASSERT_MES(ip, "No IP + PORT");
+	TESTP_ASSERT(ip, "No IP + PORT");
 
 	fd_sock = pepa_connect_to_shva(ip);
 

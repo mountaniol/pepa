@@ -4,7 +4,7 @@
 #include <string.h>
 #include "pepa_core.h"
 #include "pepa_errors.h"
-#include "debug.h"
+#include "buf_t/se_debug.h"
 
 static pepa_core_t *g_pepa_core = NULL;
 
@@ -23,12 +23,14 @@ static pepa_core_t *g_pepa_core = NULL;
 static int pepa_core_sem_init(pepa_core_t *core)
 {
 	TESTP(core, -1);
-	const int sem_rc = sem_init(&core->mutex, 0, 1);
+	int sem_rc = sem_init(&core->mutex, 0, 1);
+
 	if (0 != sem_rc) {
 		DE("Could not init mutex\n");
 		perror("sem init failure: ");
 		return (-PEPA_ERR_INIT_MITEX);
 	}
+
 	return PEPA_ERR_OK;
 }
 
@@ -57,9 +59,9 @@ static int pepa_core_sem_destroy(pepa_core_t *core)
 static void pepa_core_set_default_values(pepa_core_t *core)
 {
 	TESTP_VOID(core);
-	core->fd_in = -1;
-	core->fd_out = -1;
-	core->fd_shva = -1;
+	core->shva_thread.fd = -1;
+	core->in_thread.fd = -1;
+	core->out_thread.fd = -1;
 }
 
 /**
@@ -73,15 +75,22 @@ static void pepa_core_set_default_values(pepa_core_t *core)
  */
 static pepa_core_t *pepa_create_core_t(void)
 {
+	int rc;
+
 	pepa_core_t *core = malloc(sizeof(pepa_core_t));
-	TESTP_ASSERT_MES(core, "Can not create core");
+	TESTP_ASSERT(core, "Can not create core");
 	pepa_core_set_default_values(core);
-	const int sem_rc = pepa_core_sem_init(core);
-	if (sem_rc) {
+	rc = pepa_core_sem_init(core);
+	if (rc) {
 		DE("Could not init mutex - returning NULL\n");
 		free(core);
 		return NULL;
 	}
+
+	rc = pthread_cond_init(&core->shva_thread.thread_condition, NULL);
+	rc = pthread_cond_init(&core->in_thread.thread_condition, NULL);
+	rc = pthread_cond_init(&core->out_thread.thread_condition, NULL);
+
 	return core;
 }
 
@@ -159,14 +168,14 @@ int pepa_core_finish(void)
 
 pepa_core_t *pepa_get_core(void)
 {
-	TESTP_ASSERT_MES(g_pepa_core, "Core is NULL!");
+	TESTP_ASSERT(g_pepa_core, "Core is NULL!");
 	return g_pepa_core;
 }
 
-int pepa_lock_core(void)
+int pepa_core_lock(void)
 {
 	int rc;
-	TESTP_ASSERT_MES(g_pepa_core, "Core is NULL!");
+	TESTP_ASSERT(g_pepa_core, "Core is NULL!");
 	sem_getvalue(&g_pepa_core->mutex, &rc);
 	if (rc > 1) {
 		DE("Semaphor count is too high: %d > 1\n", rc);
@@ -184,10 +193,10 @@ int pepa_lock_core(void)
 	return PEPA_ERR_OK;
 }
 
-int pepa_unlock_core(void)
+int pepa_core_unlock(void)
 {
 	int rc;
-	TESTP_ASSERT_MES(g_pepa_core, "Core is NULL!");
+	TESTP_ASSERT(g_pepa_core, "Core is NULL!");
 	sem_getvalue(&g_pepa_core->mutex, &rc);
 	if (rc > 0) {
 		DE("Tried to unlock not locked left semaphor\n\r");
@@ -205,30 +214,5 @@ int pepa_unlock_core(void)
 	return PEPA_ERR_OK;
 }
 
-/**** API: GETTERS/SETTERS *****/
-
-void pepa_core_set_shva_fd(int fd)
-{
-	TESTP_ASSERT_MES(g_pepa_core, "Core is NULL!");
-	g_pepa_core->fd_shva = fd;
-}
-
-void pepa_core_set_out_fd(int fd)
-{
-	TESTP_ASSERT_MES(g_pepa_core, "Core is NULL!");
-	g_pepa_core->fd_out = fd;
-}
-
-int pepa_core_get_shva_fd(void)
-{
-	TESTP_ASSERT_MES(g_pepa_core, "Core is NULL!");
-	return 	g_pepa_core->fd_shva;
-}
-
-int pepa_core_get_out_fd(void)
-{
-	TESTP_ASSERT_MES(g_pepa_core, "Core is NULL!");
-	return 	g_pepa_core->fd_out;
-}
 
 
