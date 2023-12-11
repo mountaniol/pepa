@@ -3,7 +3,7 @@
 
 #GCC=clang-10
 #GCC=gcc
-GCC=gcc-10
+GCC=gcc
 CFLAGS=-Wall -Wextra -O2
 #CFLAGS=-Wall -Wextra -O2
 DEBUG=-DDEBUG3

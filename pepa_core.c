@@ -5,6 +5,7 @@
 #include <unistd.h>
 
 #include "pepa_core.h"
+#include "pepa_config.h"
 #include "pepa_errors.h"
 #include "pepa_debug.h"
 #include "buf_t/se_debug.h"
@@ -64,9 +65,9 @@ static int pepa_core_sem_destroy(pepa_core_t *core)
 static void pepa_core_set_default_values(pepa_core_t *core)
 {
 	TESTP_VOID(core);
-	core->shva_thread.fd = -1;
-	core->in_thread.fd = -1;
-	core->out_thread.fd = -1;
+	core->shva_thread.fd_listen = -1;
+	core->in_thread.fd_listen = -1;
+	core->out_thread.fd_listen = -1;
 }
 
 /**
@@ -92,6 +93,8 @@ static pepa_core_t *pepa_create_core_t(void)
 		PEPA_TRY_ABORT();
 		return NULL;
 	}
+
+	core->internal_buf_size = COPY_BUF_SIZE;
 	return core;
 }
 
@@ -148,8 +151,8 @@ static int pepa_destroy_core_t(pepa_core_t *core)
 		}
 	}
 
-	if (core->shva_thread.fd > 0) {
-		close(core->shva_thread.fd);
+	if (core->shva_thread.fd_listen > 0) {
+		close(core->shva_thread.fd_listen);
 	}
 
 	if (core->in_thread.ip_string) {
@@ -160,8 +163,8 @@ static int pepa_destroy_core_t(pepa_core_t *core)
 		}
 	}
 
-	if (core->in_thread.fd > 0) {
-		close(core->in_thread.fd);
+	if (core->in_thread.fd_listen > 0) {
+		close(core->in_thread.fd_listen);
 	}
 
 	if (core->out_thread.ip_string) {
@@ -172,8 +175,8 @@ static int pepa_destroy_core_t(pepa_core_t *core)
 		}
 	}
 
-	if (core->out_thread.fd > 0) {
-		close(core->out_thread.fd);
+	if (core->out_thread.fd_listen > 0) {
+		close(core->out_thread.fd_listen);
 	}
 
 	/* Clean the core before release it, secure reasons */

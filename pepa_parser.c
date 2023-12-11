@@ -38,7 +38,8 @@ static void pepa_show_help(void)
 		   "--out   | -o - address of OUT listening socket, waiting for OUT stram connnection, in form '1.2.3.4:9779'\n"
 		   "--in    | -i - address of IN  listening socket, waiting for OUT stram connnection, in form '1.2.3.4:3748'\n"
 		   "--inim  | -n - max number of IN clients, by default 1024\n"
-		   "--abort | -a - abort on errors\n");
+		   "--abort | -a - abort on errors, for debug\n"
+		   "--bsize | -b - size of internal buffer, in bytes; if not given, 1024 byte will be set\n");
 }
 
 static long int pepa_string_to_int_strict(char *s, int *err)
@@ -181,6 +182,7 @@ int pepa_parse_arguments(int argi, char *argv[])
 		{"in",               required_argument,      0, 'i'},
 		{"inim",             required_argument,      0, 'n'},
 		{"abort",            no_argument,            0, 'a'},
+		{"bsize",            no_argument,            0, 'b'},
 		{0, 0, 0, 0}
 	};
 
@@ -191,16 +193,28 @@ int pepa_parse_arguments(int argi, char *argv[])
 		switch (opt) {
 		case 's': /* SHVA Server address to connect to */
 			core->shva_thread.ip_string = pepa_parse_ip_string_get_ip(optarg);
+			if (NULL == core->shva_thread.ip_string) {
+				DE("Could not parse SHVA ip address\n");
+				abort();
+			}
 			core->shva_thread.port_int = pepa_parse_ip_string_get_port(optarg);
 			DD("SHVA Addr OK: |%s| : |%d|\n", core->shva_thread.ip_string->data, core->shva_thread.port_int);
 			break;
 		case 'o': /* Output socket where packets from SHVA should be transfered */
 			core->out_thread.ip_string = pepa_parse_ip_string_get_ip(optarg);
+			if (NULL == core->out_thread.ip_string) {
+				DE("Could not parse OUT ip address\n");
+				abort();
+			}
 			core->out_thread.port_int = pepa_parse_ip_string_get_port(optarg);
 			DD("OUT Addr OK: |%s| : |%d|\n", core->out_thread.ip_string->data, core->out_thread.port_int);
 			break;
 		case 'i': /* Input socket - read and send to SHVA */
 			core->in_thread.ip_string = pepa_parse_ip_string_get_ip(optarg);
+			if (NULL == core->in_thread.ip_string) {
+				DE("Could not parse OUT ip address\n");
+				abort();
+			}
 			core->in_thread.port_int = pepa_parse_ip_string_get_port(optarg);
 			DD("OUT Addr OK: |%s| : |%d|\n", core->in_thread.ip_string->data, core->in_thread.port_int);
 			break;
@@ -213,6 +227,17 @@ int pepa_parse_arguments(int argi, char *argv[])
 				abort();
 			}
 			DD("Number of client of IN socket: %d\n", core->in_thread.clients);
+		}
+			break;
+		case 'b':
+		{
+			int err;
+			core->internal_buf_size = pepa_string_to_int_strict(optarg, &err);
+			if (err < 0) {
+				DE("Could not parse internal buffer size: %s\n", optarg);
+				abort();
+			}
+			DD("Internal buffer size is set to: %d\n", core->internal_buf_size);
 		}
 			break;
 		case 'a':

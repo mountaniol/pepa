@@ -1,6 +1,7 @@
 #ifndef _PEPA_CORE_H_
 #define _PEPA_CORE_H_
 
+#include <arpa/inet.h>
 #include <semaphore.h>
 #include <pthread.h>
 #include <stdint.h>
@@ -96,12 +97,22 @@ typedef struct {
 	/* Thread related */
 	pthread_t thread_id; /**< UD of thread */
 
-	/* Cosket related */
-	int  fd; /**< File descriptor of socket, i.e., a socket to read from */
+	/* Socket related */
+	int  fd_listen; /**< File descriptor of listening socket, i.e., a shoild be listened to accept incoming connection */
+	int  fd_read; /**< File descriptor of accepted connection socket, i.e., a socket to read from */
+	int  fd_write; /**< File descriptor of opening connection to another server; used in SHVA */
 	buf_t *ip_string; /**< IP of the OUT socket  */
 	int port_int; /**< Port the OUT socket  */
 	int clients; /**< Number of clients on this socket */
 } thread_vars_t;
+
+typedef struct {
+	int event_fd; /**< This is a socket to signal between IN and Acceptro threads */
+	buf_t * buf_fds; /**< Array of sockets file descriptors; filled in Acceptor thread, then merged in IN thread */
+	sem_t buf_fds_mutex; /**< A semaphor used to sync the core struct between multiple threads */
+	struct sockaddr_in   s_addr;
+	int socket; /** < Socket to accept new connections */
+} pepa_in_thread_fds_t;
 
 /**
  * @author Sebastian Mountaniol (7/20/23)
@@ -115,10 +126,15 @@ typedef struct {
 
 	int state; /**< This is state machine status */
 
-	thread_vars_t shva_thread;
-	thread_vars_t in_thread;
-	thread_vars_t out_thread;
-	int abort_flag;
+	thread_vars_t shva_thread; /**< Configuration of SHVA thread */
+	thread_vars_t in_thread; /**< Configuration of IN thread */
+	thread_vars_t out_thread; /**< Configuration of OUT thread */
+	thread_vars_t acceptor_thread; /**< Configuration of OUT thread */
+	int internal_buf_size; /**< Size of buffer used to pass packages, by defaiult COPY_BUF_SIZE bytes, see pepa_config.h */
+	int abort_flag; /**< Abort flag, if enabled, PEPA file abort on errors; for debug only */
+	buf_t *buf_in_fds; /* IN thread file descriptors of opened connections */
+	pepa_in_thread_fds_t *acceptor_shared; /* The structure shared between IN and Acceptor thread */
+
 } pepa_core_t;
 
 /**
