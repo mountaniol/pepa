@@ -1061,11 +1061,16 @@ static void pepa_back_to_disconnected_state(void)
 	rc = pthread_cancel(core->in_thread.thread_id);
 	if (0 != rc) {
 		DE("Can not cancel IN thread\n");
+	} else {
+		DDD("Terminated IN thread\n");
 	}
+
 	core->in_thread.thread_id = -1;
 	rc = pthread_cancel(core->acceptor_thread.thread_id);
 	if (0 != rc) {
 		DE("Can not cancel Acceptor thread\n");
+	} else {
+		DDD("Terminated Acceptor thread\n");
 	}
 	core->acceptor_thread.thread_id = -1;
 
