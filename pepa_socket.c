@@ -50,6 +50,7 @@ static void pepa_print_pthread_create_error(const int rc)
  * @return x_connect_t* Allocated and filled structure
  * @details 
  */
+
 static x_connect_t *x_connect_t_alloc(int fd_src, int fd_dst, size_t buf_size)
 {
 	x_connect_t *xconn = calloc(sizeof(x_connect_t), 1);
@@ -72,15 +73,9 @@ static x_connect_t *x_connect_t_alloc(int fd_src, int fd_dst, size_t buf_size)
 
 	return (xconn);
 }
-
+__attribute__((nonnull(1)))
 static void x_connect_t_release(x_connect_t *xconn)
 {
-	if (NULL == xconn) {
-		DE("Arg is NULL\n");
-		PEPA_TRY_ABORT();
-		return;
-	}
-
 	const int rc = buf_free(xconn->buf);
 	if (BUFT_OK != rc) {
 		DE("Can not release buf_t object\n");
@@ -103,6 +98,7 @@ static void x_connect_t_release(x_connect_t *xconn)
  *  	   code on error
  * @details 
  */
+__attribute__((nonnull(1, 2)))
 static int pepa_open_socket(struct sockaddr_in *s_addr, const buf_t *ip_address, const int port, const int num_of_clients)
 {
 	int rc   = PEPA_ERR_OK;
@@ -110,33 +106,20 @@ static int pepa_open_socket(struct sockaddr_in *s_addr, const buf_t *ip_address,
 
 	DD("Open Socket: starting for %s:%d, num of clients: %d\n", ip_address->data, port, num_of_clients);
 
-	if (NULL == s_addr) {
-		syslog(LOG_ERR, "Can't allocate socket: %s\n", strerror(errno));
-		perror("Can't allocate socket");
-		//PEPA_TRY_ABORT();
-		return (-PEPA_ERR_NULL_POINTER);
-	}
-
 	memset(s_addr, 0, sizeof(struct sockaddr_in));
 	s_addr->sin_family = (sa_family_t)AF_INET;
 	s_addr->sin_port = htons(port);
 
 	DD("Open Socket: Port is %d\n", port);
 
-	if (NULL == ip_address || NULL == ip_address->data) {
-		DD("Open Socket: not specified address, use INADDR_ANY\n");
-		s_addr->sin_addr.s_addr = htonl(INADDR_ANY);
-	} else {
-		//s_addr->sin_addr.s_addr = inet_addr(ip_address->data);
-		const int inet_aton_rc = inet_aton(ip_address->data, &s_addr->sin_addr);
+	const int inet_aton_rc = inet_aton(ip_address->data, &s_addr->sin_addr);
 
-		DD("Open Socket: specified address, use %s\n", ip_address->data);
-		/* Warning: inet_aton() returns 1 on success */
-		if (1 != inet_aton_rc) {
-			DE("Could not convert string address to in_addr_t\n");
-			// PEPA_TRY_ABORT();
-			return (-PEPA_ERR_CONVERT_ADDR);
-		}
+	DD("Open Socket: specified address, use %s\n", ip_address->data);
+	/* Warning: inet_aton() returns 1 on success */
+	if (1 != inet_aton_rc) {
+		DE("Could not convert string address to in_addr_t\n");
+		// PEPA_TRY_ABORT();
+		return (-PEPA_ERR_CONVERT_ADDR);
 	}
 
 	DD("Open Socket: Going to create coscket for %ss\n", ip_address->data);
@@ -235,6 +218,8 @@ static int pepa_open_shava_connection(void)
  *  	   a negative value if it should be aborted
  * @details 
  */
+
+__attribute__((pure))
 static int pepa_analyse_accept_error(const int error_code)
 {
 	switch (error_code) {
@@ -308,6 +293,7 @@ static int pepa_analyse_accept_error(const int error_code)
 
 /* TCP max socket size is 1 GB */
 #define MAX_SOCKET_SIZE (0x40000000)
+__attribute__((hot, nonnull(1)))
 static int pepa_copy_between_sockects_execute(const x_connect_t *xcon)
 {
 	ssize_t rc;
@@ -383,15 +369,19 @@ static int pepa_copy_between_sockects_execute(const x_connect_t *xcon)
 /**
  * @author Sebastian Mountaniol (12/7/23)
  * @brief This function takes two file descriptors (of sockets),
- *  	  and passes buffers between them as a tunnel
+ *  	  and passes buffers between them as a tunnel.
+ *  	  It is infinite loop function.
  * @param int fd_left Socket file descriptor
  * @param int fd_right Socket file descriptor
  * @return int Status of an error. This function suppposed to
  *  	   run in infinite loop. If it returned, it signalizes
- *  	   the reason of the return.
+ *  	   the reason of the return. The statuscan be also
+ *  	   -PEPA_ERR_EVENT which means a event from Control
+ *  		thread received.
  * @details 
  */
-static int pepa_copy_between_sockects(const int fd_src, const int fd_dst, const int buf_size)
+__attribute__((hot))
+static int pepa_copy_between_sockects(const int fd_src, const int fd_event, const int fd_dst, const int buf_size)
 {
 	/* We need two buffer:  */
 	int         rc;
@@ -402,22 +392,29 @@ static int pepa_copy_between_sockects(const int fd_src, const int fd_dst, const 
 	TESTP(xconn, -PEPA_ERR_ALLOCATION);
 
 	while (1) {
+		int            max_fd;
 		fd_set         read_set;
-		fd_set         ex_set;
 		struct timeval tv;
 
-
-		tv.tv_sec = 0;
-		tv.tv_usec = 5;
+		tv.tv_sec = 5;
+		tv.tv_usec = 0;
 
 		/* Socket sets */
 		FD_ZERO(&read_set);
-		FD_ZERO(&ex_set);
 
 		/* Read set, signaling when there is data to read */
 		FD_SET(fd_src, &read_set);
+		FD_SET(fd_event, &read_set);
 
-		rc = select(fd_src + 1, &read_set, NULL, NULL, &tv);
+		max_fd = PEPA_MAX(fd_src, fd_event);
+		DDD("fd_src = %d, fd_event = %d, fd_max = %d\n", fd_src, fd_event, max_fd);
+
+		rc = select(max_fd + 1, &read_set, NULL, NULL, &tv);
+
+		if (FD_ISSET(fd_event, &read_set)) {
+			DD("Got event from CTL\n");
+			return (-PEPA_ERR_EVENT);
+		}
 
 		/* Data is ready on the src file descriptor:
 		   read it from the left fd, write to the right: the RIGHT direction */
@@ -483,7 +480,8 @@ static pepa_in_thread_fds_t *pepa_in_thread_fds_t_alloc(void)
 	fds->socket = -1;
 	return (fds);
 }
-__attribute__((unused))
+
+__attribute__((unused, nonnull(1)))
 static void pepa_in_thread_fds_t_release(pepa_in_thread_fds_t *fds)
 {
 	if (NULL == fds) {
@@ -515,29 +513,57 @@ static void pepa_in_thread_fds_t_release(pepa_in_thread_fds_t *fds)
 	free(fds);
 }
 
-static int pepa_acceptor_event_on(pepa_in_thread_fds_t *fds)
+/* Send event */
+static void pepa_event_send(int fd, uint64_t code)
 {
-	uint64_t val = 1;
 	int      rc;
 
 	/* Set event */
 	do {
-		rc = write(fds->event_fd, &val, sizeof(val));
+		rc = write(fd, &code, sizeof(code));
 		if (EAGAIN == rc) {
 			DD("Write to eventfd returned EAGAIN\n");
+		} else {
+			DD("Wrote OK an event to eventfd\n");
 		}
 	} while (EAGAIN == rc);
-
-	return PEPA_ERR_OK;
 }
 
-static void pepa_acceptor_event_off(const pepa_in_thread_fds_t *fds)
+static void pepa_event_rm(int fd)
 {
 	uint64_t val           = 1;
 	__attribute__((unused))int      rc;
 
 	/* Set event */
-	rc = read(fds->event_fd, &val, sizeof(val));
+	rc = read(fd, &val, sizeof(val));
+}
+
+__attribute__((unused))
+static int pepa_event_check(int fd)
+{
+	uint64_t val           = 1;
+	__attribute__((unused))int      rc;
+
+	/* Set event */
+	rc = read(fd, &val, sizeof(val));
+	if (rc == sizeof(val)) {
+		return 1;
+	}
+
+	return 0;
+}
+
+__attribute__((nonnull(1)))
+static int pepa_acceptor_event_on(pepa_in_thread_fds_t *fds)
+{
+	pepa_event_send(fds->event_fd, 1);
+	return PEPA_ERR_OK;
+}
+
+__attribute__((nonnull(1)))
+static void pepa_acceptor_event_off(const pepa_in_thread_fds_t *fds)
+{
+	pepa_event_rm(fds->event_fd);
 }
 
 /**
@@ -552,6 +578,7 @@ static void pepa_acceptor_event_off(const pepa_in_thread_fds_t *fds)
  *  	   happened and it exits by timeout; A negative value on
  *  	   error
  */
+__attribute__((nonnull(1)))
 int pepa_wait_for_signal_from_acceptor(const pepa_in_thread_fds_t *fds, const size_t sec, const size_t usec)
 {
 	/* Select related variables */
@@ -608,6 +635,7 @@ int pepa_wait_for_signal_from_acceptor(const pepa_in_thread_fds_t *fds, const si
 	return 1;
 }
 
+__attribute__((nonnull(1, 2)))
 int pepa_merge_buffers(buf_t *buf_dst, pepa_in_thread_fds_t *fds)
 {
 	int rc;
@@ -700,6 +728,7 @@ void *pepa_in_thread_acceptor(__attribute__((unused))void *arg)
 	pthread_exit(NULL);
 }
 
+__attribute__((nonnull(1, 2)))
 static int pepa_in_thread_create_socket(pepa_core_t *core, struct sockaddr_in *s_addr)
 {
 	int i;
@@ -724,6 +753,7 @@ static int pepa_in_thread_create_socket(pepa_core_t *core, struct sockaddr_in *s
 	return (PEPA_ERR_OK);
 }
 
+__attribute__((hot, nonnull(1, 2)))
 static int pepa_in_thread_send_data(pepa_core_t *core, x_connect_t *xconn, int fd_members, fd_set read_set)
 {
 	int index;
@@ -872,7 +902,7 @@ void *pepa_in_thread(__attribute__((unused))void *arg)
 	while (1) {
 		int            index;
 		int            fd_members;
-		int            fd_max                = 0;
+		int            fd_max     = 0;
 		fd_set         read_set;
 		struct timeval tv;
 
@@ -910,7 +940,11 @@ void *pepa_in_thread(__attribute__((unused))void *arg)
 		/* Add event fd into the set */
 		FD_SET(core->acceptor_shared->event_fd, &read_set);
 
+		/* ALso listen signal from Control thread */
+		FD_SET(core->controls.in_from_ctl, &read_set);
+
 		fd_max = PEPA_MAX(core->acceptor_shared->event_fd, fd_max);
+		fd_max = PEPA_MAX(core->controls.in_from_ctl, fd_max);
 
 		/*** The second level loop, wait on select and process ***/
 
@@ -936,6 +970,14 @@ void *pepa_in_thread(__attribute__((unused))void *arg)
 			}
 
 			/*** Test events from Acceptor ***/
+
+			if (FD_ISSET(core->controls.in_from_ctl, &read_set)) {
+				/* Turn off one event on the event fd, we got the signal, thank you */
+				pepa_event_rm(core->controls.in_from_ctl);
+				DD("Got STOP event from Control thread\n");
+				goto cancel_it;
+				break;
+			}
 
 			/* If we got signal from Acceptor, we need to get new file descriptors;
 			 * we just break the loop, and upped while() loop care about it.
@@ -965,8 +1007,38 @@ void *pepa_in_thread(__attribute__((unused))void *arg)
 		} while (buf_arr_get_members_count(core->buf_in_fds) > 0);
 	}
 
-
+cancel_it:
+	/* Here: cloae everything and exit the thread */
 	DDD("Thread IN: Finishing the thread\n");
+
+	/* Terminate Acceptor thread */
+	rc = pthread_cancel(core->acceptor_thread.thread_id);
+	if (rc < 0) {
+		DE("Could not teminate acceptor thread\n");
+	}
+
+	/* Release xconn */
+	x_connect_t_release(xconn);
+
+	/* Close all file descriptors and release buffers */
+	if (NULL != core->buf_in_fds) {
+		int index;
+		for (index = 0; index < buf_arr_get_members_count(core->buf_in_fds); index++) {
+			const int *fd = buf_arr_get_member_ptr(core->buf_in_fds, index);
+			rc = close(*fd);
+			if (0 != rc) {
+				DE("Can not close IN read socket fd (%d), error: %d\n", *fd, rc);
+			}
+		}
+
+		rc = buf_free(core->buf_in_fds);
+		if (0 != rc) {
+			DE("Can not free buf_array, memory leak possible: %s\n",
+			   buf_error_code_to_string(rc));
+		}
+		core->buf_in_fds = NULL;
+	}
+
 	pthread_exit(NULL);
 }
 
@@ -1069,6 +1141,7 @@ static void pepa_shva_prepare_core(void)
 	core->shva_thread.fd_write = -1;
 }
 
+__attribute__((nonnull(1)))
 static int pepa_shva_wait_first_OUT_connection(struct sockaddr *s_addr)
 {
 	pepa_core_t *core = pepa_get_core();
@@ -1109,7 +1182,7 @@ static int pepa_shva_wait_first_OUT_connection(struct sockaddr *s_addr)
  *  		when connection to SHVA or connection to OUT is
  *  		terminated.
  */
-void *pepa_shva_socket_thread(__attribute__((unused))void *arg)
+void *pepa_shva_thread(__attribute__((unused))void *arg)
 {
 	int                rc;
 	pepa_core_t        *core  = pepa_get_core();
@@ -1202,7 +1275,10 @@ void *pepa_shva_socket_thread(__attribute__((unused))void *arg)
 		/*** Enter infinite loop ****/
 
 		DDD("Thread SHVA: Starting the internal loop copy_between_sockects\n");
-		int rc = pepa_copy_between_sockects(core->shva_thread.fd_write, core->out_thread.fd_listen, core->internal_buf_size);
+		int rc = pepa_copy_between_sockects(core->shva_thread.fd_write,
+											core->controls.shva_from_ctl,
+											core->out_thread.fd_listen,
+											core->internal_buf_size);
 
 		/*** The inifnite loop was interrupted ***/
 
@@ -1235,18 +1311,188 @@ void *pepa_shva_socket_thread(__attribute__((unused))void *arg)
 	pthread_exit(NULL);
 }
 
+void *pepa_ctl_thread(__attribute__((unused))void *arg)
+{
+	int         rc;
+	pepa_core_t *core = pepa_get_core();
+
+	/*** Init the thread ****/
+
+	DDD("Thread CONTROL: Detaching\n");
+	if (0 != pthread_detach(pthread_self())) {
+		DE("Thread CONTROL: can't detach myself\n");
+		perror("Thread CONTROL: can't detach myself");
+		PEPA_TRY_ABORT();
+		abort();
+	}
+
+	DDD("Thread CONTROL: Detached\n");
+
+	rc = pthread_setname_np(pthread_self(), "CONTROL THREAD");
+	if (0 != rc) {
+		DE("Thread CONTROL: can't set name\n");
+	}
+
+	/* This is the main loop of this thread */
+
+	while (1) {
+		fd_set         read_set;
+		int            max_fd;
+		struct timeval tv;
+
+		/* Socket sets */
+		FD_ZERO(&read_set);
+
+		FD_SET(core->controls.ctl_from_shva, &read_set);
+		max_fd = PEPA_MAX(core->controls.ctl_from_shva, max_fd);
+
+		FD_SET(core->controls.ctl_from_in, &read_set);
+		max_fd = PEPA_MAX(core->controls.ctl_from_in, max_fd);
+
+		FD_SET(core->controls.ctl_from_acceptor, &read_set);
+		max_fd = core->controls.ctl_from_acceptor;
+
+		FD_SET(core->controls.ctl_from_out, &read_set);
+		max_fd = PEPA_MAX(core->controls.ctl_from_out, max_fd);
+
+		rc = select(max_fd + 1, &read_set, NULL, NULL, &tv);
+
+		/*** SHVA sent a signal ***/
+
+		if (FD_ISSET(core->controls.ctl_from_shva, &read_set)) {
+			/* Stop all threads but SHVA */
+			DDD("Thread CONTROL: Event from SHVA\n");
+
+			rc = pthread_cancel(core->acceptor_thread.thread_id);
+			if (rc < 0) {
+				DE("Thread CONTROL: Could not cancel ACCEPTOR thread\n");
+			} else {
+				DDD("Thread CONTROL: Terminated ACCEPTOR thread\n");
+			}
+
+			rc = pthread_cancel(core->out_thread.thread_id);
+			if (rc < 0) {
+				DE("Thread CONTROL: Could not cancel OUT thread\n");
+			} else {
+				DDD("Thread CONTROL: Terminated OUT thread\n");
+			}
+
+			rc = pthread_cancel(core->in_thread.thread_id);
+			if (rc < 0) {
+				DE("Thread CONTROL: Could not cancel IN thread\n");
+			} else {
+				DDD("Thread CONTROL: Terminated IN thread\n");
+			}
+
+			pepa_event_rm(core->controls.ctl_from_shva);
+			DDD("Thread CONTROL: Removed even from SHVA\n");
+		} /* if */
+
+		/*** IN thread sent a signal ***/
+
+		if (FD_ISSET(core->controls.ctl_from_in, &read_set)) {
+			DDD("Thread CONTROL: Event from IN\n");
+			/* We should kill all threads but SHVA, and send SHVA signal to start over */
+			rc = pthread_cancel(core->acceptor_thread.thread_id);
+			if (rc < 0) {
+				DE("Could not cancel ACCEPTOR thread\n");
+			} else {
+				DDD("Thread CONTROL: Terminated ACCEPTOR thread\n");
+			}
+
+			rc = pthread_cancel(core->out_thread.thread_id);
+			if (rc < 0) {
+				DE("Could not cancel OUT thread\n");
+			} else {
+				DDD("Thread CONTROL: Terminated OUT thread\n");
+			}
+			/* Send signal to SHVA */
+			pepa_event_send(core->controls.shva_from_ctl, 1);
+			DDD("Thread CONTROL: Sent signal to SHVA\n");
+			pepa_event_rm(core->controls.ctl_from_in);
+			DDD("Thread CONTROL: Removed even from IN\n");
+		} /* if */
+
+		/*** ACCEPTOR thread sent a signal ***/
+
+		if (FD_ISSET(core->controls.ctl_from_acceptor, &read_set)) {
+			DDD("Thread CONTROL: Event from ACCEPTOR\n");
+			/* We should kill all threads but SHVA, and send SHVA signal to start over */
+			rc = pthread_cancel(core->in_thread.thread_id);
+			if (rc < 0) {
+				DE("Could not cancel IN thread\n");
+			} else {
+				DDD("Thread CONTROL: Terminated IN thread\n");
+			}
+
+			rc = pthread_cancel(core->out_thread.thread_id);
+			if (rc < 0) {
+				DE("Could not cancel OUT thread\n");
+			} else {
+				DDD("Thread CONTROL: Terminated OUT thread\n");
+			}
+			/* Send signal to SHVA */
+			pepa_event_send(core->controls.shva_from_ctl, 1);
+			DDD("Thread CONTROL: Sent signal to SHVA\n");
+
+			pepa_event_rm(core->controls.ctl_from_acceptor);
+			DDD("Thread CONTROL: Removed even from ACCEPTOR\n");
+		} /* if */
+
+		/*** OUT thread sent a signal ***/
+
+		if (FD_ISSET(core->controls.ctl_from_out, &read_set)) {
+			DDD("Thread CONTROL: Event from OUT\n");
+			/* We should kill all threads but SHVA, and send SHVA signal to start over */
+			rc = pthread_cancel(core->acceptor_thread.thread_id);
+			if (rc < 0) {
+				DE("Could not cancel ACCEPTOR thread\n");
+			} else {
+				DDD("Thread CONTROL: Terminated ACCEPTOR thread\n");
+			}
+
+			rc = pthread_cancel(core->in_thread.thread_id);
+			if (rc < 0) {
+				DE("Could not cancel IN thread\n");
+			} else {
+				DDD("Thread CONTROL: Terminated IN thread\n");
+			}
+			/* Send signal to SHVA */
+			pepa_event_send(core->controls.shva_from_ctl, 1);
+			DDD("Thread CONTROL: Sent signal to SHVA\n");
+			pepa_event_rm(core->controls.ctl_from_out);
+			DDD("Thread CONTROL: Removed even from OUT\n");
+		} /* if */
+	} /* While */
+}
+
 int pepa_start_threads(void)
 {
+	int         rc;
 	pepa_core_t *core = pepa_get_core();
+
+	/* Start CTL thread */
+	DDD("Starting CTL thread\n");
+	rc    = pthread_create(&core->ctl_thread.thread_id, NULL, pepa_ctl_thread, NULL);
+	if (0 == rc) {
+		DDD("CTL thread is started\n");
+	} else {
+		pepa_print_pthread_create_error(rc);
+		return -1;
+	}
+
 	/* Start SHVA thread */
 	DDD("Starting SHVA thread\n");
-	int         rc    = pthread_create(&core->shva_thread.thread_id, NULL, pepa_shva_socket_thread, NULL);
+	rc    = pthread_create(&core->shva_thread.thread_id, NULL, pepa_shva_thread, NULL);
 	if (0 == rc) {
 		DDD("SHVA thread is started\n");
 	} else {
 		pepa_print_pthread_create_error(rc);
 		return -1;
 	}
+
+//	sleep(3);
+//	pepa_event_send(core->controls.ctl_from_shva, 1);
 
 #if 0 /* SEB */
 	usleep(500);

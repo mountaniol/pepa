@@ -3,6 +3,7 @@
 #include <semaphore.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/eventfd.h> /* For eventfd */
 
 #include "pepa_core.h"
 #include "pepa_config.h"
@@ -95,6 +96,13 @@ static pepa_core_t *pepa_create_core_t(void)
 	}
 
 	core->internal_buf_size = COPY_BUF_SIZE;
+
+	/* Create event fd control descriptors */
+	core->controls.ctl_from_acceptor = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
+	core->controls.ctl_from_shva = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
+	core->controls.ctl_from_in = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
+	core->controls.ctl_from_acceptor = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
+	core->controls.shva_from_ctl = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
 	return core;
 }
 

@@ -4,6 +4,10 @@
 typedef enum {
 	PEPA_ERR_OK = 0,
 
+	/* Not so errors */
+	PEPA_ERR_EVENT, /* This is code telling an event received on event fd  */
+	PEPA_ERR_STOP, /* This is code telling to thread to stop */
+
 	/* Memory related errors */
 	PEPA_ERR_NULL_POINTER,
 	PEPA_ERR_ALLOCATION,

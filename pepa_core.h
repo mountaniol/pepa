@@ -114,6 +114,22 @@ typedef struct {
 	int socket; /** < Socket to accept new connections */
 } pepa_in_thread_fds_t;
 
+typedef enum {
+	PEPA_CTL_FAIL = 1 /**< This valie send from CONTROL to SHVA and commands to go to FAIL state */
+} pepa_control_val_t;
+
+typedef struct {
+	int ctl_from_shva; /**< This event fd will signalize from SHVA to CONTROL */
+	int ctl_from_in; /**< This event fd will signalize that IN thread is canceled */
+	int ctl_from_out; /**< This event fd will signalize that OUT thread is canceled */
+	int ctl_from_acceptor; /**< This event fd will signalize that ACCEPTOR thread is canceled */
+
+	int shva_from_ctl; /**< This event fd listened in SHVA thread and receive commands from CONTROL thread */
+	int in_from_ctl; /**< This event fd listened in SHVA thread and receive commands from CONTROL thread */
+	int out_from_ctl; /**< This event fd listened in SHVA thread and receive commands from CONTROL thread */
+	int acceptor_from_ctl; /**< This event fd listened in SHVA thread and receive commands from CONTROL thread */
+} pepa_control_fds_t;
+
 /**
  * @author Sebastian Mountaniol (7/20/23)
  * @brief This structure unites all variables and file
@@ -126,6 +142,7 @@ typedef struct {
 
 	int state; /**< This is state machine status */
 
+	thread_vars_t ctl_thread; /**< Configuration of SHVA thread */
 	thread_vars_t shva_thread; /**< Configuration of SHVA thread */
 	thread_vars_t in_thread; /**< Configuration of IN thread */
 	thread_vars_t out_thread; /**< Configuration of OUT thread */
@@ -134,6 +151,7 @@ typedef struct {
 	int abort_flag; /**< Abort flag, if enabled, PEPA file abort on errors; for debug only */
 	buf_t *buf_in_fds; /* IN thread file descriptors of opened connections */
 	pepa_in_thread_fds_t *acceptor_shared; /* The structure shared between IN and Acceptor thread */
+	pepa_control_fds_t controls; /**< These event fds used for communication between control thread and all other threads */
 
 } pepa_core_t;
 
