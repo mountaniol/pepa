@@ -107,10 +107,7 @@ typedef struct {
  * @details 
  */
 typedef struct {
-	/* Thread related */
 	pthread_t thread_id; /**< UD of thread */
-
-	/* Socket related */
 	buf_t *ip_string; /**< IP of socket  */
 	int port_int; /**< Port of socket  */
 	int clients; /**< Number of clients on this socket */
@@ -129,6 +126,11 @@ typedef struct {
 	int in_listen;
 } pepa_sockets_t;
 
+/**
+ * @author Sebastian Mountaniol (12/12/23)
+ * @brief Event sockets for Control thread
+ * @details 
+ */
 typedef struct {
 	int ctl_from_shva; /**< This event fd will signalize from SHVA to CONTROL */
 	int ctl_from_in; /**< This event fd will signalize that IN thread is canceled */
@@ -160,11 +162,10 @@ typedef struct {
 	thread_vars_t acceptor_thread; /**< Configuration of OUT thread */
 	int internal_buf_size; /**< Size of buffer used to pass packages, by defaiult COPY_BUF_SIZE bytes, see pepa_config.h */
 	int abort_flag; /**< Abort flag, if enabled, PEPA file abort on errors; for debug only */
-	buf_t *buf_in_fds; /* IN thread file descriptors of opened connections */
+	buf_t *buf_in_fds; /* IN thread file descriptors of opened connections (read sockets) */
 	pepa_in_thread_fds_t *acceptor_shared; /* The structure shared between IN and Acceptor thread */
 	pepa_control_fds_t controls; /**< These event fds used for communication between control thread and all other threads */
 	pepa_sockets_t sockets;
-
 } pepa_core_t;
 
 /**

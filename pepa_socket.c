@@ -1066,7 +1066,10 @@ static void pepa_close_socket(int fd, const char *socket_name)
 /**
  * @author Sebastian Mountaniol (12/11/23)
  * @brief Finish all thread but SHVA; Close all sockets.
- * @details 
+ * @details This function returns everything to to very beginning state.
+ * It closed all opened sockets, stop all threads but SHVA thread.
+ * After this funcion is finished, the SHVA can start from the very beginning,
+ * opening all sockets, starting all threads and so on.
  */
 static void pepa_back_to_disconnected_state(void)
 {
@@ -1079,7 +1082,7 @@ static void pepa_back_to_disconnected_state(void)
 	pepa_core_lock();
 	sem_wait(&fds->buf_fds_mutex);
 
-	/* Cancel threads */
+	/*** Terminate threads ***/
 
 	pepa_cancel_thread(core->in_thread.thread_id, "IN");
 	core->in_thread.thread_id = -1;
@@ -1090,7 +1093,8 @@ static void pepa_back_to_disconnected_state(void)
 	pepa_cancel_thread(core->out_thread.thread_id, "OUT");
 	core->out_thread.thread_id = -1;
 
-	/* Close all Acceptor file descriptors */
+	/*** Close all Acceptor file descriptors ***/
+
 	if (NULL != fds->buf_fds) {
 		for (index = 0; index < buf_arr_get_members_count(fds->buf_fds); index++) {
 			const int *fd = buf_arr_get_member_ptr(fds->buf_fds, index);
@@ -1111,7 +1115,8 @@ static void pepa_back_to_disconnected_state(void)
 	/* We do not need the semaphore anymore */
 	sem_post(&fds->buf_fds_mutex);
 
-	/* Close all IN file descriptors */
+	/** Close all IN file descriptors ***/
+
 	if (NULL != core->buf_in_fds) {
 		for (index = 0; index < buf_arr_get_members_count(core->buf_in_fds); index++) {
 			const int *fd = buf_arr_get_member_ptr(core->buf_in_fds, index);
@@ -1128,6 +1133,8 @@ static void pepa_back_to_disconnected_state(void)
 		}
 		core->buf_in_fds = NULL;
 	}
+
+	/*** Close the rest of the sockets ****/
 
 	/* Close the IN socket */
 	pepa_close_socket(core->sockets.in_listen, "core->in_thread.fd_listen");
