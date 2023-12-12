@@ -472,7 +472,7 @@ static pepa_in_thread_fds_t *pepa_in_thread_fds_t_alloc(void)
 			DE("Could not release buf_t; possible memory leak\n");
 		}
 		free(fds);
-		DE("Could not open eventfd");
+		DE("Could not open eventfd\n");
 		PEPA_TRY_ABORT();
 		return (NULL);
 	}
@@ -616,7 +616,7 @@ int pepa_wait_for_signal_from_acceptor(const pepa_in_thread_fds_t *fds, const si
 		 * serious bug - this should not happen: we know that we have one
 		   file descriptor, and the event must be there and only there  */
 		if (!FD_ISSET(fds->event_fd, &rfds)) {
-			DE("Something bad happened");
+			DE("Something bad happened\n");
 		}
 
 		/* We ignore signals */
@@ -853,7 +853,7 @@ void *pepa_in_thread(__attribute__((unused))void *arg)
 
 	rc = pthread_create(&acceptor_thread, NULL, pepa_in_thread_acceptor, NULL);
 	if (0 != rc) {
-		DE("Thread IN: Could not create the acceptor thread, terminating");
+		DE("Thread IN: Could not create the acceptor thread, terminating\n");
 		pepa_print_pthread_create_error(rc);
 		PEPA_TRY_ABORT();
 		pthread_exit(NULL);
@@ -1001,7 +1001,7 @@ void *pepa_in_thread(__attribute__((unused))void *arg)
 			/*** Process file descriptors, send data to SHVA  ***/
 			rc = pepa_in_thread_send_data(core, xconn, fd_members, read_set);
 			if (PEPA_ERR_OK != rc) {
-				DE("Error in processing file descriptors \n");
+				DE("Error in processing file descriptors\n");
 				break;
 			}
 		} while (buf_arr_get_members_count(core->buf_in_fds) > 0);
@@ -1270,7 +1270,7 @@ void *pepa_shva_thread(__attribute__((unused))void *arg)
 		DDD("Thread SHVA: Going to start the IN thread\n");
 		const int in_create_rc = pthread_create(&core->in_thread.thread_id, NULL, pepa_in_thread, NULL);
 		if (0 != in_create_rc) {
-			DE("Something wrong witb IN thread, not created; terminate here");
+			DE("Something wrong witb IN thread, not created; terminate here\n");
 			pepa_print_pthread_create_error(in_create_rc);
 			perror("Can not create IN thread: ");
 			pepa_back_to_disconnected_state();
@@ -1302,7 +1302,7 @@ void *pepa_shva_thread(__attribute__((unused))void *arg)
 		DDD("Thread SHVA: Going to stop the IN thread\n");
 		const int in_calncel_rc = pthread_cancel(core->in_thread.thread_id);
 		if (0 != in_calncel_rc) {
-			DE("Thread SHVA: Error happened on stopping the IN thread");
+			DE("Thread SHVA: Error happened on stopping the IN thread\n");
 		} else {
 			DDD("Thread SHVA: The IN thread stopped\n");
 		}
