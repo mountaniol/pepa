@@ -16,6 +16,7 @@
 #include "pepa_errors.h"
 #include "pepa_core.h"
 #include "pepa_debug.h"
+#include "pepa_state_machine.h"
 #include "buf_t/buf_t.h"
 #include "buf_t/se_debug.h"
 
@@ -1040,119 +1041,6 @@ cancel_it:
 	}
 
 	pthread_exit(NULL);
-}
-
-static void pepa_cancel_thread(pthread_t pid, const char *name)
-{
-	int rc = pthread_cancel(pid);
-	if (0 != rc) {
-		DE("Can not cancel %s thread\n", name);
-	} else {
-		DDD("Terminated %s thread\n", name);
-	}
-}
-static void pepa_close_socket(int fd, const char *socket_name)
-{
-	if (fd > 0) {
-		int rc = close(fd);
-		if (0 != rc) {
-			DE("Can not close %s, error %d\n",
-			   socket_name, rc);
-		}
-	}
-}
-
-/* This function returns the state machine to the disconnected state */
-/**
- * @author Sebastian Mountaniol (12/11/23)
- * @brief Finish all thread but SHVA; Close all sockets.
- * @details This function returns everything to to very beginning state.
- * It closed all opened sockets, stop all threads but SHVA thread.
- * After this funcion is finished, the SHVA can start from the very beginning,
- * opening all sockets, starting all threads and so on.
- */
-static void pepa_back_to_disconnected_state(void)
-{
-	int                  rc;
-	int                  index;
-	pepa_core_t          *core = pepa_get_core();
-	pepa_in_thread_fds_t *fds  = core->acceptor_shared;
-
-	DD("BACK TO DISCONNECTED STATE\n");
-	pepa_core_lock();
-	sem_wait(&fds->buf_fds_mutex);
-
-	/*** Terminate threads ***/
-
-	pepa_cancel_thread(core->in_thread.thread_id, "IN");
-	core->in_thread.thread_id = -1;
-
-	pepa_cancel_thread(core->acceptor_thread.thread_id, "ACCEPTOR");
-	core->acceptor_thread.thread_id = -1;
-
-	pepa_cancel_thread(core->out_thread.thread_id, "OUT");
-	core->out_thread.thread_id = -1;
-
-	/*** Close all Acceptor file descriptors ***/
-
-	if (NULL != fds->buf_fds) {
-		for (index = 0; index < buf_arr_get_members_count(fds->buf_fds); index++) {
-			const int *fd = buf_arr_get_member_ptr(fds->buf_fds, index);
-			rc = close(*fd);
-			if (0 != rc) {
-				DE("Can not close Acceptor read socket fd (%d), error: %d\n", *fd, rc);
-			}
-		}
-
-		rc = buf_free(fds->buf_fds);
-		if (0 != rc) {
-			DE("Can not free buf_array, memory leak is possible: %s\n",
-			   buf_error_code_to_string(rc));
-		}
-		fds->buf_fds = NULL;
-	}
-
-	/* We do not need the semaphore anymore */
-	sem_post(&fds->buf_fds_mutex);
-
-	/** Close all IN file descriptors ***/
-
-	if (NULL != core->buf_in_fds) {
-		for (index = 0; index < buf_arr_get_members_count(core->buf_in_fds); index++) {
-			const int *fd = buf_arr_get_member_ptr(core->buf_in_fds, index);
-			rc = close(*fd);
-			if (0 != rc) {
-				DE("Can not close IN read socket fd (%d), error: %d\n", *fd, rc);
-			}
-		}
-
-		rc = buf_free(core->buf_in_fds);
-		if (0 != rc) {
-			DE("Can not free buf_array, memory leak possible: %s\n",
-			   buf_error_code_to_string(rc));
-		}
-		core->buf_in_fds = NULL;
-	}
-
-	/*** Close the rest of the sockets ****/
-
-	/* Close the IN socket */
-	pepa_close_socket(core->sockets.in_listen, "core->in_thread.fd_listen");
-	core->sockets.in_listen = -1;
-
-	/* Close the SHVA write socket */
-	pepa_close_socket(core->sockets.shva_rw, "core->shva_thread.fd_write");
-	core->sockets.shva_rw = -1;
-
-	/* Close the OUT listen socket */
-	pepa_close_socket(core->sockets.out_listen, "core->shva_thread.fd_write");
-	core->sockets.out_listen = -1;
-
-	/* Close the OUT listen socket */
-	pepa_close_socket(core->sockets.out_read, "core->shva_thread.fd_write");
-	core->sockets.out_read = -1;
-
-	pepa_core_unlock();
 }
 
 static void pepa_shva_prepare_core(void)

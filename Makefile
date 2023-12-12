@@ -29,7 +29,7 @@ PEPA_DEFINES+=-DPEPA_HOST=\"$(PEPA_HOST_VAL)\"
 #CFLAGS+= -DPEPA_VERSION_GIT=\"$(PEPA_VERSION_GIT_VAL)\"
 CFLAGS+=$(PEPA_DEFINES)
 
-PEPA_O=pepa_parser.o main.o pepa_core.o pepa_server.o pepa_socket.o pepa_errors.o 
+PEPA_O=pepa_state_machine.o pepa_parser.o main.o pepa_core.o pepa_server.o pepa_socket.o pepa_errors.o 
 PEPA_T=pepa-ng
 BUFT_AR=buf_t/buf_t.a
 
