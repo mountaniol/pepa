@@ -1042,6 +1042,26 @@ cancel_it:
 	pthread_exit(NULL);
 }
 
+static void pepa_cancel_thread(pthread_t pid, const char *name)
+{
+	int rc = pthread_cancel(pid);
+	if (0 != rc) {
+		DE("Can not cancel %s thread\n", name);
+	} else {
+		DDD("Terminated %s thread\n", name);
+	}
+}
+static void pepa_close_socket(int fd, const char *socket_name)
+{
+	if (fd > 0) {
+		int rc = close(fd);
+		if (0 != rc) {
+			DE("Can not close %s, error %d\n",
+			   socket_name, rc);
+		}
+	}
+}
+
 /* This function returns the state machine to the disconnected state */
 /**
  * @author Sebastian Mountaniol (12/11/23)
@@ -1059,22 +1079,16 @@ static void pepa_back_to_disconnected_state(void)
 	pepa_core_lock();
 	sem_wait(&fds->buf_fds_mutex);
 
-	/* Close IN thread and Acceptor thread */
-	rc = pthread_cancel(core->in_thread.thread_id);
-	if (0 != rc) {
-		DE("Can not cancel IN thread\n");
-	} else {
-		DDD("Terminated IN thread\n");
-	}
+	/* Cancel threads */
 
+	pepa_cancel_thread(core->in_thread.thread_id, "IN");
 	core->in_thread.thread_id = -1;
-	rc = pthread_cancel(core->acceptor_thread.thread_id);
-	if (0 != rc) {
-		DE("Can not cancel Acceptor thread\n");
-	} else {
-		DDD("Terminated Acceptor thread\n");
-	}
+
+	pepa_cancel_thread(core->acceptor_thread.thread_id, "ACCEPTOR");
 	core->acceptor_thread.thread_id = -1;
+
+	pepa_cancel_thread(core->out_thread.thread_id, "OUT");
+	core->out_thread.thread_id = -1;
 
 	/* Close all Acceptor file descriptors */
 	if (NULL != fds->buf_fds) {
@@ -1116,24 +1130,17 @@ static void pepa_back_to_disconnected_state(void)
 	}
 
 	/* Close the IN socket */
-	if (core->in_thread.fd_listen > 0) {
-		rc = close(core->in_thread.fd_listen);
-		if (0 != rc) {
-			DE("Can not close listening socket (%d) of IN thread, error %d\n",
-			   core->in_thread.fd_listen, rc);
-		}
-		core->in_thread.fd_listen = -1;
-	}
+	pepa_close_socket(core->in_thread.fd_listen, "core->in_thread.fd_listen");
+	core->in_thread.fd_listen = -1;
 
-	/* Close the SHVA socket */
-	if (core->shva_thread.fd_listen > 0) {
-		rc = close(core->shva_thread.fd_listen);
-		if (0 != rc) {
-			DE("Can not close listening socket (%d) of IN thread, error %d\n",
-			   core->shva_thread.fd_listen, rc);
-		}
-		core->shva_thread.fd_listen = -1;
-	}
+	/* Close the SHVA listening socket */
+	pepa_close_socket(core->shva_thread.fd_listen, "core->shva_thread.fd_listen");
+	core->shva_thread.fd_listen = -1;
+
+	/* Close the SHVA write socket */
+	pepa_close_socket(core->shva_thread.fd_listen, "core->shva_thread.fd_listen");
+	core->shva_thread.fd_listen = -1;
+
 	pepa_core_unlock();
 }
 
@@ -1230,7 +1237,9 @@ void *pepa_shva_thread(__attribute__((unused))void *arg)
 		if (core->out_thread.fd_listen < 0) {
 			core->out_thread.fd_listen = pepa_open_socket(&s_addr, core->out_thread.ip_string, core->out_thread.port_int, 1);
 			if (core->out_thread.fd_listen < 0) {
-				DE("Can not create SHVA socket\n");
+				DE("Can not create SHVA socket; sleep 10 seconds and try again\n");
+				/* Wait 10 seconds before continue */
+				sleep(10);
 				continue;
 			}
 		}
@@ -1242,6 +1251,7 @@ void *pepa_shva_thread(__attribute__((unused))void *arg)
 		/* Acept OUT connection */
 		rc = pepa_shva_wait_first_OUT_connection((struct sockaddr *)&s_addr);
 		if (PEPA_ERR_OK != rc) {
+			DE("Waiting for OUT connection returned error; going to FAIL state\n");
 			pepa_back_to_disconnected_state();
 			continue;
 		}
@@ -1254,10 +1264,10 @@ void *pepa_shva_thread(__attribute__((unused))void *arg)
 		core->shva_thread.fd_write = pepa_open_shava_connection();
 
 		if (core->shva_thread.fd_write < 0) {
-			DE("Can not open connection to SHVA server\n");
+			DE("Can not open connection to SHVA server; wait 10 seconds and try over\n");
 			/* Here we shoudl close connection to OUT socket and wait for the new OUT connection */
 			close(core->out_thread.fd_write);
-			core->out_thread.fd_write = -1;
+			pepa_back_to_disconnected_state();
 			continue;
 		}
 
@@ -1290,23 +1300,8 @@ void *pepa_shva_thread(__attribute__((unused))void *arg)
 		/*** The inifnite loop was interrupted ***/
 
 		if (PEPA_ERR_OK != rc) {
-			DE("Thread SHVA: An error happened in copy_between_sockects loop: %s\n", pepa_error_code_to_str(rc));
-			pepa_back_to_disconnected_state();
-			continue;
+			DD("Thread SHVA: Something happened in the copy_between_sockects loop: %s\n", pepa_error_code_to_str(rc));
 		}
-
-		/* Else, if no critical error, we should reselt all and start over */
-
-		/*** Ternimate IN thread ***/
-
-		DDD("Thread SHVA: Going to stop the IN thread\n");
-		const int in_calncel_rc = pthread_cancel(core->in_thread.thread_id);
-		if (0 != in_calncel_rc) {
-			DE("Thread SHVA: Error happened on stopping the IN thread\n");
-		} else {
-			DDD("Thread SHVA: The IN thread stopped\n");
-		}
-
 
 		/*** Terminate everything, start over ***/
 
