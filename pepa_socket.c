@@ -12,6 +12,7 @@
 
 
 #include <errno.h>
+#include "pepa_config.h"
 #include "pepa_socket.h"
 #include "pepa_errors.h"
 #include "pepa_core.h"
@@ -19,10 +20,6 @@
 #include "pepa_state_machine.h"
 #include "buf_t/buf_t.h"
 #include "buf_t/se_debug.h"
-
-#ifndef PPEPA_MAX
-	#define PEPA_MAX(a,b) ( a > b ? a : b)
-#endif
 
 static void pepa_print_pthread_create_error(const int rc)
 {
@@ -51,7 +48,6 @@ static void pepa_print_pthread_create_error(const int rc)
  * @return x_connect_t* Allocated and filled structure
  * @details 
  */
-
 static x_connect_t *x_connect_t_alloc(int fd_src, int fd_dst, size_t buf_size)
 {
 	x_connect_t *xconn = calloc(sizeof(x_connect_t), 1);
@@ -220,7 +216,6 @@ static int pepa_open_shava_connection(void)
  * @details 
  */
 
-__attribute__((pure))
 static int pepa_analyse_accept_error(const int error_code)
 {
 	switch (error_code) {

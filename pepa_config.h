@@ -16,4 +16,8 @@
 /* Predefined number of SHVA clients */
 #define PEPA_SHVA_SOCKETS (1)
 
+#ifndef PPEPA_MAX
+	#define PEPA_MAX(a,b) ( a > b ? a : b)
+#endif
+
 #endif /* _PEPA_CONFIG_H_ */
