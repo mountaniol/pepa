@@ -890,7 +890,7 @@ void *pepa_in_thread(__attribute__((unused))void *arg)
 	}
 
 	/* Prepare the xconn structure: we always copy to shava socket */
-	xconn = x_connect_t_alloc(core->shva_thread.fd_listen, 0, core->internal_buf_size);
+	xconn = x_connect_t_alloc(core->sockets.shva_rw, 0, core->internal_buf_size);
 	if (NULL == xconn) {
 		DE("Thread IN: Can not create x_connect_t structure\n");
 		PEPA_TRY_ABORT();
@@ -1130,24 +1130,20 @@ static void pepa_back_to_disconnected_state(void)
 	}
 
 	/* Close the IN socket */
-	pepa_close_socket(core->in_thread.fd_listen, "core->in_thread.fd_listen");
-	core->in_thread.fd_listen = -1;
-
-	/* Close the SHVA listening socket */
-	pepa_close_socket(core->shva_thread.fd_listen, "core->shva_thread.fd_listen");
-	core->shva_thread.fd_listen = -1;
+	pepa_close_socket(core->sockets.in_listen, "core->in_thread.fd_listen");
+	core->sockets.in_listen = -1;
 
 	/* Close the SHVA write socket */
-	pepa_close_socket(core->shva_thread.fd_write, "core->shva_thread.fd_write");
-	core->shva_thread.fd_write = -1;
+	pepa_close_socket(core->sockets.shva_rw, "core->shva_thread.fd_write");
+	core->sockets.shva_rw = -1;
 
 	/* Close the OUT listen socket */
-	pepa_close_socket(core->out_thread.fd_listen, "core->shva_thread.fd_write");
-	core->out_thread.fd_listen = -1;
+	pepa_close_socket(core->sockets.out_listen, "core->shva_thread.fd_write");
+	core->sockets.out_listen = -1;
 
 	/* Close the OUT listen socket */
-	pepa_close_socket(core->out_thread.fd_read, "core->shva_thread.fd_write");
-	core->out_thread.fd_read = -1;
+	pepa_close_socket(core->sockets.out_read, "core->shva_thread.fd_write");
+	core->sockets.out_read = -1;
 
 	pepa_core_unlock();
 }
@@ -1155,29 +1151,26 @@ static void pepa_back_to_disconnected_state(void)
 static void pepa_shva_prepare_core(void)
 {
 	pepa_core_t *core = pepa_get_core();
-	core->out_thread.fd_listen = -1;
-	core->out_thread.fd_read = -1;
-	core->out_thread.fd_write = -1;
-	core->shva_thread.fd_listen = -1;
-	core->shva_thread.fd_read = -1;
-	core->shva_thread.fd_write = -1;
+	core->sockets.out_listen = -1;
+	core->sockets.out_read = -1;
+	core->sockets.shva_rw = -1;
 }
 
 __attribute__((nonnull(1)))
 static int pepa_shva_wait_first_OUT_connection(struct sockaddr *s_addr)
 {
 	pepa_core_t *core = pepa_get_core();
-	while (core->out_thread.fd_read < 0) {
+	while (core->sockets.out_read < 0) {
 		int       error_action = PEPA_ERR_OK;
 
 		socklen_t addrlen      = sizeof(struct sockaddr);
 
 		DDD("Thread SHVA: Starting OUT 'accept' waiting\n");
-		core->out_thread.fd_read = accept(core->out_thread.fd_listen, s_addr, &addrlen);
+		core->sockets.out_read = accept(core->sockets.out_listen, s_addr, &addrlen);
 		DDD("Thread SHVA: Accepted OUT connection\n");
 
 		/* If something went wrong, analyze the error and decide what to do */
-		if (core->out_thread.fd_read < 0) {
+		if (core->sockets.out_read < 0) {
 			DE("Thread SHVA: Some error happend regarding accepting WAITING connection\n");
 			error_action = pepa_analyse_accept_error(errno);
 		}
@@ -1242,9 +1235,9 @@ void *pepa_shva_thread(__attribute__((unused))void *arg)
 		/*** Create OUT listening socket ***/
 
 		DDD("Thread SHVA: Going to create out socket\n");
-		if (core->out_thread.fd_listen < 0) {
-			core->out_thread.fd_listen = pepa_open_socket(&s_addr, core->out_thread.ip_string, core->out_thread.port_int, 1);
-			if (core->out_thread.fd_listen < 0) {
+		if (core->sockets.out_listen < 0) {
+			core->sockets.out_listen = pepa_open_socket(&s_addr, core->out_thread.ip_string, core->out_thread.port_int, 1);
+			if (core->sockets.out_listen < 0) {
 				DE("Can not create SHVA socket; sleep 10 seconds and try again\n");
 				/* Wait 10 seconds before continue */
 				sleep(10);
@@ -1269,12 +1262,10 @@ void *pepa_shva_thread(__attribute__((unused))void *arg)
 		/* 4. Connect to SHVA server */
 		DDD("Thread SHVA: Finished with OUT: there is connection\n");
 		DDD("Thread SHVA: Going to create SHVA socket\n");
-		core->shva_thread.fd_write = pepa_open_shava_connection();
+		core->sockets.shva_rw = pepa_open_shava_connection();
 
-		if (core->shva_thread.fd_write < 0) {
+		if (core->sockets.shva_rw < 0) {
 			DE("Can not open connection to SHVA server; wait 10 seconds and try over\n");
-			/* Here we shoudl close connection to OUT socket and wait for the new OUT connection */
-			close(core->out_thread.fd_write);
 			pepa_back_to_disconnected_state();
 			continue;
 		}
@@ -1300,9 +1291,9 @@ void *pepa_shva_thread(__attribute__((unused))void *arg)
 		/*** Enter infinite loop ****/
 
 		DDD("Thread SHVA: Starting the internal loop copy_between_sockects\n");
-		int rc = pepa_copy_between_sockects(core->shva_thread.fd_write,
+		int rc = pepa_copy_between_sockects(core->sockets.shva_rw,
 											core->controls.shva_from_ctl,
-											core->out_thread.fd_listen,
+											core->sockets.out_listen,
 											core->internal_buf_size);
 
 		/*** The inifnite loop was interrupted ***/

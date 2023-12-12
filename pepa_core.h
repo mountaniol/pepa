@@ -93,6 +93,14 @@ typedef enum {
 }
 pepa_state_sig_t;
 
+typedef struct {
+	int event_fd; /**< This is a socket to signal between IN and Acceptro threads */
+	buf_t * buf_fds; /**< Array of sockets file descriptors; filled in Acceptor thread, then merged in IN thread */
+	sem_t buf_fds_mutex; /**< A semaphor used to sync the core struct between multiple threads */
+	struct sockaddr_in   s_addr;
+	int socket; /** < Socket to accept new connections */
+} pepa_in_thread_fds_t;
+
 /**
  * @author Sebastian Mountaniol (12/12/23)
  * @brief Per-thread variables
@@ -103,25 +111,23 @@ typedef struct {
 	pthread_t thread_id; /**< UD of thread */
 
 	/* Socket related */
-	int  fd_listen; /**< File descriptor of listening socket, i.e., a shoild be listened to accept incoming connection */
-	int  fd_read; /**< File descriptor of accepted connection socket, i.e., a socket to read from */
-	int  fd_write; /**< File descriptor of opening connection to another server; used in SHVA */
 	buf_t *ip_string; /**< IP of socket  */
 	int port_int; /**< Port of socket  */
 	int clients; /**< Number of clients on this socket */
 } thread_vars_t;
 
+/**
+ * @author Sebastian Mountaniol (12/12/23)
+ * @brief Sockets (listen / read / write ) of all threads are
+ *  	  gathered in this stucture
+ * @details 
+ */
 typedef struct {
-	int event_fd; /**< This is a socket to signal between IN and Acceptro threads */
-	buf_t * buf_fds; /**< Array of sockets file descriptors; filled in Acceptor thread, then merged in IN thread */
-	sem_t buf_fds_mutex; /**< A semaphor used to sync the core struct between multiple threads */
-	struct sockaddr_in   s_addr;
-	int socket; /** < Socket to accept new connections */
-} pepa_in_thread_fds_t;
-
-typedef enum {
-	PEPA_CTL_FAIL = 1 /**< This valie send from CONTROL to SHVA and commands to go to FAIL state */
-} pepa_control_val_t;
+	int shva_rw;
+	int out_listen;
+	int out_read;
+	int in_listen;
+} pepa_sockets_t;
 
 typedef struct {
 	int ctl_from_shva; /**< This event fd will signalize from SHVA to CONTROL */
@@ -157,6 +163,7 @@ typedef struct {
 	buf_t *buf_in_fds; /* IN thread file descriptors of opened connections */
 	pepa_in_thread_fds_t *acceptor_shared; /* The structure shared between IN and Acceptor thread */
 	pepa_control_fds_t controls; /**< These event fds used for communication between control thread and all other threads */
+	pepa_sockets_t sockets;
 
 } pepa_core_t;
 
