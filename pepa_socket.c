@@ -1138,8 +1138,16 @@ static void pepa_back_to_disconnected_state(void)
 	core->shva_thread.fd_listen = -1;
 
 	/* Close the SHVA write socket */
-	pepa_close_socket(core->shva_thread.fd_listen, "core->shva_thread.fd_listen");
-	core->shva_thread.fd_listen = -1;
+	pepa_close_socket(core->shva_thread.fd_write, "core->shva_thread.fd_write");
+	core->shva_thread.fd_write = -1;
+
+	/* Close the OUT listen socket */
+	pepa_close_socket(core->out_thread.fd_listen, "core->shva_thread.fd_write");
+	core->out_thread.fd_listen = -1;
+
+	/* Close the OUT listen socket */
+	pepa_close_socket(core->out_thread.fd_read, "core->shva_thread.fd_write");
+	core->out_thread.fd_read = -1;
 
 	pepa_core_unlock();
 }
