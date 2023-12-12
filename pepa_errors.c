@@ -5,6 +5,10 @@
 typedef enum {
 	PEPA_ERR_OK = 0,
 
+	/* Not so errors */
+	PEPA_ERR_EVENT, /* This is code telling an event received on event fd  */
+	PEPA_ERR_STOP, /* This is code telling to thread to stop */
+
 	/* Memory related errors */
 	PEPA_ERR_NULL_POINTER,
 	PEPA_ERR_ALLOCATION,
@@ -16,7 +20,6 @@ typedef enum {
 	PEPA_ERR_CORE_DESTROY,
 
 	/* Network related errors */
-	PEPA_ERR_INVALID_ADDRESS,
 	PEPA_ERR_ADDRESS_FORMAT,
 	PEPA_ERR_SOCKET_CREATION,
 	PEPA_ERR_SOCKET_BIND,
@@ -24,23 +27,27 @@ typedef enum {
 	PEPA_ERR_SOCK_CONNECT,
 	PEPA_ERR_CONVERT_ADDR,
 
-
 	/* Data transfer */
 	PEPA_ERR_SELECT_EXCEPTION_LEFT,
 	PEPA_ERR_SELECT_EXCEPTION_RIGHT,
 	PEPA_ERR_SELECT_ABNORMAL,
 	PEPA_ERR_SOCKET_READ,
+	PEPA_ERR_BAD_SOCKET_READ,
+	PEPA_ERR_BAD_SOCKET_WRITE,
 	PEPA_ERR_SOCKET_READ_CLOSED,
 	PEPA_ERR_SOCKET_WRITE,
 	PEPA_ERR_SOCKET_WRITE_CLOSED,
-
 } pepa_error_t;
+
 #endif
 
 const char *pepa_error_code_to_str(int code)
 {
-	switch (abs(code)) {
+	pepa_error_t enum_code = abs(code);
+	switch (enum_code) {
 	case PEPA_ERR_OK: return "OK";
+	case PEPA_ERR_EVENT: return "And event received on event fd desciptor";
+	case PEPA_ERR_STOP: return "Thread must stop and terminate";
 
 	/* Memory related errors */
 	case PEPA_ERR_NULL_POINTER: return "An argument is NULL pointer";
@@ -63,6 +70,10 @@ const char *pepa_error_code_to_str(int code)
 	/* Data transfer */
 	case PEPA_ERR_SELECT_EXCEPTION_LEFT: return "An exception happened on 'left' file descriptor";
 	case PEPA_ERR_SELECT_EXCEPTION_RIGHT: return "An exception happened on 'right' file descriptor";
+	case PEPA_ERR_SELECT_ABNORMAL: return "select() call finished with an error";
+	case PEPA_ERR_SOCKET_READ: return "Data transfer between sockets finished with an error";
+	case PEPA_ERR_BAD_SOCKET_READ: return "Could not read from socket; this is not because socket is closed";
+	case PEPA_ERR_BAD_SOCKET_WRITE: return "Could not write to socket; this is not because socket is closed";
 	case PEPA_ERR_SOCKET_READ_CLOSED: return "Socked closed when tried to read from";
 	case PEPA_ERR_SOCKET_WRITE: return "Socked closed when tried to write to";
 	case PEPA_ERR_SOCKET_WRITE_CLOSED: return "Right socked closed when tried to write to";

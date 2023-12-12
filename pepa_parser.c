@@ -27,19 +27,27 @@
 #include "pepa_core.h"
 #include "pepa_errors.h"
 #include "pepa_debug.h"
-
 #include "pepa_parser.h"
+#include "pepa_version.h"
+
+void pepa_print_version(void)
+{
+	printf("pepa-ng version: %d.%d.%d\n", PEPA_VERSION_MAJOR, PEPA_VERSION_MINOR, PEPA_VERSION_PATCH);
+	printf("git commmit: %s branch %s\n", PEPA_VERSION_GIT, PEPA_BRANCH_GIT);
+	printf("Compiled at %s by %s@%s\n", PEPA_COMP_DATE, PEPA_USER, PEPA_HOST);
+}
 
 static void pepa_show_help(void)
 {
 	printf("Use:\n"
-		   "--help  | -h - show this help\n"
-		   "--shva  | -s - address of SHVA server to connect to in form: '1.2.3.4:7887'\n"
-		   "--out   | -o - address of OUT listening socket, waiting for OUT stram connnection, in form '1.2.3.4:9779'\n"
-		   "--in    | -i - address of IN  listening socket, waiting for OUT stram connnection, in form '1.2.3.4:3748'\n"
-		   "--inim  | -n - max number of IN clients, by default 1024\n"
-		   "--abort | -a - abort on errors, for debug\n"
-		   "--bsize | -b - size of internal buffer, in bytes; if not given, 1024 byte will be set\n");
+		   "--shva    | -s - address of SHVA server to connect to in form: '1.2.3.4:7887'\n"
+		   "--out     | -o - address of OUT listening socket, waiting for OUT stram connnection, in form '1.2.3.4:9779'\n"
+		   "--in      | -i - address of IN  listening socket, waiting for OUT stram connnection, in form '1.2.3.4:3748'\n"
+		   "--inim    | -n - max number of IN clients, by default 1024\n"
+		   "--abort   | -a - abort on errors, for debug\n"
+		   "--bsize   | -b - size of internal buffer, in bytes; if not given, 1024 byte will be set\n"
+		   "--version | -v - show version + git revision + compilation time\n"
+	       "--help    | -h - show this help\n");
 }
 
 static long int pepa_string_to_int_strict(char *s, int *err)
@@ -166,12 +174,14 @@ int pepa_parse_arguments(int argi, char *argv[])
 	//ip_port_t *ip_prev  = NULL;
 	pepa_core_t *core = pepa_get_core();
 
+#if 0 /* SEB */
 	/* We need at least 6 params : -- addr "address:port" -i "input_file" -o "output_file" */
 	if (argi < 6) {
 		printf("ERROR: At least 3 arguments expected: SHVA, IN, OUT\n");
 		pepa_show_help();
 		exit(0);
 	}
+#endif	
 
 	/* Long options. Address should be given in form addr:port*/
 	static struct option long_options[] = {
@@ -183,13 +193,14 @@ int pepa_parse_arguments(int argi, char *argv[])
 		{"inim",             required_argument,      0, 'n'},
 		{"abort",            no_argument,            0, 'a'},
 		{"bsize",            no_argument,            0, 'b'},
+		{"version",          no_argument,            0, 'v'},
 		{0, 0, 0, 0}
 	};
 
 
 	int                  opt;
 	int                  option_index   = 0;
-	while ((opt = getopt_long(argi, argv, "s:o:i:n:ha", long_options, &option_index)) != -1) {
+	while ((opt = getopt_long(argi, argv, "s:o:i:n:hav", long_options, &option_index)) != -1) {
 		switch (opt) {
 		case 's': /* SHVA Server address to connect to */
 			core->shva_thread.ip_string = pepa_parse_ip_string_get_ip(optarg);
@@ -246,7 +257,10 @@ int pepa_parse_arguments(int argi, char *argv[])
 			break;
 		case 'h': /* Show help */
 			pepa_show_help();
-			break;
+			exit(0);
+		case 'v': /* Show help */
+			pepa_print_version();
+			exit(0);
 		default:
 			printf("Unknown argument: %c\n", opt);
 			pepa_show_help();

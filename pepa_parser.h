@@ -12,4 +12,7 @@
  */
 int pepa_parse_arguments(int argi, char *argv[]);
 
+
+void pepa_print_version(void);
+
 #endif /* _PEPA_PARSE_H__ */

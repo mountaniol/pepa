@@ -122,7 +122,7 @@ static int pepa_open_socket(struct sockaddr_in *s_addr, const buf_t *ip_address,
 		return (-PEPA_ERR_CONVERT_ADDR);
 	}
 
-	DD("Open Socket: Going to create coscket for %ss\n", ip_address->data);
+	DD("Open Socket: Going to create socket for %s:%d\n", ip_address->data, port);
 	sock = socket(PF_INET, SOCK_STREAM, 0);
 	if (sock  < 0) {
 		syslog(LOG_ERR, "could not create listen socket: %s\n", strerror(errno));
@@ -835,7 +835,7 @@ void *pepa_in_thread(__attribute__((unused))void *arg)
 
 	/*** Open listening socket ****/
 
-	DDD("Thread IN: Going to created IN socket\n");
+	DDD("Thread IN: Going to create IN socket\n");
 
 	rc = pepa_in_thread_create_socket(core, &s_addr);
 
@@ -1054,6 +1054,8 @@ static void pepa_back_to_disconnected_state(void)
 	int                  index;
 	pepa_core_t          *core = pepa_get_core();
 	pepa_in_thread_fds_t *fds  = core->acceptor_shared;
+
+	DD("BACK TO DISCONNECTED STATE\n");
 	pepa_core_lock();
 	sem_wait(&fds->buf_fds_mutex);
 

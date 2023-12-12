@@ -77,7 +77,7 @@ static void pepa_core_set_default_values(pepa_core_t *core)
  *  	  with defailt values, like '-1' for file descriptors
  * @param  void  
  * @return pepa_core_t* Allocated and inited pepa_core_t struct
- * @details THe semaphor is inited and ready for usage when the
+ * @details The semaphor is inited and ready for usage when the
  *  		structure returned to caller 
  */
 static pepa_core_t *pepa_create_core_t(void)
@@ -101,8 +101,16 @@ static pepa_core_t *pepa_create_core_t(void)
 	core->controls.ctl_from_acceptor = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
 	core->controls.ctl_from_shva = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
 	core->controls.ctl_from_in = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
-	core->controls.ctl_from_acceptor = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
+	core->controls.ctl_from_out = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
+
+	core->controls.acceptor_from_ctl = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
 	core->controls.shva_from_ctl = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
+	core->controls.in_from_ctl = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
+	core->controls.out_from_ctl = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
+
+	core->shva_thread.clients = PEPA_SHVA_SOCKETS;
+	core->out_thread.clients = PEPA_OUT_SOCKETS;
+	core->in_thread.clients = PEPA_IN_SOCKETS;
 	return core;
 }
 
@@ -270,7 +278,7 @@ int pepa_core_unlock(void)
 }
 
 
-int pepa_if_abort()
+int pepa_if_abort(void)
 {
 	if (NULL == g_pepa_core) {
 		return 0;

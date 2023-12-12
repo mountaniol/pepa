@@ -27,6 +27,7 @@
 #include "pepa_errors.h"
 #include "pepa_parser.h"
 #include "pepa_socket.h"
+#include "pepa_version.h"
 
 #if 0 /* SEB */
 /**** GLOBAL FILE DESCRIPTORS *****/
@@ -399,6 +400,10 @@ int       main(int argi, char *argv[])
 {
 	int rc;
 	atexit(bye);
+
+	//printf("pepa-ng version %d.%d.%d/%s\n", PEPA_VERSION_MAJOR, PEPA_VERSION_MINOR, PEPA_VERSION_PATCH, PEPA_VERSION_GIT);
+
+	pepa_print_version();
 
 	DDD("Going to init core\n");
 	rc = pepa_core_init();

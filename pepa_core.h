@@ -93,6 +93,11 @@ typedef enum {
 }
 pepa_state_sig_t;
 
+/**
+ * @author Sebastian Mountaniol (12/12/23)
+ * @brief Per-thread variables
+ * @details 
+ */
 typedef struct {
 	/* Thread related */
 	pthread_t thread_id; /**< UD of thread */
@@ -101,8 +106,8 @@ typedef struct {
 	int  fd_listen; /**< File descriptor of listening socket, i.e., a shoild be listened to accept incoming connection */
 	int  fd_read; /**< File descriptor of accepted connection socket, i.e., a socket to read from */
 	int  fd_write; /**< File descriptor of opening connection to another server; used in SHVA */
-	buf_t *ip_string; /**< IP of the OUT socket  */
-	int port_int; /**< Port the OUT socket  */
+	buf_t *ip_string; /**< IP of socket  */
+	int port_int; /**< Port of socket  */
 	int clients; /**< Number of clients on this socket */
 } thread_vars_t;
 
