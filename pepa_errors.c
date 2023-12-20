@@ -63,6 +63,7 @@ const char *pepa_error_code_to_str(int code)
 	case PEPA_ERR_ADDRESS_FORMAT: return "IP address format is invalid";
 	case PEPA_ERR_SOCKET_CREATION: return "Can not create socket";
 	case PEPA_ERR_SOCKET_BIND: return "Can not bind socket";
+	case PEPA_ERR_SOCKET_IN_USE: return "Socket in use";
 	case PEPA_ERR_SOCKET_LISTEN: return "Can not listen on socket";
 	case PEPA_ERR_SOCK_CONNECT: return "Can not connect socket";
 	case PEPA_ERR_CONVERT_ADDR: return "Can not convert IP address from string to binary";

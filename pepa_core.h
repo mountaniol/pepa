@@ -9,103 +9,10 @@
 #include "buf_t/buf_t.h"
 
 /**
- * @author Sebastian Mountaniol (7/20/23)
- * @brief This enum used to indicate what is the mode of IN and
- *  	  OUT streams. A stream can be file, fifo or socket.
- *  		The socket can be be one of 3 types: TCP, UDP ot
- *  		LOCAL (an Unux Domain Socket)
- * @details 
- */
-typedef enum in_and_out_mode {
-	MODE_NOT_INITED = 11,
-	MODE_FIFO = 17,
-	MODE_FILE = 18,
-	MODE_SOCKET_TCP = 19,
-	MODE_SOCKET_UDP = 20,
-	MODE_SOCKET_LOCAL = 21
-} in_out_mode_t;
-
-/**
- * @author Sebastian Mountaniol (12/7/23)
- * @brief These PEPA_ST_* values describe the state machine
- *  	  states of PEPA-NG. 
- * @details Here is the explanation of each state, signals of
- *          transition from state to state and actions:
- *
- * PEPA_ST_DISCONNECTED:
- * This state is the initial state. All sockets are down.
- * The PEPA-NG waits until the OUT socket is up, which means,
- * a remote client is connected. When it happens, PEPA makes
- * transition to the next state, CONNECTING
- *
- * PEPA_ST_CONNECTING:
- * In this state, PEPA starts a connection to the SHVA server.
- * When the connection is established, PEPA makes the transition to the
- * state ESTABLISHED.
- * If the connection to SHVA can not be established, PEPA closes the
- * OUT connection, and make the transition to the DISCONNECTED
- * state.
- *
- * PEPA_ST_ESTABLISHED:
- * In this state, PEPA is waiting for an IN connection.
- * It also passes all packets from SHVA to the OUT socket.
- * When the first IN connection is established, it makes the transition
- * to OPERATING state.
- *
- * In case of OUT or SHVA socket, it closes all sockets and makes
- * transition to DISCONNECTED state.
- *
- * PEPA_ST_OPERATING:
- * This is the main state where PEPA should be all the time.
- * All connections are established.
- * Packets from SHVA are being transferred to OUT.
- * Packets from multiple IN sockets are being transferred to SHVA.
- *
- * All IN connection could be closed; in this case PEPA makes
- * transition to ESTABLISHED.
- *
- * If any of the SHVA or OUT sockets is closed, PEPA closes another
- * socket (either SHVA or OUT, which of them is still opened)
- * and made the transition to an INTERMEDIATE state.
- *
- * PEPA_ST_COLLAPSE: This is the state when there is no
- * connection to SHVA and OUT, but IN sockets are still alive.
- * In this state, PEPS closes all IN sockets and makes a
- * transition to the DISCONNECTED state.
- */
-typedef enum {
-	PEPA_ST_FAIL = 1,
-	PEPA_ST_DISCONNECTED, /**< Initial state: all sockets are down */
-	PEPA_ST_CONNECTING, /**< OUT connection established */
-	PEPA_ST_ESTABLISHED, /**< SHVA connection established */
-	PEPA_ST_OPERATING, /**< IN connection stablished */
-	PEPA_ST_COLLAPSE /**< SHVA failed; IN connections are still established */
-} pepa_state_t;
-
-typedef enum {
-	PEPA_SIG_OUT_CLOSED = 1, /**< OUT socket is closed */
-	PEPA_SIG_SHVA_CLOSED, /**< SHVA socket is closed */
-	PEPA_SIG_ALL_IN_CLOSED, /**< All INsockets are closed */
-	PEPA_SIG_OUT_CONNECTED, /**< OUT socket connected */
-	PEPA_SIG_SHVA_CONNECTED, /**< SHVA connection is established */
-	PEPA_SIG_ALL_IN_OPENED, /**< At least one IN socket is connected */
-	PEPA_SIG_FAIL, /**< Could not execute a critical operation, like opening socket; state machine should transit to FAIL */
-}
-pepa_state_sig_t;
-
-typedef struct {
-	int event_fd; /**< This is a socket to signal between IN and Acceptro threads */
-	buf_t * buf_fds; /**< Array of sockets file descriptors; filled in Acceptor thread, then merged in IN thread */
-	sem_t buf_fds_mutex; /**< A semaphor used to sync the core struct between multiple threads */
-	struct sockaddr_in   s_addr;
-	int socket; /** < Socket to accept new connections */
-} pepa_in_thread_fds_t;
-
-/**
- * @author Sebastian Mountaniol (12/12/23)
- * @brief Per-thread variables
- * @details 
- */
+* @author Sebastian Mountaniol (12/12/23)
+* @brief Per-thread variables
+* @details 
+*/
 typedef struct {
 	pthread_t thread_id; /**< UD of thread */
 	buf_t *ip_string; /**< IP of socket  */
@@ -121,27 +28,85 @@ typedef struct {
  */
 typedef struct {
 	int shva_rw;
+	sem_t shva_rw_mutex;
+
 	int out_listen;
-	int out_read;
+	sem_t out_listen_mutex;
+
+	int out_write;
+	sem_t out_write_mutex;
+
 	int in_listen;
+	sem_t in_listen_mutex;
 } pepa_sockets_t;
 
-/**
- * @author Sebastian Mountaniol (12/12/23)
- * @brief Event sockets for Control thread
- * @details 
- */
-typedef struct {
-	int ctl_from_shva; /**< This event fd will signalize from SHVA to CONTROL */
-	int ctl_from_in; /**< This event fd will signalize that IN thread is canceled */
-	int ctl_from_out; /**< This event fd will signalize that OUT thread is canceled */
-	int ctl_from_acceptor; /**< This event fd will signalize that ACCEPTOR thread is canceled */
+typedef enum {
+	PEPA_TH_OUT_START = 0, /* Start thread routines */
+	PEPA_TH_OUT_CREATE_LISTEN, /* Create listening socket */
+	PEPA_TH_OUT_ACCEPT, /* Run accept() which creates Write socket */
+	PEPA_TH_OUT_START_TRANSFER, /* Start transfering thread */
+	PEPA_TH_OUT_WATCH_WRITE_SOCK, /* Watch the status of Write  socket */
+	PEPA_TH_OUT_CLOSE_WRITE_SOCKET, /* Close Write socket */
+	PEPA_TH_OUT_CLOSE_LISTEN_SOCKET, /* Close listening socket */
+	PEPA_TH_OUT_TERMINATE /* Terminate thread */
+} pepa_out_thread_state_t;
 
-	int shva_from_ctl; /**< This event fd listened in SHVA thread and receive commands from CONTROL thread */
-	int in_from_ctl; /**< This event fd listened in SHVA thread and receive commands from CONTROL thread */
-	int out_from_ctl; /**< This event fd listened in SHVA thread and receive commands from CONTROL thread */
-	int acceptor_from_ctl; /**< This event fd listened in SHVA thread and receive commands from CONTROL thread */
-} pepa_control_fds_t;
+typedef enum {
+	PEPA_TH_SHVA_START = 0, /* Start thread routines */
+	PEPA_TH_SHVA_OPEN_CONNECTION,
+	PEPA_TH_SHVA_TEST_CONNECTION, /* Test socket status */
+	PEPA_TH_SHVA_START_TRANSFER, /* Start transfering thread */
+	PEPA_TH_SHVA_WATCH_SOCKET, /* Watch the status of SHAV serrver socket */
+	PEPA_TH_SHVA_CLOSE_SOCKET, /* Close connection to SHVA sserver */
+	PEPA_TH_SHVA_TERMINATE /* Terminate thread */
+} pepa_shva_thread_state_t;
+
+typedef enum {
+	PEPA_TH_IN_START = 0, /* Start thread routines */
+	PEPA_TH_IN_CREATE_LISTEN, /* Create listening socket */
+	PEPA_TH_IN_CLOSE_LISTEN, /* Create listening socket */
+	PEPA_TH_IN_TEST_LISTEN_SOCKET, /* Create listening socket */
+	PEPA_TH_IN_WAIT_SHVA, /* Wait until SHVA is connected  */
+	PEPA_TH_IN_CREATE_WATCHDOG, /* Create a thread watchin Listen and SHVA sockets */
+	PEPA_TH_IN_ACCEPT, /* Run accept() which creates Write socket */
+	PEPA_TH_IN_START_TRANSFER, /* Start transfering thread */
+	PEPA_TH_IN_TERMINATE /* Terminate thread */
+} pepa_in_thread_state_t;
+
+typedef enum {
+	PEPA_ST_NONE = 0,
+	PEPA_ST_RUN,
+	PEPA_ST_FAIL,
+	PEPA_ST_SOCKET_RESET,
+	PEPA_ST_MAX
+} pepa_sig_t;
+
+typedef enum {
+	PEPA_PR_OUT = 0,
+	PEPA_PR_SHVA,
+	PEPA_PR_IN,
+	PEPA_PR_CLT,
+	PEPA_PR_MAX
+} pepa_proc_t;
+
+typedef enum {
+	PEPA_ACT_NONE = 0,
+	PEPA_ACT_START_OUT,
+	PEPA_ACT_START_IN,
+	PEPA_ACT_START_SHVA,
+	PEPA_ACT_STOP_OUT,
+	PEPA_ACT_STOP_IN,
+	PEPA_ACT_STOP_SHVA,
+	PEPA_ACT_RESTART_ALL,
+	PEPA_ACT_ABORT,
+	PEPA_ACT_MAX,
+} pepa_action_t;
+
+typedef struct {
+	int signals[PEPA_PR_MAX];
+	pthread_cond_t sync;
+	pthread_mutex_t sync_sem;
+} pepa_status_t;
 
 /**
  * @author Sebastian Mountaniol (7/20/23)
@@ -153,19 +118,14 @@ typedef struct {
 typedef struct {
 	sem_t mutex; /**< A semaphor used to sync the core struct between multiple threads */
 
-	int state; /**< This is state machine status */
-
 	thread_vars_t ctl_thread; /**< Configuration of SHVA thread */
 	thread_vars_t shva_thread; /**< Configuration of SHVA thread */
 	thread_vars_t in_thread; /**< Configuration of IN thread */
 	thread_vars_t out_thread; /**< Configuration of OUT thread */
-	thread_vars_t acceptor_thread; /**< Configuration of OUT thread */
 	int internal_buf_size; /**< Size of buffer used to pass packages, by defaiult COPY_BUF_SIZE bytes, see pepa_config.h */
 	int abort_flag; /**< Abort flag, if enabled, PEPA file abort on errors; for debug only */
-	buf_t *buf_in_fds; /* IN thread file descriptors of opened connections (read sockets) */
-	pepa_in_thread_fds_t *acceptor_shared; /* The structure shared between IN and Acceptor thread */
-	pepa_control_fds_t controls; /**< These event fds used for communication between control thread and all other threads */
 	pepa_sockets_t sockets;
+	pepa_status_t state;
 } pepa_core_t;
 
 /**
@@ -197,6 +157,7 @@ int pepa_core_finish(void);
  * It is safe to hold core pointer without lock,
  * the core structure must as long as the app is running.
  */
+__attribute__((hot))
 pepa_core_t *pepa_get_core(void);
 
 /**
@@ -219,21 +180,6 @@ int pepa_core_lock(void);
  */
 int pepa_core_unlock(void);
 
-
-/**
- * @author Sebastian Mountaniol (12/7/23)
- * @brief Set new state
- * @param int state State to set
- */
-void pepa_set_state(int state);
-
-/**
- * @author Sebastian Mountaniol (12/7/23)
- * @brief Get current state
- * @return int Current state
- */
-int pepa_get_state(void);
-
 /**
  * @author Sebastian Mountaniol (12/10/23)
  * @brief Return abort flag; if core is not inited yet,
@@ -243,4 +189,9 @@ int pepa_get_state(void);
  * @details 
  */
 int pepa_if_abort(void);
+
+
+const char *pepa_out_thread_state_str(pepa_out_thread_state_t s);
+const char *pepa_shva_thread_state_str(pepa_shva_thread_state_t s);
+const char *pepa_in_thread_state_str(pepa_in_thread_state_t s);
 #endif /* _PEPA_CORE_H_ */

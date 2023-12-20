@@ -50,7 +50,7 @@ static void pepa_show_help(void)
 	       "--help    | -h - show this help\n");
 }
 
-static long int pepa_string_to_int_strict(char *s, int *err)
+long int pepa_string_to_int_strict(char *s, int *err)
 {
 	char     *endptr;
 	long int res;
@@ -93,7 +93,7 @@ static long int pepa_string_to_int_strict(char *s, int *err)
  *  	   argument as an integer; A negative value on error
  */
 
-static int pepa_parse_ip_string_get_port(const char *argument)
+int pepa_parse_ip_string_get_port(const char *argument)
 {
 	int  _err       = 0;
 	char *colon_ptr = NULL;
@@ -128,7 +128,7 @@ static int pepa_parse_ip_string_get_port(const char *argument)
  * @return buf_t* String buffer containing ADDRESS part of the
  *  	   argument as a string; NULL on an error
  */
-static buf_t *pepa_parse_ip_string_get_ip(const char *_argument)
+buf_t *pepa_parse_ip_string_get_ip(const char *_argument)
 {
 	char   *colon_ptr   = NULL;
 	char   *argument    = NULL;
@@ -223,11 +223,11 @@ int pepa_parse_arguments(int argi, char *argv[])
 		case 'i': /* Input socket - read and send to SHVA */
 			core->in_thread.ip_string = pepa_parse_ip_string_get_ip(optarg);
 			if (NULL == core->in_thread.ip_string) {
-				DE("Could not parse OUT ip address\n");
+				DE("Could not parse IN ip address\n");
 				abort();
 			}
 			core->in_thread.port_int = pepa_parse_ip_string_get_port(optarg);
-			DD("OUT Addr OK: |%s| : |%d|\n", core->in_thread.ip_string->data, core->in_thread.port_int);
+			DD("IN Addr OK: |%s| : |%d|\n", core->in_thread.ip_string->data, core->in_thread.port_int);
 			break;
 		case 'n':
 		{

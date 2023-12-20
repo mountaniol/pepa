@@ -20,4 +20,6 @@
 	#define PEPA_MAX(a,b) ( a > b ? a : b)
 #endif
 
+#define PTHREAD_DEAD ((pthread_t)0xBEEFDEAD)
+
 #endif /* _PEPA_CONFIG_H_ */

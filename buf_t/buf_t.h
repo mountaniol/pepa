@@ -157,8 +157,7 @@ typedef enum {
 	BUFT_NO = 1,    /* NO in case a function returns YES or NO */
 	BUFT_OK = 0,    /* Success status */
 	BUFT_YES = 0,   /* YES in case a function returns YES or NO */
-	BUFT_ERROR_BASE = 10000,
-	BUFT_BAD,  /* Error status */
+	BUFT_BAD = 1000,  /* Error status */
 	BUFT_NULL_POINTER,  /* Got a new pointer as an argument */
 	BUFT_NULL_DATA,  /* The buffer data is NULL, not expected it */
 	BUFT_BAD_BUFT_TYPE,  /* The type of buf_t is unknown; it it memory damage or version mismatch */
@@ -184,6 +183,7 @@ typedef enum {
 	BUFT_HAS_CANARY,  /* The buffer is asked to set data, but the buffer has canary. Before set new ->data, the CANARY flag should be removed */
 	BUFT_FILE_CLOSE,  /* Cannot close opened file */
 	BUFT_STRING_NO_NULL,  /* Cannot close opened file */
+	BUFT_ARR_DIFFERENT_SIZE,  /* Two array are not compatible, for example, they have different member sizes */
 } buf_t_error_t;
 
 /**

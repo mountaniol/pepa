@@ -29,9 +29,13 @@ static int pepa_core_sem_init(pepa_core_t *core)
 {
 	TESTP(core, -1);
 	int sem_rc = sem_init(&core->mutex, 0, 1);
+	sem_rc += sem_init(&core->sockets.shva_rw_mutex, 0, 1);
+	sem_rc += sem_init(&core->sockets.out_listen_mutex, 0, 1);
+	sem_rc += sem_init(&core->sockets.out_write_mutex, 0, 1);
+	sem_rc += sem_init(&core->sockets.in_listen_mutex, 0, 1);
 
 	if (0 != sem_rc) {
-		DE("Could not init mutex\n");
+		DE("Could not init mutexes\n");
 		perror("sem init failure: ");
 		PEPA_TRY_ABORT();
 		return (-PEPA_ERR_INIT_MITEX);
@@ -96,18 +100,14 @@ static pepa_core_t *pepa_create_core_t(void)
 		return NULL;
 	}
 
+	core->ctl_thread.thread_id = PTHREAD_DEAD;
+	core->shva_thread.thread_id = PTHREAD_DEAD;
+	core->in_thread.thread_id = PTHREAD_DEAD;
+	core->out_thread.thread_id = PTHREAD_DEAD;
+
 	core->internal_buf_size = COPY_BUF_SIZE;
 
 	/* Create event fd control descriptors */
-	core->controls.ctl_from_acceptor = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
-	core->controls.ctl_from_shva = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
-	core->controls.ctl_from_in = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
-	core->controls.ctl_from_out = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
-
-	core->controls.acceptor_from_ctl = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
-	core->controls.shva_from_ctl = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
-	core->controls.in_from_ctl = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
-	core->controls.out_from_ctl = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
 
 	core->shva_thread.clients = PEPA_SHVA_SOCKETS;
 	core->out_thread.clients = PEPA_OUT_SOCKETS;
@@ -115,8 +115,22 @@ static pepa_core_t *pepa_create_core_t(void)
 
 	core->sockets.shva_rw = -1;
 	core->sockets.out_listen = -1;
-	core->sockets.out_read = -1;
+	// core->sockets.out_read = -1;
+	core->sockets.out_write = -1;
 	core->sockets.in_listen = -1;
+
+	rc = pthread_mutex_init(&core->state.sync_sem, NULL);
+	if (rc < 0) {
+		DE("Can not init core->state.sync_sem\n");
+		abort();
+	}
+
+	rc = pthread_cond_init(&core->state.sync, NULL);
+	if (rc < 0) {
+		DE("Can not init core->state.sync\n");
+		abort();
+	}
+
 	return core;
 }
 
@@ -227,6 +241,7 @@ int pepa_core_finish(void)
 	return pepa_destroy_core_t(g_pepa_core);
 }
 
+__attribute__((hot))
 pepa_core_t *pepa_get_core(void)
 {
 	TESTP_ASSERT(g_pepa_core, "Core is NULL!");
@@ -244,7 +259,7 @@ int pepa_core_lock(void)
 		abort();
 	}
 
-	DD("Gettin sem\n\r");
+	//DD("Gettin sem\n\r");
 	rc = sem_wait(&g_pepa_core->mutex);
 	if (0 != rc) {
 		DE("Can't wait on semaphore; abort\n");
@@ -267,7 +282,7 @@ int pepa_core_unlock(void)
 		abort();
 	}
 
-	DD("Putting sem\n\r");
+	// DD("Putting sem\n\r");
 	rc = sem_post(&g_pepa_core->mutex);
 	if (0 != rc) {
 		DE("Can't unlock semaphore: abort\n");
@@ -287,5 +302,50 @@ int pepa_if_abort(void)
 	}
 
 	return g_pepa_core->abort_flag;
+}
+
+const char *pepa_out_thread_state_str(pepa_out_thread_state_t s)
+{
+	switch(s) {
+		case PEPA_TH_OUT_START: return("PEPA_TH_OUT_START"); /* Start thread routines */
+		case PEPA_TH_OUT_CREATE_LISTEN: return("PEPA_TH_OUT_CREATE_LISTEN");/* Create listening socket */
+		case PEPA_TH_OUT_ACCEPT: return("PEPA_TH_OUT_ACCEPT");/* Run accept() which creates Write socket */
+		case PEPA_TH_OUT_START_TRANSFER: return("PEPA_TH_OUT_START_TRANSFER");/* Start transfering thread */
+		case PEPA_TH_OUT_WATCH_WRITE_SOCK: return("PEPA_TH_OUT_WATCH_WRITE_SOCK");/* Watch the status of Write  socket */
+		case PEPA_TH_OUT_CLOSE_WRITE_SOCKET: return("PEPA_TH_OUT_CLOSE_WRITE_SOCKET");/* Close Write socket */
+		case PEPA_TH_OUT_CLOSE_LISTEN_SOCKET: return("PEPA_TH_OUT_CLOSE_LISTEN_SOCKET");/* Close listening socket */
+		case PEPA_TH_OUT_TERMINATE: return("PEPA_TH_OUT_TERMINATE");/* Terminate thread */
+	}
+	return "UNKNOWN";
+}
+
+const char *pepa_shva_thread_state_str(pepa_shva_thread_state_t s)
+{
+	switch(s) {
+		case PEPA_TH_SHVA_START: return("PEPA_TH_SHVA_START"); /* Start thread routines */
+		case PEPA_TH_SHVA_OPEN_CONNECTION: return("PEPA_TH_SHVA_OPEN_CONNECTION"); /* Start thread routines */
+		case PEPA_TH_SHVA_TEST_CONNECTION: return("PEPA_TH_SHVA_TEST_CONNECTION");/* Run accept() which creates Write socket */
+		case PEPA_TH_SHVA_START_TRANSFER: return("PEPA_TH_SHVA_START_TRANSFER");/* Start transfering thread */
+		case PEPA_TH_SHVA_WATCH_SOCKET: return("PEPA_TH_SHVA_WATCH_SOCKET");/* Watch the status of Write  socket */
+		case PEPA_TH_SHVA_CLOSE_SOCKET: return("PEPA_TH_SHVA_CLOSE_SOCKET");/* Close Write socket */
+		case PEPA_TH_SHVA_TERMINATE: return("PEPA_TH_SHVA_TERMINATE");/* Close listening socket */
+	}
+	return "UNKNOWN";
+}
+
+const char *pepa_in_thread_state_str(pepa_in_thread_state_t s)
+{
+	switch(s) {
+		case PEPA_TH_IN_START: return("PEPA_TH_IN_START"); /* Start thread routines */
+		case PEPA_TH_IN_CREATE_LISTEN: return("PEPA_TH_IN_CREATE_LISTEN");/* Run accept() which creates Write socket */
+		case PEPA_TH_IN_CLOSE_LISTEN: return("PEPA_TH_IN_CLOSE_LISTEN");/* Run accept() which creates Write socket */
+		case PEPA_TH_IN_TEST_LISTEN_SOCKET: return("PEPA_TH_IN_TEST_LISTEN_SOCKET");/* Start transfering thread */
+		case PEPA_TH_IN_WAIT_SHVA: return("PEPA_TH_IN_WAIT_SHVA");/* Watch the status of Write  socket */
+		case PEPA_TH_IN_CREATE_WATCHDOG: return("PEPA_TH_IN_CREATE_WATCHDOG");/* Close Write socket */
+		case PEPA_TH_IN_ACCEPT: return("PEPA_TH_IN_ACCEPT");/* Close listening socket */
+		case PEPA_TH_IN_START_TRANSFER: return("PEPA_TH_IN_START_TRANSFER");/* Close listening socket */
+		case PEPA_TH_IN_TERMINATE: return("PEPA_TH_IN_TERMINATE");/* Close listening socket */
+	}
+	return "UNKNOWN";
 }
 

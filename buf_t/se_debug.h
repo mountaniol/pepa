@@ -7,16 +7,16 @@
 #define D_EMPTY_PRINT(x,...) do{}while(0)
 
 /* Print a message */
-#define _D_PRINT(fmt, ...) do{printf("%s +%d : " fmt , __func__, __LINE__, ##__VA_ARGS__); }while(0 == 1)
+#define _D_PRINT(fmt, ...) do{printf("[OK ] %s +%d : " fmt , __func__, __LINE__, ##__VA_ARGS__); }while(0 == 1)
 
 /* Print an error */
-#define _D_PRINT_ERR(fmt, ...) do{fprintf(stderr, "%s +%d [ERR] : " fmt, __func__, __LINE__, ##__VA_ARGS__); }while(0 == 1)
+#define _D_PRINT_ERR(fmt, ...) do{fprintf(stderr, "[ERR] %s +%d ######>>> [ERR] : " fmt, __func__, __LINE__, ##__VA_ARGS__); }while(0 == 1)
 
 /* Print one liner message with return */
-#define _D_PRINT_LINE(fmt, ...) do{printf("%s +%d : " fmt "\n" , __func__, __LINE__, ##__VA_ARGS__); }while(0 == 1)
+#define _D_PRINT_LINE(fmt, ...) do{printf("[OK] %s +%d : " fmt "\n" , __func__, __LINE__, ##__VA_ARGS__); }while(0 == 1)
 
 /* Print an one-line error with line return  */
-#define _D_PRINT_ERR_LINE(fmt, ...) do{fprintf(stderr, "%s +%d [ERR] : " fmt "\n", __func__, __LINE__, ##__VA_ARGS__); }while(0 == 1)
+#define _D_PRINT_ERR_LINE(fmt, ...) do{fprintf(stderr, "[ERR] %s +%d ######>>> [ERR] : " fmt "\n", __func__, __LINE__, ##__VA_ARGS__); }while(0 == 1)
 
 #define D D_EMPTY_PRINT
 #define DD D_EMPTY_PRINT

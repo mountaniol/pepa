@@ -1,15 +1,15 @@
 #GCC=gcc
 #CFLAGS=-Wall -Wextra -rdynamic -O2
 
-#GCC=clang-10
+GCC=clang-10
 #GCC=gcc
-GCC=gcc-10
-CFLAGS=-Wall -Wextra -O2 -Wswitch-enum
+#GCC=gcc-10
+CFLAGS=-Wall -Wextra -O0 -Wswitch-enum -Wimplicit-fallthrough
 #CFLAGS=-Wall -Wextra -O2
 DEBUG=-DDEBUG3
 # Static GCC-10 analyzer
-#CFLAGS += -fanalyzer
-
+#CFLAGS+=-fanalyzer
+#CFLAGS+=-pg 
 # Clang static analyzer
 #CFLAGS += -Xfanalyzer
 
@@ -29,9 +29,16 @@ PEPA_DEFINES+=-DPEPA_HOST=\"$(PEPA_HOST_VAL)\"
 #CFLAGS+= -DPEPA_VERSION_GIT=\"$(PEPA_VERSION_GIT_VAL)\"
 CFLAGS+=$(PEPA_DEFINES)
 
-PEPA_O=pepa_state_machine.o pepa_parser.o main.o pepa_core.o pepa_server.o pepa_socket.o pepa_errors.o 
+PEPA_O=pepa_state_machine.o pepa_parser.o main.o pepa_core.o \
+		pepa_server.o pepa_errors.o \
+		pepa_socket_common.o pepa_socket_in.o \
+		pepa_socket_out.o pepa_socket_shva.o pepa_socket_ctl.o
+		
 PEPA_T=pepa-ng
 BUFT_AR=buf_t/buf_t.a
+
+EMU_O=pepa_emulator.o pepa_state_machine.o pepa_parser.o pepa_core.o pepa_server.o pepa_socket.o pepa_errors.o
+EMU_T=emu
 
 all: pepa
 
@@ -42,8 +49,12 @@ pepa: buf_t $(PEPA_O)
 buf_t:
 	make -C buf_t
 
+.PHONY:emu
+emu: buf_t $(EMU_O)
+	$(GCC) $(CFLAGS) -ggdb $(DEBUG) $(EMU_O) $(BUFT_AR) -o $(EMU_T) -lpthread
+
 clean:
-	rm -f $(PEPA_T) $(PEPA_O)
+	rm -f $(PEPA_T) $(PEPA_O) $(EMU_T) $(EMU_O)
 	make -C buf_t clean
 
 %.o:%.c

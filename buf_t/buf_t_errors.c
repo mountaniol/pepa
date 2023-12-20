@@ -45,8 +45,10 @@
 
 char *buf_error_code_to_string(int er)
 {
-	switch(abs(er)) {
+	buf_t_error_t _er = abs(er);
+	switch(_er) {
 	case BUFT_YES: return "BUFT_YES";
+	case BUFT_NO: return "BUFT_NO";
 	case BUFT_BAD: return "BUFT_BAD";
 	case BUFT_NULL_POINTER: return "BUFT_NULL_POINTER";
 	case BUFT_NULL_DATA: return "BUFT_NULL_DATA";
@@ -71,6 +73,9 @@ char *buf_error_code_to_string(int er)
 	case BUFT_HAS_CANARY: return "BUFT_HAS_CANARY";
 	case BUFT_FILE_CLOSE: return "BUFT_FILE_CLOSE";
 	case BUFT_STRING_NO_NULL: return "BUFT_STRING_NO_NULL";
+	case BUFT_NO_CANARY: return "BUFT_NO_CANARY";
+	case BUFT_OUT_OF_LIMIT_OP: return "BUFT_OUT_OF_LIMIT_OP";
+	case BUFT_ARR_DIFFERENT_SIZE: return "BUFT_ARR_DIFFERENT_SIZE";
 #if 0 /* SEB */
 	case XXX: return "YYY";
 	case XXX: return "YYY";

@@ -309,12 +309,14 @@ ret_t buf_arr_merge(buf_t *buf_dst, buf_t *buf_src)
 	
 	/* Both buffers must be compatible */
 	if (buf_src_member_size != buf_dst_member_size) {
-		DE("Can not copy from buf arr to buf array: member size is differ: %d != %d\n",
-		   buf_src_member_size, buf_dst_member_size);
+		DE("Can not copy from buf arr to buf array: member size is differ: dst: %d != src: %d\n",
+		   buf_dst_member_size, buf_src_member_size);
+		return BUFT_ARR_DIFFERENT_SIZE;
 	}
 
 	/* If buf_src is empty, we have nothing to do */
 	if (buf_src_count < 1) {
+		DDD("Arr merge: src is empty, return OK\n");
 		return BUFT_OK;
 	}
 

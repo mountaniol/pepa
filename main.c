@@ -26,8 +26,9 @@
 #include "pepa_core.h"
 #include "pepa_errors.h"
 #include "pepa_parser.h"
-#include "pepa_socket.h"
+#include "pepa_socket_common.h"
 #include "pepa_version.h"
+#include "pepa_state_machine.h"
 
 #if 0 /* SEB */
 /**** GLOBAL FILE DESCRIPTORS *****/
@@ -41,8 +42,7 @@ int  fd_sock    = -1;
 
 char *file_name_fifo = NULL;
 
-static ip_port_t *pepa_ip_port_t_alloc(void)
-{
+static ip_port_t *pepa_ip_port_t_alloc(void){
 	ip_port_t *ip = malloc(sizeof(ip_port_t));
 	if (NULL == ip) {
 		DE("Can't allocate\n");
@@ -53,8 +53,7 @@ static ip_port_t *pepa_ip_port_t_alloc(void)
 	return (ip);
 }
 
-static void pepa_ip_port_t_release(ip_port_t *ip)
-{
+static void pepa_ip_port_t_release(ip_port_t *ip){
 	if (NULL == ip) {
 		DE("Arg is NULL\n");
 		return;
@@ -65,8 +64,7 @@ static void pepa_ip_port_t_release(ip_port_t *ip)
 	free(ip);
 }
 
-static void pepa_show_help(void)
-{
+static void pepa_show_help(void){
 	printf("Use:\n"
 		   "-h - show this help\n"
 		   "--addr | -a - address to connect to in form:1.2.3.4:7887\n"
@@ -74,8 +72,7 @@ static void pepa_show_help(void)
 		   "--in   | -i - input file, means the file pepa will listenm read from and send to socket\n");
 }
 
-long int pepa_string_to_int_strict(char *s, int *err)
-{
+long int pepa_string_to_int_strict(char *s, int *err){
 	char     *endptr;
 	long int res;
 	errno = 0;
@@ -105,8 +102,7 @@ long int pepa_string_to_int_strict(char *s, int *err)
 }
 
 /* This parses a string containing an IP:PORT, create and returns a struct */
-static ip_port_t *pepa_parse_ip_string(char *argument)
-{
+static ip_port_t *pepa_parse_ip_string(char *argument){
 	ip_port_t *ip        = NULL;
 	int       _err       = 0;
 	char      *colon_ptr = NULL;
@@ -145,8 +141,7 @@ static ip_port_t *pepa_parse_ip_string(char *argument)
  * @return int File descriptor on success, NULL on an error
  * @details THe file must exists
  */
-static int pepa_open_pipe_in(char *file_name)
-{
+static int pepa_open_pipe_in(char *file_name){
 	TESTP_ASSERT(file_name, "file_name is NULL");
 	int fd = open(file_name, O_RDONLY | O_CLOEXEC);
 	// int fd = open(file_name, O_RDONLY | O_NONBLOCK);
@@ -171,8 +166,7 @@ static int pepa_open_pipe_in(char *file_name)
  *  		mode. It is up to end user to decide either the file
  *  		should be cleaned before a writing will start
  */
-static int pepa_open_file_out(char *file_name)
-{
+static int pepa_open_file_out(char *file_name){
 	TESTP_ASSERT(file_name, "file_name is NULL");
 	int fd = open(file_name, O_WRONLY | O_APPEND | O_CLOEXEC);
 	if (fd < 0) {
@@ -248,8 +242,7 @@ static int pepa_connect_to_shva(ip_port_t *ip){
  * @return int Number of processes bytes
  * @details 
  */
-int pepa_copy_fd_to_fd(int fd_from, int fd_to)
-{
+int pepa_copy_fd_to_fd(int fd_from, int fd_to){
 	uint8_t buf[COPY_BUF_SIZE];
 	int     rc_read            = 0;
 	int     accum              = 0;
@@ -291,8 +284,7 @@ int pepa_copy_fd_to_fd(int fd_from, int fd_to)
  * @return void* 
  * @details 
  */
-void *pepa_merry_go_round_fifo(__attribute__((unused)) void *arg)
-{
+void *pepa_merry_go_round_fifo(__attribute__((unused)) void *arg){
 	uint64_t       accum_to_sock   = 0;
 
 	while (1) {
@@ -323,15 +315,14 @@ void *pepa_merry_go_round_fifo(__attribute__((unused)) void *arg)
  * @return void* 
  * @details 
  */
-void *pepa_merry_go_round_sock(__attribute__((unused)) void *arg)
-{
+void *pepa_merry_go_round_sock(__attribute__((unused)) void *arg){
 	fd_set         rfds;
 
 /* Select related variables */
 	struct timeval tv;
 	int            retval          = -1;
 	uint64_t       accum_from_sock = 0;
-	
+
 	while (1) {
 		FD_ZERO(&rfds);
 		FD_SET(fd_sock, &rfds);
@@ -396,10 +387,43 @@ void bye(void)
 	pepa_core_finish();
 }
 
-int       main(int argi, char *argv[])
+#define handle_error_en(en, msg) \
+               do { errno = en; perror(msg); exit(EXIT_FAILURE); } while (0)
+
+/* Catch Signal Handler functio */
+static void signal_callback_handler(int signum)
+{
+	printf("Caught signal SIGPIPE %d\n", signum);
+	if (signum == SIGINT) {
+		exit(0);
+	}
+}
+
+static void main_set_sig_handler(void)
+{
+	sigset_t set;
+	sigfillset(&set);
+
+	int rc = pthread_sigmask(SIG_BLOCK, &set, NULL);
+	if (rc != 0) {
+		handle_error_en(rc, "pthread_sigmask");
+		exit(-1);
+	}
+
+	rc = sigprocmask(SIG_SETMASK, &set, NULL);
+	if (rc != 0) {
+		handle_error_en(rc, "process_mask");
+		exit(-1);
+	}
+
+	signal(SIGPIPE, signal_callback_handler);
+	signal(SIGINT, signal_callback_handler);
+}
+
+int main(int argi, char *argv[])
 {
 	int rc;
-	atexit(bye);
+//	atexit(bye);
 
 	//printf("pepa-ng version %d.%d.%d/%s\n", PEPA_VERSION_MAJOR, PEPA_VERSION_MINOR, PEPA_VERSION_PATCH, PEPA_VERSION_GIT);
 
@@ -418,17 +442,18 @@ int       main(int argi, char *argv[])
 	rc = pepa_parse_arguments(argi, argv);
 	if (rc < 0) {
 		DE(" Could not parse arguments\n");
-		exit (-11);
+		exit(-11);
 	}
 
 	DDD("Arguments parsed\n");
 
-
+	main_set_sig_handler();
+	
 	DDD("Going to start threads\n");
 	rc = pepa_start_threads();
 	if (rc < 0) {
 		DE("Could not start threads\n");
-		exit (-11);
+		exit(-11);
 	}
 
 	DDD("Threads are started\n");
@@ -437,6 +462,9 @@ int       main(int argi, char *argv[])
 	while (1) {
 		sleep(60);
 	}
-	return 0;
+	pepa_back_to_disconnected_state_new();
+	sleep(1);
+	DD("PEPA Exit\n");
+	return(0);
 }
 
