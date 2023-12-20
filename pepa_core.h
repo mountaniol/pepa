@@ -44,7 +44,6 @@ typedef enum {
 	PEPA_TH_OUT_START = 0, /* Start thread routines */
 	PEPA_TH_OUT_CREATE_LISTEN, /* Create listening socket */
 	PEPA_TH_OUT_ACCEPT, /* Run accept() which creates Write socket */
-	PEPA_TH_OUT_START_TRANSFER, /* Start transfering thread */
 	PEPA_TH_OUT_WATCH_WRITE_SOCK, /* Watch the status of Write  socket */
 	PEPA_TH_OUT_CLOSE_WRITE_SOCKET, /* Close Write socket */
 	PEPA_TH_OUT_CLOSE_LISTEN_SOCKET, /* Close listening socket */
@@ -54,7 +53,6 @@ typedef enum {
 typedef enum {
 	PEPA_TH_SHVA_START = 0, /* Start thread routines */
 	PEPA_TH_SHVA_OPEN_CONNECTION,
-	PEPA_TH_SHVA_TEST_CONNECTION, /* Test socket status */
 	PEPA_TH_SHVA_START_TRANSFER, /* Start transfering thread */
 	PEPA_TH_SHVA_WATCH_SOCKET, /* Watch the status of SHAV serrver socket */
 	PEPA_TH_SHVA_CLOSE_SOCKET, /* Close connection to SHVA sserver */

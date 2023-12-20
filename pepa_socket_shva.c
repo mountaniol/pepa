@@ -54,11 +54,11 @@ static int pepa_shva_thread_start_transfer(pepa_core_t *core, __attribute__((unu
 	/* Start the new thread copying between this new read socket and writing to shva socket */
 	int        thread_rc  = pthread_create(&pthread_id, NULL, pepa_one_direction_rw_thread, fds);
 	if (thread_rc < 0) {
-		DE("SHVA: Could not start new thread\n");
+		DDE("SHVA: Could not start new thread\n");
 		return -1;
 	}
 
-	DD("%s: A new forwarding thread is up\n", my_name);
+	DDD("%s: A new forwarding thread is up\n", my_name);
 	return PEPA_ERR_OK;
 }
 
@@ -69,31 +69,27 @@ static int pepa_shva_thread_open_connection(pepa_core_t *core, const char *my_na
 		core->sockets.shva_rw = pepa_open_shava_connection();
 
 		if (core->sockets.shva_rw < 0) {
-			DE("%s: Can not open connection to SHVA server; wait 10 seconds and try over\n", my_name);
-			sleep(10);
+			DDE("%s: Can not open connection to SHVA server; wait 1 seconds and try over\n", my_name);
+			usleep(1 * 1000000);
 			continue;
 		}
 	} while (core->sockets.shva_rw < 0);
 
-	DD("%s: Opened connection to SHVA\n", my_name);
+	DDD("%s: Opened connection to SHVA\n", my_name);
 	return PEPA_ERR_OK;
 }
 
 static int pepa_shva_thread_close_socket(pepa_core_t *core, __attribute__((unused)) const char *my_name)
 {
-	close(core->sockets.shva_rw);
+	//int rc = pepa_close_socket(core->sockets.shva_rw, my_name);
+	int sock = core->sockets.shva_rw;
+	int rc = close(sock);
+	if (rc < 0) {
+		DDDE("%s: Could not close the socket: fd: %d, %s\n", my_name, sock, strerror(errno));
+		return -1;
+	}
+
 	core->sockets.shva_rw = -1;
-
-	close(core->sockets.in_listen);
-	core->sockets.in_listen = -1;
-
-	close(core->sockets.out_listen);
-	core->sockets.out_listen = -1;
-
-	close(core->sockets.out_write);
-	core->sockets.out_write = -1;
-
-	DD("%s: Closed connection to SHVA\n", my_name);
 	return 0;
 }
 
@@ -118,7 +114,7 @@ void *pepa_shva_thread_new(__attribute__((unused))void *arg)
 		pepa_shva_thread_state_t this_step = next_step;
 		switch (next_step) {
 		case 	PEPA_TH_SHVA_START:
-			DD("START STEP: %s\n", pepa_shva_thread_state_str(this_step));
+			DDD("START STEP: %s\n", pepa_shva_thread_state_str(this_step));
 			next_step = PEPA_TH_SHVA_OPEN_CONNECTION;
 			rc = pepa_pthread_init_phase(my_name);
 			if (rc < 0) {
@@ -126,80 +122,71 @@ void *pepa_shva_thread_new(__attribute__((unused))void *arg)
 				pepa_state_set(core, PEPA_PR_IN, PEPA_ST_FAIL, __func__, __LINE__);
 				next_step = PEPA_TH_SHVA_TERMINATE;
 			}
-			DD("END STEP:   %s\n", pepa_shva_thread_state_str(this_step));
+			DDD("END STEP:   %s\n", pepa_shva_thread_state_str(this_step));
 			break;
 
 		case PEPA_TH_SHVA_OPEN_CONNECTION:
-			DD("START STEP: %s\n", pepa_shva_thread_state_str(this_step));
+			DDD("START STEP: %s\n", pepa_shva_thread_state_str(this_step));
 			next_step = PEPA_TH_SHVA_START_TRANSFER;
 			rc = pepa_shva_thread_open_connection(core, my_name);
 			if (PEPA_ERR_OK != rc) {
 				next_step = PEPA_TH_SHVA_OPEN_CONNECTION;
 			}
-			DD("END STEP:   %s\n", pepa_shva_thread_state_str(this_step));
-			break;
-
-		case PEPA_TH_SHVA_TEST_CONNECTION:
-			DD("START STEP: %s\n", pepa_shva_thread_state_str(this_step));
-			next_step = PEPA_TH_SHVA_START_TRANSFER;
-			if (pepa_test_fd(core->sockets.shva_rw) < 0) {
-				next_step = PEPA_TH_SHVA_CLOSE_SOCKET;
-			}
-			DD("END STEP:   %s\n", pepa_shva_thread_state_str(this_step));
+			DDD("END STEP:   %s\n", pepa_shva_thread_state_str(this_step));
 			break;
 
 		case PEPA_TH_SHVA_START_TRANSFER:
-			DD("START STEP: %s\n", pepa_shva_thread_state_str(this_step));
+			DDD("START STEP: %s\n", pepa_shva_thread_state_str(this_step));
 			/* TODO: Different steps depends on return status */
 			read_sock = pepa_shva_thread_start_transfer(core, my_name);
 			if (read_sock < 0) {
-				DD("Could not open listen socket\n");
+				DDDE("Could not open listen socket\n");
 				next_step = PEPA_TH_SHVA_CLOSE_SOCKET;
 			}
 			next_step = PEPA_TH_SHVA_WATCH_SOCKET;
 			pepa_state_set(core, PEPA_PR_SHVA, PEPA_ST_RUN, __func__, __LINE__);
-			DD("END STEP:   %s\n", pepa_shva_thread_state_str(this_step));
+			DDD("END STEP:   %s\n", pepa_shva_thread_state_str(this_step));
 			break;
 
 		case PEPA_TH_SHVA_WATCH_SOCKET:
-			//DD("START STEP: %s\n", pepa_shva_thread_state_str(next_step));
+			//DDD("START STEP: %s\n", pepa_shva_thread_state_str(next_step));
 			next_step = PEPA_TH_SHVA_WATCH_SOCKET;
 			rc = pepa_shva_thread_watch(core, my_name);
 			if (rc) {
 				next_step = PEPA_TH_SHVA_CLOSE_SOCKET;
 			}
-			//DD("END STEP:   %s\n", pepa_shva_thread_state_str(next_step));
+			//DDD("END STEP:   %s\n", pepa_shva_thread_state_str(next_step));
 			usleep(1000);
 			break;
 
 		case PEPA_TH_SHVA_CLOSE_SOCKET:
-			DD("START STEP: %s\n", pepa_shva_thread_state_str(this_step));
+			DDD("START STEP: %s\n", pepa_shva_thread_state_str(this_step));
 			rc = pepa_shva_thread_close_socket(core, my_name);
 			next_step = PEPA_TH_SHVA_OPEN_CONNECTION;
-			DD("END STEP:   %s\n", pepa_shva_thread_state_str(this_step));
+			DDD("END STEP:   %s\n", pepa_shva_thread_state_str(this_step));
 			break;
 
 		case PEPA_TH_SHVA_TERMINATE:
-			DD("START STEP: %s\n", pepa_shva_thread_state_str(this_step));
+			DDD("START STEP: %s\n", pepa_shva_thread_state_str(this_step));
 			pepa_state_set(core, PEPA_PR_IN, PEPA_ST_FAIL, __func__, __LINE__);
 			sleep(10);
-			DD("END STEP:   %s\n", pepa_shva_thread_state_str(this_step));
+			DDD("END STEP:   %s\n", pepa_shva_thread_state_str(this_step));
 			break;
 
 		default:
-			DD("Should never be here: next_steps = %d\n", next_step);
+			DE("Should never be here: next_steps = %d\n", next_step);
 			abort();
 			break;
 		}
 	} while (1);
-	DD("Should never be here\n");
+	DE("Should never be here\n");
 	abort();
 	pthread_exit(NULL);
 
 	return NULL;
 
 	/* Tell to CTL that we are in air */
-	DD("SHVA: Sending CONNECTED signal to CLT\n");
+	DDD("SHVA: Sending CONNECTED signal to CLT\n");
 	//pepa_event_send(core->controls.ctl_from_shva_started, 1);
 	pepa_state_set(core, PEPA_PR_SHVA, PEPA_ST_RUN, __func__, __LINE__);
 
@@ -209,7 +196,7 @@ void *pepa_shva_thread_new(__attribute__((unused))void *arg)
 		if (0 != pepa_test_fd(core->sockets.shva_rw)) {
 			DE("SHVA: core->sockets.shva_rw is invalid: %d, terminate\n", core->sockets.shva_rw);
 			pepa_state_set(core, PEPA_PR_SHVA, PEPA_ST_FAIL, __func__, __LINE__);
-			sleep(10);
+			usleep(1 * 1000000);
 		}
 	} while (1);
 

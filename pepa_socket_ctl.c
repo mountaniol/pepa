@@ -30,52 +30,52 @@
 
 static int pepa_ctl_execute_action(pepa_action_t act)
 {
-	DD("EXECUTING ACTION: %s\n", pepa_act_str(act));
+	DDD("EXECUTING ACTION: %s\n", pepa_act_str(act));
 	switch (act) {
 	case PEPA_ACT_NONE:
-		DD("CTL: Run action PEPA_ACT_NONE\n");
+		DDD("CTL: Run action PEPA_ACT_NONE\n");
 		return 0;
 	case PEPA_ACT_START_OUT:
-		DD("CTL: Run action PEPA_ACT_START_OUT\n");
+		DDD("CTL: Run action PEPA_ACT_START_OUT\n");
 		pepa_thread_start_out();
 		return 0;
 	case PEPA_ACT_START_IN:
-		DD("CTL: Run action PEPA_ACT_START_IN\n");
+		DDD("CTL: Run action PEPA_ACT_START_IN\n");
 		pepa_thread_start_in();
 		return 0;
 	case PEPA_ACT_START_SHVA:
-		DD("CTL: Run action PEPA_ACT_START_SHVA\n");
+		DDD("CTL: Run action PEPA_ACT_START_SHVA\n");
 		pepa_thread_start_shva();
 		return 0;
 	case PEPA_ACT_STOP_OUT:
-		DD("CTL: Run action PEPA_ACT_STOP_OUT\n");
+		DDD("CTL: Run action PEPA_ACT_STOP_OUT\n");
 		pepa_thread_kill_out();
 		return 0;
 	case PEPA_ACT_STOP_IN:
-		DD("CTL: Run action PEPA_ACT_STOP_IN\n");
+		DDD("CTL: Run action PEPA_ACT_STOP_IN\n");
 		pepa_thread_kill_in();
 		return 0;
 	case PEPA_ACT_STOP_SHVA:
-		DD("CTL: Run action PEPA_ACT_STOP_SHVA\n");
+		DDD("CTL: Run action PEPA_ACT_STOP_SHVA\n");
 		pepa_thread_kill_shva();
 		return 0;
 	case PEPA_ACT_RESTART_ALL:
-		DD("CTL: Run action PEPA_ACT_RESTART_ALL\n");
+		DDD("CTL: Run action PEPA_ACT_RESTART_ALL\n");
 		pepa_back_to_disconnected_state_new();
 		sleep(1);
 		pepa_thread_start_out();
 		return 0;
 	case PEPA_ACT_ABORT:
-		DD("CTL: Run action PEPA_ACT_ABORT\n");
+		DDD("CTL: Run action PEPA_ACT_ABORT\n");
 		abort();
 	case PEPA_ACT_MAX:
-		DD("CTL: Should never be here!\n");
+		DDD("CTL: Should never be here!\n");
 		abort();
 	default:
-		DD("CTL: Should never be here!\n");
+		DDD("CTL: Should never be here!\n");
 		abort();
 	}
-	DD("CTL: Should never be here!\n");
+	DDD("CTL: Should never be here!\n");
 	return PEPA_ERR_OK;
 }
 
@@ -96,7 +96,7 @@ void *pepa_ctl_thread_new(__attribute__((unused))void *arg)
 		pepa_action_t act;
 		pepa_state_wait(core);
 
-		DD("CTL_GOT_SIGNAL\n");
+		DDD("CTL_GOT_SIGNAL\n");
 
 		for (process_num = 0; process_num < PEPA_PR_MAX; process_num++) {
 			int st = 0;
@@ -106,7 +106,7 @@ void *pepa_ctl_thread_new(__attribute__((unused))void *arg)
 				act = pepa_state_to_action(process_num, st);
 			}
 			if (PEPA_ACT_NONE != act) {
-				DD("Finished the signal processing: proc %s, sig %s, act %d\n",
+				DDD("Finished the signal processing: proc %s, sig %s, act %d\n",
 				   pepa_pr_str(process_num),
 				   pepa_sig_str(st), act);
 				pepa_ctl_execute_action(act);

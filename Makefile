@@ -1,12 +1,12 @@
 #GCC=gcc
 #CFLAGS=-Wall -Wextra -rdynamic -O2
 
-GCC=clang-10
-#GCC=gcc
+#GCC=clang-10
+GCC=gcc
 #GCC=gcc-10
-CFLAGS=-Wall -Wextra -O0 -Wswitch-enum -Wimplicit-fallthrough
+CFLAGS=-Wall -Wextra -O2 -Wswitch-enum -Wimplicit-fallthrough
 #CFLAGS=-Wall -Wextra -O2
-DEBUG=-DDEBUG3
+DEBUG=-DDEBUG2
 # Static GCC-10 analyzer
 #CFLAGS+=-fanalyzer
 #CFLAGS+=-pg 
@@ -37,10 +37,13 @@ PEPA_O=pepa_state_machine.o pepa_parser.o main.o pepa_core.o \
 PEPA_T=pepa-ng
 BUFT_AR=buf_t/buf_t.a
 
-EMU_O=pepa_emulator.o pepa_state_machine.o pepa_parser.o pepa_core.o pepa_server.o pepa_socket.o pepa_errors.o
+EMU_O=pepa_emulator.o pepa_state_machine.o pepa_parser.o \
+	pepa_core.o pepa_server.o pepa_errors.o \
+	pepa_socket_common.o pepa_socket_in.o \
+	pepa_socket_out.o pepa_socket_shva.o pepa_socket_ctl.o
 EMU_T=emu
 
-all: pepa
+all: pepa emu
 
 pepa: buf_t $(PEPA_O)
 	$(GCC) $(CFLAGS) -ggdb $(DEBUG) $(PEPA_O) $(BUFT_AR) -o $(PEPA_T) -lpthread

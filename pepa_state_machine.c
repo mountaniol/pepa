@@ -30,7 +30,7 @@ static void pepa_thread_cancel(pthread_t pid, const char *name)
 	}
 
 	while (0 == pthread_kill(pid, 0)) {
-		DD("Waiting thread %s to terminate...\n", name);
+		DDD("Waiting thread %s to terminate...\n", name);
 		usleep(1);
 	}
 }
@@ -70,14 +70,14 @@ int pepa_thread_is_in_up(void)
 {
 	pepa_core_t          *core = pepa_get_core();
 
-	DD("core->in_thread.thread_id = %lX\n", core->in_thread.thread_id);
+	DDD("core->in_thread.thread_id = %lX\n", core->in_thread.thread_id);
 	if (PTHREAD_DEAD == core->in_thread.thread_id) {
-		DD("THREAD IN IS DEAD: core->in_thread.thread_id = %lX\n", core->in_thread.thread_id);
+		DE("THREAD IN IS DEAD: core->in_thread.thread_id = %lX\n", core->in_thread.thread_id);
 		return -1;
 	}
 	if (pthread_kill(core->in_thread.thread_id, 0) < 0) {
 
-		DD("THREAD IN IS DEAD: kill = %d\n", pthread_kill(core->in_thread.thread_id, 0));
+		DE("THREAD IN IS DEAD: kill = %d\n", pthread_kill(core->in_thread.thread_id, 0));
 		return -1;
 
 	}
@@ -124,9 +124,21 @@ void pepa_thread_kill_in(void)
 	core->in_thread.thread_id = PTHREAD_DEAD;
 
 	DD("#############################################\n");
+	DD("##       THREAD IN IS KILLED                ##\n");
+	DD("#############################################\n");
+}
+
+void pepa_thread_kill_ctl(void)
+{
+	pepa_core_t          *core = pepa_get_core();
+	pepa_thread_cancel(core->ctl_thread.thread_id, "CTL");
+	core->in_thread.thread_id = PTHREAD_DEAD;
+
+	DD("#############################################\n");
 	DD("##       THREAD CTL IS KILLED               ##\n");
 	DD("#############################################\n");
 }
+
 
 void pepa_thread_start_ctl(void)
 {
@@ -231,6 +243,55 @@ void pepa_back_to_disconnected_state_new(void)
 	/* Close the OUT listen socket */
 	pepa_socket_close(core->sockets.out_write, "core->shva_thread.fd_write");
 	core->sockets.out_write = -1;
+
+	pepa_core_unlock();
+	counter++;
+
+	if (counter > 1) {
+		exit(0);
+	}
+}
+
+void pepa_kill_all_threads(void)
+{
+	static int  counter = 0;
+	pepa_core_t *core   = pepa_get_core();
+
+	DD("#############################################\n");
+	DD("#############################################\n");
+	DD("#############################################\n");
+	DD("##       BACK TO DISCONNECTED STATE        ##\n");
+	DD("#############################################\n");
+	DD("#############################################\n");
+	DD("#############################################\n");
+
+	pepa_core_lock();
+
+	/*** Terminate threads ***/
+
+	pepa_thread_kill_ctl();
+	pepa_thread_kill_out();
+	pepa_thread_kill_in();
+	pepa_thread_kill_shva();
+
+	/*** Close the rest of the sockets ****/
+
+	/* Close the IN socket */
+	pepa_socket_shutdown_and_close(core->sockets.in_listen, "core->in_thread.fd_listen");
+	core->sockets.in_listen = -1;
+
+	/* Close the SHVA write socket */
+	pepa_socket_close(core->sockets.shva_rw, "core->shva_thread.fd_write");
+	core->sockets.shva_rw = -1;
+
+	/* Close the OUT listen socket */
+	pepa_socket_close(core->sockets.out_write, "core->shva_thread.fd_write");
+	core->sockets.out_write = -1;
+
+	/* Close the OUT listen socket */
+	pepa_socket_shutdown_and_close(core->sockets.out_listen, "core->shva_thread.fd_write");
+	core->sockets.out_listen = -1;
+
 
 	pepa_core_unlock();
 	counter++;
@@ -402,7 +463,7 @@ void pepa_state_sig(pepa_core_t *core)
 
 void pepa_state_set(pepa_core_t *core, int process, int state, const char *func, const int line)
 {
-	DD("Setting sig for process %s, state %s from %s line %d\n",
+	DDD("Setting sig for process %s, state %s from %s line %d\n",
 	   pepa_pr_str(process), pepa_sig_str(state), func, line);
 	core->state.signals[process] = state;
 	pepa_state_sig(core);
@@ -410,7 +471,7 @@ void pepa_state_set(pepa_core_t *core, int process, int state, const char *func,
 
 int pepa_state_get(pepa_core_t *core, int process)
 {
-	DD("Returning sig for process %s, state %s\n",
+	DDD("Returning sig for process %s, state %s\n",
 	   pepa_pr_str(process),
 	   pepa_sig_str(core->state.signals[process]));
 	return core->state.signals[process];

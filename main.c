@@ -393,7 +393,7 @@ void bye(void)
 /* Catch Signal Handler functio */
 static void signal_callback_handler(int signum)
 {
-	printf("Caught signal SIGPIPE %d\n", signum);
+	//printf("Caught signal SIGPIPE %d\n", signum);
 	if (signum == SIGINT) {
 		exit(0);
 	}
@@ -462,7 +462,7 @@ int main(int argi, char *argv[])
 	while (1) {
 		sleep(60);
 	}
-	pepa_back_to_disconnected_state_new();
+	pepa_kill_all_threads();
 	sleep(1);
 	DD("PEPA Exit\n");
 	return(0);

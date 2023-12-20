@@ -50,5 +50,6 @@ int pepa_state_to_action(int process, int state);
 const char *pepa_pr_str(pepa_proc_t p);
 const char *pepa_sig_str(pepa_sig_t p);
 const char *pepa_act_str(pepa_action_t p);
+void pepa_kill_all_threads(void);
 
 #endif /* _PEPA_STATE_MACHINE_H_ */

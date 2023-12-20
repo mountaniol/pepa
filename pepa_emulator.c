@@ -225,7 +225,7 @@ int pepa_emulator_generate_buffer_buf(buf_t *buf, int64_t buffer_size)
 
 buf_t *pepa_emulator_generate_buffer(uint64_t buffer_size)
 {
-	int rc;
+	int   rc;
 	buf_t *buf = buf_new(buffer_size);
 	if (0 == pepa_emulator_generate_buffer_buf(buf, buffer_size)) {
 		return buf;
@@ -288,8 +288,8 @@ static int out_start_connection(void)
 	do {
 		sock = pepa_open_connection_to_server(core->out_thread.ip_string->data, core->out_thread.port_int, __func__);
 		if (sock < 0) {
-			DD("Emu OUT: Could not connect to OUT; waiting...\n");
-			sleep(3);
+			DD("Emu OUT: Could not connect to OUT; |%s| waiting...\n", strerror(errno));
+			sleep(5);
 		}
 	} while (sock < 0);
 	return sock;
@@ -312,7 +312,7 @@ void *pepa_emulator_out_thread(__attribute__((unused))void *arg)
 			if (rc > 0) {
 				DD(" ~~~~>>> Emu OUT: Read from OUT %d bytes\n", rc);
 				//sleep(rand() % 3);
-				usleep(rand() % 10000);
+				//usleep(rand() % 10000);
 
 				/* Sometimes emulate broken connection: break the loop, then the socket will be closed */
 				if (0 == (rand() % 777)) {
@@ -322,7 +322,7 @@ void *pepa_emulator_out_thread(__attribute__((unused))void *arg)
 			}
 
 			if (rc == 0) {
-				DE("Could not read to OUT: rc = %d\n", rc);
+				DE("Could not read from OUT: rc = %d, %s\n", rc, strerror(errno));
 				sleep(1);
 				continue;
 			}
@@ -332,6 +332,7 @@ void *pepa_emulator_out_thread(__attribute__((unused))void *arg)
 			}
 
 			close(sock);
+			//pepa_close_socket(sock, "EMU");
 			sock = out_start_connection();
 
 			sleep(rand() % 7);
@@ -339,6 +340,7 @@ void *pepa_emulator_out_thread(__attribute__((unused))void *arg)
 
 		DD("Emulating OUT broken connection\n");
 		close(sock);
+		//pepa_close_socket(sock, "EMU");
 		usleep(rand() % 1000000);
 		sock = -1;
 	}
@@ -369,10 +371,10 @@ void *pepa_emulator_out_thread_old(__attribute__((unused))void *arg)
 				DD("~~~~>>> Emu OUT: Read %d bytes\n", rc);
 			}
 
-			usleep(rand() % 10000);
+			//usleep(rand() % 10000);
 
 			/* Emulate reconnect */
-			if (0 == (usleep(rand() % 777))) {
+			if (0 == (rand() % 777)) {
 				break;
 			}
 		} while (1); /* Generating and sending data */
@@ -381,8 +383,9 @@ void *pepa_emulator_out_thread_old(__attribute__((unused))void *arg)
 
 		/* Close rw socket */
 		close(sock_read);
+		//pepa_close_socket(sock_read, "EMU");
 		sock_read = -1;
-		sleep(rand() % 3);
+		sleep(rand() % 7);
 	} while (1);
 
 	/* Now we can start send and recv */
@@ -403,7 +406,7 @@ void *pepa_emulator_shva_thread(__attribute__((unused))void *arg)
 
 	do {
 		if (NULL != buf) {
-			if(BUFT_OK != buf_free(buf)) {
+			if (BUFT_OK != buf_free(buf)) {
 				DE("Can not free buffer\n");
 			}
 		}
@@ -413,7 +416,7 @@ void *pepa_emulator_shva_thread(__attribute__((unused))void *arg)
 			sock_listen = pepa_open_listening_socket(&s_addr, core->shva_thread.ip_string, core->shva_thread.port_int, 1, __func__);
 			if (sock_listen < 0) {
 				DE("Emu SHVA: Could not open listening socket, waiting...\n");
-				sleep(3);
+				sleep(1);
 			}
 		} while (sock_listen < 0); /* Opening listening soket */
 
@@ -426,7 +429,7 @@ void *pepa_emulator_shva_thread(__attribute__((unused))void *arg)
 			sock_rw = accept(sock_listen, &s_addr, &addrlen);
 			if (sock_rw < 0) {
 				DE("Emu SHVA: Could not accept\n");
-				sleep(3);
+				sleep(1);
 			}
 		} while (sock_rw < 0);
 
@@ -483,7 +486,7 @@ void *pepa_emulator_shva_thread(__attribute__((unused))void *arg)
 				break;
 			}
 
-			usleep(rand() % 10000);
+			//usleep(rand() % 10000);
 			reinit = 0;
 
 		} while (1); /* Generating and sending data */
@@ -492,8 +495,10 @@ void *pepa_emulator_shva_thread(__attribute__((unused))void *arg)
 
 		/* Close rw socket */
 		close(sock_rw);
-		close(sock_listen);
-		sleep(rand() % 3);
+		//pepa_close_socket(sock_rw, "EMU");
+		//close(sock_listen);
+		pepa_socket_shutdown_and_close(sock_listen, "EMU");
+		sleep(5);
 
 	} while (1); /* Opening connection and acceptiny */
 
@@ -509,7 +514,7 @@ int in_start_connection(void)
 		sock = pepa_open_connection_to_server(core->in_thread.ip_string->data, core->in_thread.port_int, __func__);
 		if (sock < 0) {
 			DD("Emu IN: Could not connect to IN; waiting...\n");
-			sleep(3);
+			sleep(5);
 		}
 	} while (sock < 0);
 	return sock;
@@ -523,17 +528,24 @@ void *pepa_emulator_in_thread(__attribute__((unused))void *arg)
 
 	while (1) {
 		sock = in_start_connection();
-		DD("Emu IN: Connected to IN\n");
+		DD("Emu IN: Connected to IN: fd = %d\n", sock);
 
 		while (1) {
+			int to_write;
+
+			if (0 != pepa_test_fd(sock)) {
+				DE("Socket IN is invalid\n");
+				break;
+			}
 
 			buf_t *buf = pepa_emulator_generate_buffer(rand() % 1024);
 			if (NULL == buf) {
 				DE("Emu IN: Could not generate buf\n");
-				usleep(rand() % 100000);
+				//usleep(rand() % 100000);
 				continue;
 			}
 
+			to_write = buf->used;
 			DD0("Emu IN: Generated buffer %ld len\n", buf->used);
 
 			rc = write(sock, buf->data, buf->used);
@@ -543,9 +555,9 @@ void *pepa_emulator_in_thread(__attribute__((unused))void *arg)
 
 			buf = NULL;
 
-			if (rc > 0) {
+			if (to_write == rc) {
 				DDD("~~~~>>> Emu IN: Sent to IN %d bytes\n", rc);
-				usleep(rand() % 100000);;
+				// usleep(rand() % 100000);
 
 				/* Once a while emulate broken connection*/
 				if (0 == (rand() % 777)) {
@@ -566,7 +578,8 @@ void *pepa_emulator_in_thread(__attribute__((unused))void *arg)
 
 		DD("Emu IN: Closing connection\n");
 		close(sock);
-		sleep(3);
+		//pepa_close_socket(sock, "EMU");
+		sleep(5);
 	}
 	return NULL;
 }
@@ -577,13 +590,14 @@ void *pepa_emulator_in_thread(__attribute__((unused))void *arg)
 /* Catch Signal Handler functio */
 static void signal_callback_handler(int signum)
 {
-	printf("Caught signal SIGPIPE %d\n", signum);
+	//printf("Caught signal SIGPIPE %d\n", signum);
 	if (signum == SIGINT) {
 		exit(0);
 	}
 }
 
-static void emu_set_sig_handler(void){
+static void emu_set_sig_handler(void)
+{
 	sigset_t set;
 	sigfillset(&set);
 

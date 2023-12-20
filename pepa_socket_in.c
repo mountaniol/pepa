@@ -27,23 +27,34 @@
 #include "buf_t/buf_t.h"
 #include "buf_t/se_debug.h"
 
+static int pepa_in_thread_wait_shva(pepa_core_t *core, __attribute__((unused)) const char *my_name);
+
 static int pepa_in_thread_subthread(pepa_core_t *core, __attribute__((unused)) const char *my_name, const int read_sock)
 {
 	pthread_t pthread_id;
 	int       iteration  = 0;
-	int       sock;
+	int       shva_sock;
+
 
 	PEPA_SOCK_LOCK(core->sockets.shva_rw, core);
-	sock = core->sockets.shva_rw;
+	shva_sock = core->sockets.shva_rw;
+
 	/* Just in case test status of SHVA */
-	if (sock < 0) {
-		DE("IN: SHVA socket is dead\n");
+	if (shva_sock < 0) {
+		DDDE("IN: SHVA socket is dead\n");
 		PEPA_SOCK_UNLOCK(core->sockets.shva_rw, core);
-		return -1;
+		int rc = pepa_in_thread_wait_shva(core, my_name);
+		if (rc < 0) {
+			DDDE("IN: SHVA socket is dead, stop\n");
+			return -1;
+		}
+		//return -1;
 	}
 
+	DDD("IN SUBTHREAD: Starting with read fd = %d, write fd = %d\n", read_sock, shva_sock);
+
 	pepa_fds_t *fds      = pepa_fds_t_alloc(read_sock, /* Read from this socket */
-												 sock, /* Write to this socket*/
+												 shva_sock, /* Write to this socket*/
 												 -1, /* Do not send me signal when you die */
 												 -1, /* Listen this event fd and die when there is an event */
 												 &core->sockets.shva_rw_mutex /* Use this mutex for write operation sync */,
@@ -62,49 +73,44 @@ static int pepa_in_thread_subthread(pepa_core_t *core, __attribute__((unused)) c
 
 static int pepa_in_thread_listen(pepa_core_t *core, __attribute__((unused)) const char *my_name)
 {
-	int iteration             = 0;
+	int                iteration = 0;
 	struct sockaddr_in s_addr;
-	socklen_t          addrlen = sizeof(struct sockaddr);
+	socklen_t          addrlen   = sizeof(struct sockaddr);
 
 	do {
 		iteration++;
-		//pthread_t pthread_id;
-		//int       error_action;
-		DDD("IN: Starting 'accept' waiting, iter: %d\n", iteration);
+
+		DDD("IN ACCEPT: Starting 'accept' waiting, iter: %d\n", iteration);
+		PEPA_SOCK_LOCK(core->sockets.in_listen, core);
+
+		if (PEPA_ERR_OK != pepa_test_fd(core->sockets.in_listen)) {
+			PEPA_SOCK_UNLOCK(core->sockets.in_listen, core);
+			return -PEPA_ERR_SOCKET_LISTEN;
+		}
+
 		int read_sock = accept(core->sockets.in_listen, &s_addr, &addrlen);
 
+		PEPA_SOCK_UNLOCK(core->sockets.in_listen, core);
+
 		if (read_sock >= 0) {
-			DDD("IN: Accepted IN connection, iter: %d, fd: %d\n", iteration, read_sock);
+			DDD("IN ACCEPT: Accepted IN connection, iter: %d, fd: %d\n", iteration, read_sock);
 			return read_sock;
 		}
 
 		/* If something went wrong, analyze the error and decide what to do */
 		if (read_sock < 0) {
 			int err = errno;
-			if (PEPA_ERR_OK != pepa_test_fd(core->sockets.in_listen)) {
-				DE("Listening socket is invalid [%d]: %s\n", core->sockets.in_listen, strerror(err));
+			DE("IN ACCEPT: failed, listening socket: %d: %s | %d\n", core->sockets.in_listen, strerror(err), EINVAL);
+
+			if (EINTR != err) {
 				return -PEPA_ERR_SOCKET_LISTEN;
 			}
 
-			DE("Accept failed, listening socket: %d: %s\n", core->sockets.in_listen, strerror(err));
 		}
 
-		DDD("Continue acept()\n");
+		//usleep(1 * 1000000);
 
-
-#if 0 /* SEB */
-		DE("IN: Some error happened regarding accepting WAITING connection, iter: %d\n", iteration);
-		error_action = pepa_analyse_accept_error(errno);
-
-		/* Try Accept again */
-		if (0 == error_action) {
-			continue;
-		}
-		/* Break this loop and restart the socket */
-	}
-	DDD("IN: Connected after iters: %d, fd: %d\n", iteration, read_sock);
-	return read_sock;
-#endif
+		DDD("ACCEPT: Continue acept() nex iter\n");
 	} while (1);
 
 	return -1;
@@ -112,7 +118,11 @@ static int pepa_in_thread_listen(pepa_core_t *core, __attribute__((unused)) cons
 
 static void pepa_in_thread_close_listen(pepa_core_t *core, __attribute__((unused)) const char *my_name)
 {
-	close(core->sockets.in_listen);
+	int rc = pepa_socket_shutdown_and_close(core->sockets.in_listen, my_name);
+	if (rc < 0) {
+		DE("%s: Could not shutdownclose the listening socket: fd: %d, %s\n", my_name, core->sockets.in_listen, strerror(errno));
+		return;
+	}
 	core->sockets.in_listen = -1;
 }
 
@@ -121,7 +131,7 @@ static void pepa_in_thread_listen_socket(pepa_core_t *core, const char *my_name)
 	struct sockaddr_in s_addr;
 
 	while (1) {
-		DD("%s: Opening listening socket\n", my_name);
+		DDD("%s: Opening listening socket\n", my_name);
 		/* Just try to close it */
 		PEPA_SOCK_LOCK(core->sockets.in_listen, core);
 		pepa_in_thread_close_listen(core, __func__);
@@ -134,7 +144,7 @@ static void pepa_in_thread_listen_socket(pepa_core_t *core, const char *my_name)
 		PEPA_SOCK_UNLOCK(core->sockets.in_listen, core);
 
 		if (core->sockets.in_listen >= 0) {
-			break;
+			return;
 		}
 		sleep(3);
 	}
@@ -169,7 +179,7 @@ static void *pepa_in_thread_watchdog(__attribute__((unused))void *arg)
 	do {
 		PEPA_SOCK_LOCK(core->sockets.shva_rw, core);
 		PEPA_SOCK_LOCK(core->sockets.in_listen, core
-					   );
+					  );
 		int sock         = core->sockets.shva_rw;
 
 		int shva_sock_st = pepa_test_fd(sock);
@@ -187,10 +197,10 @@ static void *pepa_in_thread_watchdog(__attribute__((unused))void *arg)
 			PEPA_SOCK_UNLOCK(core->sockets.shva_rw, core);
 			PEPA_SOCK_UNLOCK(core->sockets.in_listen, core);
 
-			DE("SHVA or IN socket became invalid; clese it\n");
+			DE("SHVA or IN socket became invalid; closed listening socket\n");
 
 			pthread_exit(NULL);
-			usleep(100);
+			usleep(1000);
 		}
 
 		PEPA_SOCK_UNLOCK(core->sockets.shva_rw, core);
@@ -216,7 +226,7 @@ void *pepa_in_thread_new(__attribute__((unused))void *arg)
 			 * Start the thread
 			 */
 		case 	PEPA_TH_IN_START:
-			DD("START STEP: %s\n", pepa_in_thread_state_str(next_step));
+			DDD("START STEP: %s\n", pepa_in_thread_state_str(next_step));
 			next_step = PEPA_TH_IN_CREATE_LISTEN;
 			rc = pepa_pthread_init_phase(my_name);
 			if (rc < 0) {
@@ -224,7 +234,7 @@ void *pepa_in_thread_new(__attribute__((unused))void *arg)
 				pepa_state_set(core, PEPA_PR_IN, PEPA_ST_FAIL, __func__, __LINE__);
 				next_step = PEPA_TH_IN_TERMINATE;
 			}
-			DD("END STEP:   %s\n", pepa_in_thread_state_str(this_step));
+			DDD("END STEP:   %s\n", pepa_in_thread_state_str(this_step));
 			break;
 
 		case PEPA_TH_IN_CREATE_LISTEN:
@@ -232,23 +242,23 @@ void *pepa_in_thread_new(__attribute__((unused))void *arg)
 			 * Create Listening socket
 			 */
 
-			DD("START STEP: %s\n", pepa_in_thread_state_str(next_step));
+			DDD("START STEP: %s\n", pepa_in_thread_state_str(next_step));
 			next_step = PEPA_TH_IN_WAIT_SHVA;
 			pepa_in_thread_listen_socket(core, my_name);
-			DD("END STEP:   %s\n", pepa_in_thread_state_str(this_step));
+			DDD("END STEP:   %s\n", pepa_in_thread_state_str(this_step));
 			break;
 
 		case PEPA_TH_IN_CLOSE_LISTEN:
-			DD("START STEP: %s\n", pepa_in_thread_state_str(next_step));
+			DDD("START STEP: %s\n", pepa_in_thread_state_str(next_step));
 
 			next_step = PEPA_TH_IN_CREATE_LISTEN;
 			pepa_in_thread_close_listen(core,  my_name);
 
-			DD("END STEP:   %s\n", pepa_in_thread_state_str(this_step));
+			DDD("END STEP:   %s\n", pepa_in_thread_state_str(this_step));
 			break;
 
 		case PEPA_TH_IN_TEST_LISTEN_SOCKET:
-			DD("START STEP: %s\n", pepa_in_thread_state_str(next_step));
+			DDD("START STEP: %s\n", pepa_in_thread_state_str(next_step));
 			/*
 			 * Test Listening socket; if it not valid,
 			 * close the file descriptor and recreate the Listening socket
@@ -256,13 +266,16 @@ void *pepa_in_thread_new(__attribute__((unused))void *arg)
 
 			next_step = PEPA_TH_IN_CREATE_WATCHDOG;
 			if (pepa_test_fd(core->sockets.in_listen) < 0) {
+				DE("IN: Listening socked is invalid, restart it\n");
 				next_step = PEPA_TH_IN_CLOSE_LISTEN;
+			} else {
+				DE("IN: Listening socked is OK, reuse it\n");
 			}
-			DD("END STEP:   %s\n", pepa_in_thread_state_str(this_step));
+			DDD("END STEP:   %s\n", pepa_in_thread_state_str(this_step));
 			break;
 
 		case PEPA_TH_IN_CREATE_WATCHDOG:
-			DD("START STEP: %s\n", pepa_in_thread_state_str(this_step));
+			DDD("START STEP: %s\n", pepa_in_thread_state_str(this_step));
 			/*
 			 * Create a watchdog thread. This thread should test validity of the listening socket
 			 * and the SHVA socket.
@@ -275,22 +288,22 @@ void *pepa_in_thread_new(__attribute__((unused))void *arg)
 				DE("Can not create shva watchdog\n");
 				next_step = PEPA_TH_IN_TERMINATE;
 			}
-			DD("END STEP:   %s\n", pepa_in_thread_state_str(this_step));
+			DDD("END STEP:   %s\n", pepa_in_thread_state_str(this_step));
 			break;
 
 		case PEPA_TH_IN_WAIT_SHVA:
-			DD("START STEP: %s\n", pepa_in_thread_state_str(next_step));
+			DDD("START STEP: %s\n", pepa_in_thread_state_str(next_step));
 			/*
 			 * Blocking wait until SHVA becomes available.
 			 * This step happens before ACCEPT
 			 */
 			rc = pepa_in_thread_wait_shva(core, my_name);
 			next_step = PEPA_TH_IN_ACCEPT;
-			DD("END STEP:   %s\n", pepa_in_thread_state_str(this_step));
+			DDD("END STEP:   %s\n", pepa_in_thread_state_str(this_step));
 			break;
 
 		case PEPA_TH_IN_ACCEPT:
-			DD("START STEP: %s\n", pepa_in_thread_state_str(next_step));
+			DDD("START STEP: %s\n", pepa_in_thread_state_str(next_step));
 			/*
 			 * Wait until an income connection from the remote client
 			 */
@@ -298,17 +311,20 @@ void *pepa_in_thread_new(__attribute__((unused))void *arg)
 			/* TODO: Different steps depends on return status */
 			read_sock = pepa_in_thread_listen(core, my_name);
 			if (read_sock < 0) {
-				DE("Could not open listen socket\n");
+				DDE("Could not open listen socket\n");
+				//usleep(1 * 1000000);
 				next_step = PEPA_TH_IN_TEST_LISTEN_SOCKET;
+				//next_step = PEPA_TH_IN_CLOSE_LISTEN;
 			} else {
-				core->sockets.in_listen = read_sock;
+				DDD("Opened read socket: fd %d\n", read_sock);
+				//core->sockets.in_listen = read_sock;
 				next_step = PEPA_TH_IN_START_TRANSFER;
 			}
-			DD("END STEP:   %s\n", pepa_in_thread_state_str(this_step));
+			DDD("END STEP:   %s\n", pepa_in_thread_state_str(this_step));
 			break;
 
 		case PEPA_TH_IN_START_TRANSFER:
-			DD("START STEP: %s\n", pepa_in_thread_state_str(next_step));
+			DDD("START STEP: %s\n", pepa_in_thread_state_str(next_step));
 			/*
 			 * When any remote client is connected, a transfering thread for this
 			 * new socket is created.
@@ -326,23 +342,23 @@ void *pepa_in_thread_new(__attribute__((unused))void *arg)
 			next_step = PEPA_TH_IN_ACCEPT;
 			pepa_state_set(core, PEPA_PR_IN, PEPA_ST_RUN, __func__, __LINE__);
 			next_step = PEPA_TH_IN_ACCEPT;
-			DD("END STEP:   %s\n", pepa_in_thread_state_str(this_step));
+			DDD("END STEP:   %s\n", pepa_in_thread_state_str(this_step));
 			break;
 
 		case PEPA_TH_IN_TERMINATE:
-			DD("START STEP: %s\n", pepa_in_thread_state_str(next_step));
+			DDD("START STEP: %s\n", pepa_in_thread_state_str(next_step));
 			pepa_state_set(core, PEPA_PR_IN, PEPA_ST_FAIL, __func__, __LINE__);
 			sleep(10);
-			DD("END STEP:   %s\n", pepa_in_thread_state_str(this_step));
+			DDD("END STEP:   %s\n", pepa_in_thread_state_str(this_step));
 			break;
 
 		default:
-			DD("Should never be here: next_steps = %d\n", next_step);
+			DDD("Should never be here: next_steps = %d\n", next_step);
 			abort();
 			break;
 		}
 	} while (1);
-	DD("Should never be here\n");
+	DE("Should never be here\n");
 	abort();
 	pthread_exit(NULL);
 

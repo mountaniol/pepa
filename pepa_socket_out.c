@@ -35,9 +35,8 @@ static int pepa_out_wait_connection(int fd_listen)
 	const char         *my_name = "OUT-ACCEPT";
 	int                fd_read  = -1;
 	do {
-		DD("1\n");
 		//int       error_action;
-		DD("%s: Starting accept() waiting\n", my_name);
+		DDD("%s: Starting accept() waiting\n", my_name);
 
 		fd_read = accept4(fd_listen, &s_addr, &addrlen, SOCK_CLOEXEC);
 //		       int accept4(int sockfd, struct sockaddr *addr,
@@ -53,7 +52,7 @@ static int pepa_out_thread_start(char *name)
 	return pepa_pthread_init_phase(name);
 }
 
-static int pepa_out_thread_socket(pepa_core_t *core, char *my_name)
+static int pepa_out_thread_open_listening_socket(pepa_core_t *core, char *my_name)
 {
 	struct sockaddr_in s_addr;
 	int                waiting_time = 0;
@@ -66,10 +65,10 @@ static int pepa_out_thread_socket(pepa_core_t *core, char *my_name)
 															  core->out_thread.clients,
 															  __func__);
 		if (core->sockets.out_listen < 0) {
-			DDD("OUT: Can not open listening socket: %s\n", strerror(errno));
-			usleep(timeout * 1000000);
+			DDE("OUT: Can not open listening socket: %s\n", strerror(errno));
+			//usleep(timeout * 1000000);
 			waiting_time += timeout;
-			DD("%s: Wait for %d secs\n", my_name, waiting_time);
+			///DDD("%s: Wait for %d secs\n", my_name, waiting_time);
 		}
 	} while (core->sockets.out_listen < 0);
 	return PEPA_ERR_OK;
@@ -78,46 +77,33 @@ static int pepa_out_thread_socket(pepa_core_t *core, char *my_name)
 static int pepa_out_thread_accept(pepa_core_t *core, __attribute__((unused))char *my_name)
 {
 	int fd_read = pepa_out_wait_connection(core->sockets.out_listen);
-	pepa_core_lock();
-	core->sockets.out_write = fd_read; 
-	pepa_core_unlock();
+	core->sockets.out_write = fd_read;
 	return PEPA_ERR_OK;
-}
-
-static int pepa_out_thread_forward(pepa_core_t *core, __attribute__((unused))char *my_name)
-{
-	do {
-		usleep(50);
-		if (0 != pepa_test_fd(core->sockets.out_write)) {
-			DE("OUT: core->sockets.out_read is invalid: %d, terminate\n", core->sockets.out_write);
-			return -1;
-		}
-	} while (1);
-	return 0;
 }
 
 static int pepa_out_thread_close_listen(pepa_core_t *core, __attribute__((unused))char *my_name)
 {
-	close(core->sockets.out_write);
-	core->sockets.out_write = -1;
+	int rc = pepa_socket_shutdown_and_close(core->sockets.out_listen, my_name);
+	if (rc < 0) {
+		DE("%s: Could not shutdown the socket: fd: %d, %s\n", my_name, core->sockets.out_listen, strerror(errno));
+		return -1;
+	}
+
+	core->sockets.out_listen = -1;
 	return 0;
 }
 
-static int pepa_out_thread_close_socket(pepa_core_t *core, __attribute__((unused))char *my_name)
+static int pepa_out_thread_close_write_socket(pepa_core_t *core, __attribute__((unused))char *my_name)
 {
-	close(core->sockets.shva_rw);
-	core->sockets.shva_rw = -1;
+	int sock = core->sockets.out_write;
+	int rc = close(sock);
+	if (rc < 0) {
+		DE("%s: Could not close the socket: fd: %d, %s\n", my_name, sock, strerror(errno));
+		return -1;
+	}
 
-	close(core->sockets.in_listen);
-	core->sockets.in_listen = -1;
-
-	close(core->sockets.out_listen);
-	core->sockets.out_listen = -1;
-
-	close(core->sockets.out_write);
 	core->sockets.out_write = -1;
-
-	return 0;
+	return rc;
 }
 
 static int pepa_out_thread_watch_write_socket(pepa_core_t *core, __attribute__((unused))char *my_name)
@@ -126,6 +112,7 @@ static int pepa_out_thread_watch_write_socket(pepa_core_t *core, __attribute__((
 		if (pepa_test_fd(core->sockets.out_write) <  0) {
 			return 0;
 		}
+		usleep(1000);
 	} while (1);
 	return 0;
 }
@@ -141,7 +128,7 @@ void *pepa_out_thread(__attribute__((unused))void *arg)
 		pepa_out_thread_state_t this_step = next_step;
 		switch (next_step) {
 		case 	PEPA_TH_OUT_START:
-			DD("START STEP: %s\n", pepa_out_thread_state_str(this_step));
+			DDD("START STEP: %s\n", pepa_out_thread_state_str(this_step));
 			next_step = PEPA_TH_OUT_CREATE_LISTEN;
 			rc = pepa_out_thread_start(my_name);
 			if (rc < 0) {
@@ -149,79 +136,74 @@ void *pepa_out_thread(__attribute__((unused))void *arg)
 				pepa_state_set(core, PEPA_PR_OUT, PEPA_ST_FAIL, __func__, __LINE__);
 				next_step = PEPA_TH_OUT_TERMINATE;
 			}
-			DD("END STEP  : %s\n", pepa_out_thread_state_str(this_step));
+			DDD("END STEP  : %s\n", pepa_out_thread_state_str(this_step));
 			break;
 
 		case PEPA_TH_OUT_CREATE_LISTEN:
-			DD("START STEP: %s\n", pepa_out_thread_state_str(this_step));
+			DDD("START STEP: %s\n", pepa_out_thread_state_str(this_step));
 			next_step = PEPA_TH_OUT_ACCEPT;
-			rc = pepa_out_thread_socket(core, my_name);
+			rc = pepa_out_thread_open_listening_socket(core, my_name);
 			if (rc) {
+				DDE("%s: Can not open listening socket\n", my_name);
 				next_step = PEPA_TH_OUT_CLOSE_WRITE_SOCKET;
 			}
-			DD("END STEP  : %s\n", pepa_out_thread_state_str(this_step));
+			DDD("END STEP  : %s\n", pepa_out_thread_state_str(this_step));
 			break;
 
 		case PEPA_TH_OUT_ACCEPT:
-			DD("START STEP: %s\n", pepa_out_thread_state_str(this_step));
-			next_step = PEPA_TH_OUT_START_TRANSFER;
+			DDD("START STEP: %s\n", pepa_out_thread_state_str(this_step));
+			next_step = PEPA_TH_OUT_WATCH_WRITE_SOCK;
 			if (0 != pepa_test_fd(core->sockets.out_listen)) {
+				DDE("%s: Can not start accept: listening socket is invalid: fd %d\n", my_name, core->sockets.out_listen);
 				next_step	= PEPA_TH_OUT_CLOSE_WRITE_SOCKET;
 				break;
 			}
 
 			rc = pepa_out_thread_accept(core, my_name);
 			if (rc) {
+				DDE("%s: Can not accept incoming connection\n", my_name);
 				next_step = PEPA_TH_OUT_CLOSE_WRITE_SOCKET;
 			}
-			DD("END STEP  : %s\n", pepa_out_thread_state_str(this_step));
-			break;
-
-		case PEPA_TH_OUT_START_TRANSFER:
-			DD("START STEP: %s\n", pepa_out_thread_state_str(this_step));
-			pepa_state_set(core, PEPA_PR_OUT, PEPA_ST_RUN, __func__, __LINE__);
-			rc = pepa_out_thread_forward(core, my_name);
-			next_step = PEPA_TH_OUT_CLOSE_WRITE_SOCKET;
-			DD("END STEP  : %s\n", pepa_out_thread_state_str(this_step));
+			DDD("END STEP  : %s\n", pepa_out_thread_state_str(this_step));
 			break;
 
 		case PEPA_TH_OUT_WATCH_WRITE_SOCK:
-			DD("START STEP: %s\n", pepa_out_thread_state_str(this_step));
+			DDD("START STEP: %s\n", pepa_out_thread_state_str(this_step));
 			/* TODO */
+			pepa_state_set(core, PEPA_PR_OUT, PEPA_ST_RUN, __func__, __LINE__);
 			rc = pepa_out_thread_watch_write_socket(core, my_name);
 			next_step = PEPA_TH_OUT_CLOSE_WRITE_SOCKET;
-			DD("END STEP  : %s\n", pepa_out_thread_state_str(this_step));
+			DDD("END STEP  : %s\n", pepa_out_thread_state_str(this_step));
 			break;
 
 		case PEPA_TH_OUT_CLOSE_LISTEN_SOCKET:
-			DD("START STEP: %s\n", pepa_out_thread_state_str(this_step));
+			DDD("START STEP: %s\n", pepa_out_thread_state_str(this_step));
 			rc = pepa_out_thread_close_listen(core, my_name);
 			next_step = PEPA_TH_OUT_ACCEPT;
-			DD("END STEP\n");
-			DD("END STEP  : %s\n", pepa_out_thread_state_str(this_step));
+			DDD("END STEP  : %s\n", pepa_out_thread_state_str(this_step));
 			break;
 
 		case PEPA_TH_OUT_CLOSE_WRITE_SOCKET:
-			DD("START STEP: %s\n", pepa_out_thread_state_str(this_step));
-			rc = pepa_out_thread_close_socket(core, my_name);
+			DDD("START STEP: %s\n", pepa_out_thread_state_str(this_step));
+			rc = pepa_out_thread_close_write_socket(core, my_name);
 			next_step = PEPA_TH_OUT_CREATE_LISTEN;
-			DD("END STEP  : %s\n", pepa_out_thread_state_str(this_step));
+			DDD("END STEP  : %s\n", pepa_out_thread_state_str(this_step));
 			break;
 
 		case PEPA_TH_OUT_TERMINATE:
-			DD("START STEP: %s\n", pepa_out_thread_state_str(this_step));
+			DDD("START STEP: %s\n", pepa_out_thread_state_str(this_step));
 			pepa_state_set(core, PEPA_PR_OUT, PEPA_ST_FAIL, __func__, __LINE__);
 			sleep(10);
-			DD("END STEP  : %s\n", pepa_out_thread_state_str(this_step));
+			DDD("END STEP  : %s\n", pepa_out_thread_state_str(this_step));
 			break;
 
 		default:
-			DD("Should never be here: next_steps = %d\n", next_step);
+			DE("Should never be here: next_steps = %d\n", next_step);
 			abort();
 			break;
 		}
 	} while (1);
-	DD("Should never be here\n");
+	DE("Should never be here\n");
 	abort();
 	pthread_exit(NULL);
 }

@@ -89,7 +89,7 @@ static pepa_core_t *pepa_create_core_t(void)
 {
 	int         rc;
 
-	pepa_core_t *core = malloc(sizeof(pepa_core_t));
+	pepa_core_t *core = calloc(sizeof(pepa_core_t), 1);
 	TESTP_ASSERT(core, "Can not create core");
 	pepa_core_set_default_values(core);
 	rc = pepa_core_sem_init(core);
@@ -310,7 +310,6 @@ const char *pepa_out_thread_state_str(pepa_out_thread_state_t s)
 		case PEPA_TH_OUT_START: return("PEPA_TH_OUT_START"); /* Start thread routines */
 		case PEPA_TH_OUT_CREATE_LISTEN: return("PEPA_TH_OUT_CREATE_LISTEN");/* Create listening socket */
 		case PEPA_TH_OUT_ACCEPT: return("PEPA_TH_OUT_ACCEPT");/* Run accept() which creates Write socket */
-		case PEPA_TH_OUT_START_TRANSFER: return("PEPA_TH_OUT_START_TRANSFER");/* Start transfering thread */
 		case PEPA_TH_OUT_WATCH_WRITE_SOCK: return("PEPA_TH_OUT_WATCH_WRITE_SOCK");/* Watch the status of Write  socket */
 		case PEPA_TH_OUT_CLOSE_WRITE_SOCKET: return("PEPA_TH_OUT_CLOSE_WRITE_SOCKET");/* Close Write socket */
 		case PEPA_TH_OUT_CLOSE_LISTEN_SOCKET: return("PEPA_TH_OUT_CLOSE_LISTEN_SOCKET");/* Close listening socket */
@@ -324,7 +323,6 @@ const char *pepa_shva_thread_state_str(pepa_shva_thread_state_t s)
 	switch(s) {
 		case PEPA_TH_SHVA_START: return("PEPA_TH_SHVA_START"); /* Start thread routines */
 		case PEPA_TH_SHVA_OPEN_CONNECTION: return("PEPA_TH_SHVA_OPEN_CONNECTION"); /* Start thread routines */
-		case PEPA_TH_SHVA_TEST_CONNECTION: return("PEPA_TH_SHVA_TEST_CONNECTION");/* Run accept() which creates Write socket */
 		case PEPA_TH_SHVA_START_TRANSFER: return("PEPA_TH_SHVA_START_TRANSFER");/* Start transfering thread */
 		case PEPA_TH_SHVA_WATCH_SOCKET: return("PEPA_TH_SHVA_WATCH_SOCKET");/* Watch the status of Write  socket */
 		case PEPA_TH_SHVA_CLOSE_SOCKET: return("PEPA_TH_SHVA_CLOSE_SOCKET");/* Close Write socket */

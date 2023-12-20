@@ -11,18 +11,19 @@
 #define X_BUF_SIZE (1024)
 
 #define PEPA_SOCK_LOCK(_sock_name, _core) do \
-	{	DDD("Locking %s from: %s +%d\n", #_sock_name, __func__, __LINE__);\
+	{	DDD0("Locking %s from: %s +%d\n", #_sock_name, __func__, __LINE__);\
 		sem_wait(&_sock_name##_mutex); \
-		DDD("Locked %s from: %s +%d\n", #_sock_name, __func__, __LINE__); \
-	} while (1)
+		DDD0("Locked %s from: %s +%d\n", #_sock_name, __func__, __LINE__); \
+	} while (0)
 
 #define PEPA_SOCK_UNLOCK(_sock_name, _core) do \
-	{DDD("Unlocking %s from: %s +%d\n", #_sock_name, __func__, __LINE__);\
+	{	DDD0("Unlocking %s from: %s +%d\n", #_sock_name, __func__, __LINE__);\
 		sem_post(&_sock_name##_mutex); \
-		DDD("Unlocked %s from: %s +%d\n", #_sock_name, __func__, __LINE__); \
-	} while (1)
+		DDD0("Unlocked %s from: %s +%d\n", #_sock_name, __func__, __LINE__); \
+	} while (0)
 
 typedef struct {
+	char my_name[32];
 	int fd_read; /**< Read from this fd */
 	int fd_write; /**< Write to this fd */
 	int fd_event; /**< If given, then send event to parent thread before exit thread */
@@ -31,6 +32,12 @@ typedef struct {
 	char *name_read;
 	char *name_write;
 	sem_t *fd_write_mutex;
+	void *buf;
+	uint64_t rx;
+	uint64_t tx;
+	uint64_t reads;
+	uint64_t writes;
+
 } pepa_fds_t;
 
 #if 0 /* SEB */
@@ -173,6 +180,8 @@ void *pepa_out_thread(__attribute__((unused))void *arg);
 // void pepa_event_send(int fd, uint64_t code);
 void pepa_event_rm(int fd);
 void pepa_set_out_read_sock(pepa_core_t *core, int fd, const char * func, const int line);
+
+int pepa_socket_shutdown_and_close(int sock, const char *my_name);
 
 //void pepa_print_pthread_create_error(const int rc);
 #endif /* _PEPA_SOCKET_H__ */
