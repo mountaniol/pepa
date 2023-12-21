@@ -81,8 +81,7 @@ void pepa_parse_pthread_create_error(const int rc)
 
 pepa_fds_t *pepa_fds_t_alloc(int fd_read,
 							 int fd_write,
-							 int fd_event,
-							 int fd_die,
+							 int close_read_sock,
 							 sem_t *out_mutex,
 							 char *name_thread,
 							 char *name_read,
@@ -98,8 +97,7 @@ pepa_fds_t *pepa_fds_t_alloc(int fd_read,
 
 	fdx->fd_read = fd_read;
 	fdx->fd_write = fd_write;
-	fdx->fd_event = fd_event;
-	fdx->fd_die = fd_die;
+	fdx->close_read_sock = close_read_sock;
 	fdx->fd_write_mutex = out_mutex;
 	fdx->name = name_thread;
 	fdx->name_read = name_read;
@@ -128,20 +126,24 @@ uint32_t pepa_thread_counter(void)
 
 int pepa_one_direction_copy(pepa_fds_t *fdx, buf_t *buf)
 {
-	int ret         = PEPA_ERR_OK;
-	int tx     = 0;
-	int tx_total = 0;
-	int rx          = 0;
-	int rx_total      = 0;
-	int iteration   = 0;
+	int ret        = PEPA_ERR_OK;
+	int rx         = 0;
+	int tx_total   = 0;
+	int rx_total   = 0;
+	int iteration  = 0;
 
 	do {
+		int tx         = 0;
+		int tx_current = 0;
+
 		iteration++;
 
 		DDD0("Going to read from %s fd %d to buf size %ld\n", fdx->name_read, fdx->fd_read, buf->room);
+
+		/* Read one time, then we will transfer it possibly in pieces */
 		rx = read(fdx->fd_read, buf->data, buf->room);
 		fdx->reads++;
-		
+
 		if (rx < 0) {
 			DE("Could not read: from %s %s\n", fdx->name_read, strerror(errno));
 			ret = -PEPA_ERR_BAD_SOCKET_READ;
@@ -167,44 +169,48 @@ int pepa_one_direction_copy(pepa_fds_t *fdx, buf_t *buf)
 			 fdx->name_write,
 			 fdx->fd_read,
 			 rx, rx);
-		if (fdx->fd_write_mutex) {
-			sem_wait(fdx->fd_write_mutex);
-		}
 
-		tx = write(fdx->fd_write, buf->data, rx);
-		fdx->writes++;
+		/* Write until transfer the whole received buffer */
+		do {
+			if (fdx->fd_write_mutex) {
+				sem_wait(fdx->fd_write_mutex);
+			}
 
-		if (fdx->fd_write_mutex) {
-			sem_post(fdx->fd_write_mutex);
-		}
+			tx_current  = write(fdx->fd_write, (buf->data + tx), (rx - tx));
+			fdx->writes++;
 
-		if (tx < 0) {
-			ret = -PEPA_ERR_BAD_SOCKET_WRITE;
-			DDDE("Could not write to %s: returned -1: %s\n", fdx->name_write, strerror(errno));
-			goto endit;
-		}
+			if (fdx->fd_write_mutex) {
+				sem_post(fdx->fd_write_mutex);
+			}
 
-		if (tx == rx) {
-			DD0("Wrote buffer %s -> %s, success\n", fdx->name_read, fdx->name_write);
-		}
+			if (tx_current < 0) {
+				ret = -PEPA_ERR_BAD_SOCKET_WRITE;
+				DDDE("Could not write to %s: returned -1: %s\n", fdx->name_write, strerror(errno));
+				goto endit;
+			}
 
-		if (tx < rx) {
-			DDE("Wrote less than asked %s -> %s: read %d, written %d\n", fdx->name_read, fdx->name_write, rx, tx);
-		}
+			tx += tx_current;
+
+			/* If we still not transfered everything, give the TX socket some time to rest and finish the transfer */
+			if (tx < rx) {
+				usleep(10);
+			}
+
+		} while (tx < rx);
 
 		rx_total += rx;
 		tx_total += tx;
-	} while (rx == buf->room);
+	} while (rx == buf->room); /* While we can read the whole buffer */
 
 	ret = PEPA_ERR_OK;
 endit:
 	fdx->rx += rx_total;
 	fdx->tx += tx_total;
 #if 0 /* SEB */
-if (written_acc + rd_acc > 0) {
-	DDD("%s -> %s written_acc %d, rd_acc = %d\n", fdx->name_read, fdx->name_write, written_acc, rd_acc);
-}
-#endif	
+	if (written_acc + rd_acc > 0) {
+		DDD("%s -> %s written_acc %d, rd_acc = %d\n", fdx->name_read, fdx->name_write, written_acc, rd_acc);
+	}
+#endif
 	return ret;
 }
 
@@ -244,10 +250,12 @@ static void pepa_one_direction_rw_thread_cleanup(void *arg)
 	pepa_fds_t *fdx        = (pepa_fds_t *)arg;
 	DDD("Running RW THREAD EXIT [%s] cleanup routine\n", fdx->my_name);
 
-	/* We should close the read file descriptor sinf we only use it */
-	int close_rc = close(fdx->fd_read);
-	if (0 != close_rc) {
-		DE("%s: Could not close reading socket: %s\n", fdx->my_name, strerror(errno));
+	/* We should close the read file descriptor if the flag 'close reading socket' is set */
+	if (fdx->close_read_sock) {
+		int close_rc = close(fdx->fd_read);
+		if (0 != close_rc) {
+			DE("%s: Could not close reading socket: %s\n", fdx->my_name, strerror(errno));
+		}
 	}
 
 	if (fdx->buf) {
@@ -257,8 +265,12 @@ static void pepa_one_direction_rw_thread_cleanup(void *arg)
 		}
 	}
 
+	if (fdx->fd_eventpoll) {
+		close(fdx->fd_eventpoll);
+	}
+
 	DD("***** %-14s TRANSFER THREAD ENDED: TRANSFERED: reads: %-5lu, writes: %-5lurx bytes: %-10lu Kb:%-8lu tx: bytes: %-10lu Kb:%-8lu *****\n",
-	   fdx->my_name, fdx->reads, fdx->writes, fdx->rx, fdx->rx / 1024, fdx->tx, fdx->tx/1024);
+	   fdx->my_name, fdx->reads, fdx->writes, fdx->rx, fdx->rx / 1024, fdx->tx, fdx->tx / 1024);
 
 	/* Release struct */
 	pepa_fds_t_release(fdx);
@@ -285,8 +297,8 @@ void *pepa_one_direction_rw_thread(void *arg)
 		pthread_exit(NULL);
 	}
 
-	DDD("%s: Starting: %s -> %s, fd read: %d, fd_write: %d, fd event: %d, fd die: %d\n",
-		fdx->my_name, fdx->name_read, fdx->name_write, fdx->fd_read, fdx->fd_write, fdx->fd_event, fdx->fd_die);
+	DDD("%s: Starting: %s -> %s, fd read: %d, fd_write: %d\n",
+		fdx->my_name, fdx->name_read, fdx->name_write, fdx->fd_read, fdx->fd_write);
 
 	if (fdx->fd_read < 0 || fdx->fd_write < 0) {
 		DE("%s: One of descriptors is invalid\n", fdx->my_name);
@@ -303,6 +315,8 @@ void *pepa_one_direction_rw_thread(void *arg)
 		pthread_exit(NULL);
 	}
 
+	fdx->fd_eventpoll = epoll_fd;
+
 	if (epoll_ctl_add(epoll_fd, fdx->fd_write, EPOLLOUT)) {
 		DDE("%s: Tried to add fdx->fd_write = %d and failed\n", fdx->my_name,  fdx->fd_write);
 		pthread_exit(NULL);
@@ -310,18 +324,18 @@ void *pepa_one_direction_rw_thread(void *arg)
 
 	do {
 		event_count = epoll_wait(epoll_fd, events, 1, 300000);
+		int err = errno;
 		/* Nothing to do, exited by timeout */
 		if (0 == event_count) {
 			continue;
 		}
 
 		/* Interrupted by a signal */
-		if (event_count < 0 && EINTR == errno) {
+		if (event_count < 0 && EINTR == err) {
 			continue;
 		}
 
 		if (event_count < 0) {
-			int err = errno;
 			DE("%s: error on wait: %s\n", fdx->my_name, strerror(err));
 			pthread_exit(NULL);
 		}
@@ -329,29 +343,24 @@ void *pepa_one_direction_rw_thread(void *arg)
 		for (i = 0; i < event_count; i++) {
 
 			if (events[i].events & (EPOLLRDHUP | EPOLLHUP)) {
-				DDDE("%s: Connection |%s| is closed, terminate thread\n\n", fdx->my_name,
-				   (events[i].data.fd == fdx->fd_read) ? "read" : "write");
+				DDDE("%s: Connection |%s = %d| is closed, terminate thread: %s\n\n", fdx->my_name,
+					 (events[i].data.fd == fdx->fd_read) ? "read" : "write",
+					 (events[i].data.fd == fdx->fd_read) ? fdx->fd_read : fdx->fd_write,
+					 strerror(err));
 				pthread_exit(NULL);
 			}
 
-			if (events[i].data.fd == fdx->fd_read) {
-				if (events[i].events & (EPOLLRDHUP | EPOLLHUP)) {
-					DDDE("%s: Connection |%s| is closed, terminate thread\n", fdx->my_name,
-					   (events[i].data.fd == fdx->fd_read) ? "read" : "write");
+			/* Read from socket */
+			if ((events[i].data.fd == fdx->fd_read) && (events[i].events & EPOLLIN)) {
+				rc = pepa_one_direction_copy(fdx, buf);
+				if (rc < 0) {
+					DDE("%s: Read/Write op between sockets failure: fd read: %d. fd out: %d\n",
+						fdx->my_name, fdx->fd_read, fdx->fd_write);
+					//pepa_event_send(fdx->fd_event, 1);
 					pthread_exit(NULL);
 				}
+				continue;
 
-				/* Read from socket */
-				if (events[i].events & EPOLLIN) {
-					rc = pepa_one_direction_copy(fdx, buf);
-					if (rc < 0) {
-						DDE("%s: Read/Write op between sockets failure: fd read: %d. fd out: %d\n",
-						   fdx->my_name, fdx->fd_read, fdx->fd_write);
-						//pepa_event_send(fdx->fd_event, 1);
-						pthread_exit(NULL);
-					}
-					continue;
-				}
 			} /* End of read descriptor processing */
 
 			/* The write descriptor is ready for write; we ignore it */
@@ -359,7 +368,7 @@ void *pepa_one_direction_rw_thread(void *arg)
 				continue;
 			}
 		}
-#if 1 /* SEB */
+#if 0 /* SEB */
 		/* Test all descriptors, and exit thread if one of them is invalid */
 		if (0 != pepa_test_fd(fdx->fd_read)) {
 			DDE("%s: read fd is invalid, terminate\n", fdx->my_name);
@@ -371,6 +380,11 @@ void *pepa_one_direction_rw_thread(void *arg)
 			pthread_exit(NULL);
 		}
 #endif
+
+		if ((fdx->reads > 0) && (0 == (fdx->reads % 1000))) {
+			DD("===== %-14s TRANSFER THREAD WORKING: TRANSFERED: reads: %-7lu writes: %-7lurx bytes: %-10lu Kb:%-8lu tx: bytes: %-10lu Kb:%-8lu =====\n",
+			   fdx->my_name, fdx->reads, fdx->writes, fdx->rx, fdx->rx / 1024, fdx->tx, fdx->tx / 1024);
+		}
 	} while (1);
 
 
@@ -380,6 +394,10 @@ void *pepa_one_direction_rw_thread(void *arg)
 
 int pepa_socket_shutdown_and_close(int sock, const char *my_name)
 {
+	if (sock < 0) {
+		return -1;
+	}
+
 	int rc = shutdown(sock, SHUT_RDWR);
 	if (rc < 0) {
 		DDDE("%s: Could not shutdown the socket: fd: %d, %s\n", my_name, sock, strerror(errno));

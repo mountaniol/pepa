@@ -55,8 +55,7 @@ static int pepa_in_thread_subthread(pepa_core_t *core, __attribute__((unused)) c
 
 	pepa_fds_t *fds      = pepa_fds_t_alloc(read_sock, /* Read from this socket */
 												 shva_sock, /* Write to this socket*/
-												 -1, /* Do not send me signal when you die */
-												 -1, /* Listen this event fd and die when there is an event */
+												 1, /* Close the reading socket on exit from thread */
 												 &core->sockets.shva_rw_mutex /* Use this mutex for write operation sync */,
 												 "IN", "IN", "SHVA" /* Starter thread name */);
 

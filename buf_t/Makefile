@@ -1,11 +1,12 @@
 #GCC=gcc
 AFL=~/src/exaware/AFLplusplus/afl-gcc 
-GCC=gcc-10
+#GCC=gcc-10
+GCC=gcc
 AR=ar
 #GCC=clang-10
 CFLAGS=-Wall -Wextra -Wpedantic -rdynamic -O2 -Wswitch-enum
 #DEBUG=-DDEBUG2
-DEBUG=-DDEBUG3
+DEBUG=-DDEBUG2
 #DEBUG += -DDERROR
 #CFLAGS += -fanalyzer
 

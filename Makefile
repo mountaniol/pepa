@@ -6,7 +6,7 @@ GCC=gcc
 #GCC=gcc-10
 CFLAGS=-Wall -Wextra -O2 -Wswitch-enum -Wimplicit-fallthrough
 #CFLAGS=-Wall -Wextra -O2
-DEBUG=-DDEBUG2
+DEBUG=-DDEBUG3
 # Static GCC-10 analyzer
 #CFLAGS+=-fanalyzer
 #CFLAGS+=-pg 

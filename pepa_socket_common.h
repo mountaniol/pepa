@@ -26,8 +26,9 @@ typedef struct {
 	char my_name[32];
 	int fd_read; /**< Read from this fd */
 	int fd_write; /**< Write to this fd */
-	int fd_event; /**< If given, then send event to parent thread before exit thread */
 	int fd_die; /**< If given, listen and exit when received event from parent thread */
+	int close_read_sock; /**< If not 0, the thread will close reading socket before when termonated */
+	int fd_eventpoll; /**< Eventpoll file descriptor, to be closed when the thread is finished */
 	char *name;
 	char *name_read;
 	char *name_write;
@@ -98,13 +99,12 @@ int pepa_open_connection_to_server(const char *address, int port, const char *na
  * @details 
  */
 pepa_fds_t *pepa_fds_t_alloc(int fd_read,
-									int fd_write,
-									int fd_event,
-									int fd_die,
-									sem_t *out_mutex,
-									char *name_thread,
-									char *name_read,
-									char *name_write);
+							 int fd_write,
+							 int close_read_sock,
+							 sem_t *out_mutex,
+							 char *name_thread,
+							 char *name_read,
+							 char *name_write);
 
 void pepa_fds_t_release(pepa_fds_t *fdx);
 uint32_t pepa_thread_counter(void);
@@ -179,7 +179,7 @@ void *pepa_out_thread(__attribute__((unused))void *arg);
 
 // void pepa_event_send(int fd, uint64_t code);
 void pepa_event_rm(int fd);
-void pepa_set_out_read_sock(pepa_core_t *core, int fd, const char * func, const int line);
+void pepa_set_out_read_sock(pepa_core_t *core, int fd, const char *func, const int line);
 
 int pepa_socket_shutdown_and_close(int sock, const char *my_name);
 

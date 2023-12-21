@@ -102,6 +102,7 @@ static pepa_core_t *pepa_create_core_t(void)
 
 	core->ctl_thread.thread_id = PTHREAD_DEAD;
 	core->shva_thread.thread_id = PTHREAD_DEAD;
+	core->shva_transfet_thread.thread_id = PTHREAD_DEAD;
 	core->in_thread.thread_id = PTHREAD_DEAD;
 	core->out_thread.thread_id = PTHREAD_DEAD;
 
@@ -323,6 +324,7 @@ const char *pepa_shva_thread_state_str(pepa_shva_thread_state_t s)
 	switch(s) {
 		case PEPA_TH_SHVA_START: return("PEPA_TH_SHVA_START"); /* Start thread routines */
 		case PEPA_TH_SHVA_OPEN_CONNECTION: return("PEPA_TH_SHVA_OPEN_CONNECTION"); /* Start thread routines */
+		case PEPA_TH_SHVA_WAIT_OUT: return("PEPA_TH_SHVA_WAIT_OUT");
 		case PEPA_TH_SHVA_START_TRANSFER: return("PEPA_TH_SHVA_START_TRANSFER");/* Start transfering thread */
 		case PEPA_TH_SHVA_WATCH_SOCKET: return("PEPA_TH_SHVA_WATCH_SOCKET");/* Watch the status of Write  socket */
 		case PEPA_TH_SHVA_CLOSE_SOCKET: return("PEPA_TH_SHVA_CLOSE_SOCKET");/* Close Write socket */

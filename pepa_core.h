@@ -53,6 +53,7 @@ typedef enum {
 typedef enum {
 	PEPA_TH_SHVA_START = 0, /* Start thread routines */
 	PEPA_TH_SHVA_OPEN_CONNECTION,
+	PEPA_TH_SHVA_WAIT_OUT, /* Wait until OUT thread is connected */
 	PEPA_TH_SHVA_START_TRANSFER, /* Start transfering thread */
 	PEPA_TH_SHVA_WATCH_SOCKET, /* Watch the status of SHAV serrver socket */
 	PEPA_TH_SHVA_CLOSE_SOCKET, /* Close connection to SHVA sserver */
@@ -118,6 +119,7 @@ typedef struct {
 
 	thread_vars_t ctl_thread; /**< Configuration of SHVA thread */
 	thread_vars_t shva_thread; /**< Configuration of SHVA thread */
+	thread_vars_t shva_transfet_thread; /**< Configuration of SHVA thread */
 	thread_vars_t in_thread; /**< Configuration of IN thread */
 	thread_vars_t out_thread; /**< Configuration of OUT thread */
 	int internal_buf_size; /**< Size of buffer used to pass packages, by defaiult COPY_BUF_SIZE bytes, see pepa_config.h */

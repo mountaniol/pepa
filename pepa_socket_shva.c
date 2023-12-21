@@ -45,9 +45,7 @@ static int pepa_shva_thread_start_transfer(pepa_core_t *core, __attribute__((unu
 	pthread_t  pthread_id;
 	pepa_fds_t *fds       = pepa_fds_t_alloc(core->sockets.shva_rw, /* Read from this socket */
 												   core->sockets.out_write, /* Write into this socket*/
-												   -1, /* Send me signal when you die using this file descriptor */
-											 //core->controls.shva_from_out_die, /* Don't listen any 'die' event */
-												   -1, /* Don't listen any 'die' event */
+												   0, /* Do not close the reading socket on exit from thread */
 												   NULL, /* Do not use any semaphor */
 												   "SHVA", "SHVA", "OUT" /*Starter thread name */);
 
@@ -57,6 +55,8 @@ static int pepa_shva_thread_start_transfer(pepa_core_t *core, __attribute__((unu
 		DDE("SHVA: Could not start new thread\n");
 		return -1;
 	}
+
+	core->shva_transfet_thread.thread_id = pthread_id;
 
 	DDD("%s: A new forwarding thread is up\n", my_name);
 	return PEPA_ERR_OK;
@@ -83,7 +83,7 @@ static int pepa_shva_thread_close_socket(pepa_core_t *core, __attribute__((unuse
 {
 	//int rc = pepa_close_socket(core->sockets.shva_rw, my_name);
 	int sock = core->sockets.shva_rw;
-	int rc = close(sock);
+	int rc   = close(sock);
 	if (rc < 0) {
 		DDDE("%s: Could not close the socket: fd: %d, %s\n", my_name, sock, strerror(errno));
 		return -1;
@@ -93,14 +93,40 @@ static int pepa_shva_thread_close_socket(pepa_core_t *core, __attribute__((unuse
 	return 0;
 }
 
-static int pepa_shva_thread_watch(pepa_core_t *core, __attribute__((unused)) const char *my_name)
+/* TODO: This should be based on a signal from SHVA */
+static int pepa_shva_thread_wait_out(pepa_core_t *core, __attribute__((unused)) const char *my_name)
 {
-	if (0 != pepa_test_fd(core->sockets.shva_rw)) {
-		return -1;
-	}
+	int sock = 0;
+	while (sock >= 0) {
+		int sock = core->sockets.out_write;
+
+		if (PEPA_ERR_OK == pepa_test_fd(sock)) {
+			return 0;
+		}
+		usleep(1000);
+	} while (1);
 	return 0;
 }
 
+static int pepa_shva_thread_watch(pepa_core_t *core, __attribute__((unused)) const char *my_name)
+{
+	do {
+		if (0 != pepa_test_fd(core->sockets.shva_rw)) {
+			DDD("SHVA socket is invalid\n");
+			return -1;
+		}
+
+		/* If the transfer thread is dead, we should restart it */
+		if (pthread_kill(core->shva_transfet_thread.thread_id, 0) < 0) {
+			core->shva_transfet_thread.thread_id = PTHREAD_DEAD;
+			DDD("SHVA transfering thread is terminated\n");
+			return 1;
+		}
+		usleep(1000);
+
+	} while (1);
+	return 0;
+}
 
 void *pepa_shva_thread_new(__attribute__((unused))void *arg)
 {
@@ -127,10 +153,20 @@ void *pepa_shva_thread_new(__attribute__((unused))void *arg)
 
 		case PEPA_TH_SHVA_OPEN_CONNECTION:
 			DDD("START STEP: %s\n", pepa_shva_thread_state_str(this_step));
-			next_step = PEPA_TH_SHVA_START_TRANSFER;
+			next_step = PEPA_TH_SHVA_WAIT_OUT;
 			rc = pepa_shva_thread_open_connection(core, my_name);
 			if (PEPA_ERR_OK != rc) {
 				next_step = PEPA_TH_SHVA_OPEN_CONNECTION;
+			}
+			DDD("END STEP:   %s\n", pepa_shva_thread_state_str(this_step));
+			break;
+
+		case PEPA_TH_SHVA_WAIT_OUT:
+			DDD("START STEP: %s\n", pepa_shva_thread_state_str(this_step));
+			next_step = PEPA_TH_SHVA_START_TRANSFER;
+			rc = pepa_shva_thread_wait_out(core, my_name);
+			if (PEPA_ERR_OK != rc) {
+				next_step = PEPA_TH_SHVA_WAIT_OUT;
 			}
 			DDD("END STEP:   %s\n", pepa_shva_thread_state_str(this_step));
 			break;
@@ -149,14 +185,21 @@ void *pepa_shva_thread_new(__attribute__((unused))void *arg)
 			break;
 
 		case PEPA_TH_SHVA_WATCH_SOCKET:
-			//DDD("START STEP: %s\n", pepa_shva_thread_state_str(next_step));
+			DDD("START STEP: %s\n", pepa_shva_thread_state_str(next_step));
 			next_step = PEPA_TH_SHVA_WATCH_SOCKET;
 			rc = pepa_shva_thread_watch(core, my_name);
-			if (rc) {
+			/* SHVA socket is invalid, we must reconnect */
+			if (-1 == rc) {
 				next_step = PEPA_TH_SHVA_CLOSE_SOCKET;
 			}
-			//DDD("END STEP:   %s\n", pepa_shva_thread_state_str(next_step));
-			usleep(1000);
+
+			/* The transfering thread is dead, we need to restart it when OUT is available */
+			if (1 == rc) {
+				next_step = PEPA_TH_SHVA_WAIT_OUT;
+			}
+
+			DDD("END STEP:   %s\n", pepa_shva_thread_state_str(next_step));
+			//usleep(1000);
 			break;
 
 		case PEPA_TH_SHVA_CLOSE_SOCKET:

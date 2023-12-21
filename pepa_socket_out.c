@@ -65,7 +65,7 @@ static int pepa_out_thread_open_listening_socket(pepa_core_t *core, char *my_nam
 															  core->out_thread.clients,
 															  __func__);
 		if (core->sockets.out_listen < 0) {
-			DDE("OUT: Can not open listening socket: %s\n", strerror(errno));
+			DDE("%s: Can not open listening socket: %s\n", my_name, strerror(errno));
 			//usleep(timeout * 1000000);
 			waiting_time += timeout;
 			///DDD("%s: Wait for %d secs\n", my_name, waiting_time);
