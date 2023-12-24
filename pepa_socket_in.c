@@ -27,96 +27,6 @@
 #include "buf_t/buf_t.h"
 #include "buf_t/se_debug.h"
 
-//static int pepa_in_thread_wait_shva(pepa_core_t *core, __attribute__((unused)) const char *my_name);
-
-#if 0 /* SEB */
-static int pepa_in_thread_subthread(pepa_core_t *core, __attribute__((unused)) const char *my_name, const int read_sock){
-	pthread_t pthread_id;
-	int       iteration  = 0;
-	int       shva_sock;
-
-
-	PEPA_SOCK_LOCK(core->sockets.shva_rw, core);
-	shva_sock = core->sockets.shva_rw;
-
-	/* Just in case test status of SHVA */
-	if (shva_sock < 0) {
-		DDDE("IN: SHVA socket is dead\n");
-		PEPA_SOCK_UNLOCK(core->sockets.shva_rw, core);
-		int rc = pepa_in_thread_wait_shva(core, my_name);
-		if (rc < 0) {
-			DDDE("IN: SHVA socket is dead, stop\n");
-			return -1;
-		}
-		//return -1;
-	}
-
-	DDD("IN SUBTHREAD: Starting with read fd = %d, write fd = %d\n", read_sock, shva_sock);
-
-	pepa_fds_t *fds      = pepa_fds_t_alloc(read_sock, /* Read from this socket */
-											shva_sock, /* Write to this socket*/
-											1, /* Close the reading socket on exit from thread */
-											&core->sockets.shva_rw_mutex /* Use this mutex for write operation sync */,
-											"IN", "IN", "SHVA" /* Starter thread name */);
-
-	/* Start the new thread copying between this new read socket and writing to shva socket */
-	int        thread_rc = pthread_create(&pthread_id, NULL, pepa_one_direction_rw_thread, fds);
-	PEPA_SOCK_UNLOCK(core->sockets.shva_rw, core);
-
-	if (thread_rc < 0) {
-		DE("IN: Could not start new thread, iter: %d\n", iteration);
-		return -1;
-	}
-	return PEPA_ERR_OK;
-}
-#endif
-
-#if 0 /* SEB */
-static int pepa_in_thread_listen(pepa_core_t *core, __attribute__((unused)) const char *my_name){
-	int                iteration = 0;
-	struct sockaddr_in s_addr;
-	socklen_t          addrlen   = sizeof(struct sockaddr);
-
-	do {
-		iteration++;
-
-		DDD("IN ACCEPT: Starting 'accept' waiting, iter: %d\n", iteration);
-		PEPA_SOCK_LOCK(core->sockets.in_listen, core);
-
-		if (PEPA_ERR_OK != pepa_test_fd(core->sockets.in_listen)) {
-			PEPA_SOCK_UNLOCK(core->sockets.in_listen, core);
-			return -PEPA_ERR_SOCKET_LISTEN;
-		}
-
-		int read_sock = accept(core->sockets.in_listen, &s_addr, &addrlen);
-
-		PEPA_SOCK_UNLOCK(core->sockets.in_listen, core);
-
-		if (read_sock >= 0) {
-			DDD("IN ACCEPT: Accepted IN connection, iter: %d, fd: %d\n", iteration, read_sock);
-			return read_sock;
-		}
-
-		/* If something went wrong, analyze the error and decide what to do */
-		if (read_sock < 0) {
-			int err = errno;
-			DE("IN ACCEPT: failed, listening socket: %d: %s | %d\n", core->sockets.in_listen, strerror(err), EINVAL);
-
-			if (EINTR != err) {
-				return -PEPA_ERR_SOCKET_LISTEN;
-			}
-
-		}
-
-		//usleep(1 * 1000000);
-
-		DDD("ACCEPT: Continue acept() nex iter\n");
-	} while (1);
-
-	return -1;
-}
-#endif
-
 static void pepa_in_thread_close_listen(pepa_core_t *core, __attribute__((unused)) const char *my_name)
 {
 	if (core->sockets.in_listen < 0) {
@@ -154,25 +64,6 @@ static void pepa_in_thread_listen_socket(pepa_core_t *core, const char *my_name)
 		sleep(3);
 	}
 }
-
-/* TODO: This should be based on a signal from SHVA */
-#if 0 /* SEB */
-static int pepa_in_thread_wait_shva(pepa_core_t *core, __attribute__((unused)) const char *my_name){
-	int sock = 0;
-	while (sock >= 0) {
-		PEPA_SOCK_LOCK(core->sockets.shva_rw, core);
-		int sock = core->sockets.shva_rw;
-
-		if (PEPA_ERR_OK == pepa_test_fd(sock)) {
-			PEPA_SOCK_UNLOCK(core->sockets.shva_rw, core);
-			return 0;
-		}
-		PEPA_SOCK_UNLOCK(core->sockets.shva_rw, core);
-		usleep(core->monitor_timeout);
-	} while (1);
-	return 0;
-}
-#endif
 
 /* Wait for signal; when SHVA is UP, return */
 static int pepa_in_thread_wait_shva_ready(pepa_core_t *core, __attribute__((unused)) const char *my_name)

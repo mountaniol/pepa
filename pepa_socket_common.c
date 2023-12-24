@@ -173,16 +173,6 @@ int pepa_one_direction_copy2(int fd_out, const char *name_out,
 				DE("Could not read on the first iteration: from read sock %s [%d]: %s\n", name_in, fd_in, strerror(errno));
 			}
 
-#if 0 /* SEB */
-			/* Try to wait a bit */
-			usleep(10000);
-
-			rx = read(fd_in, buf, buf_size);
-			if (0 == rx) {
-				ret = -PEPA_ERR_BAD_SOCKET_READ;
-			}
-#endif
-
 		}
 
 		if (PEPA_ERR_OK != ret) {
@@ -652,86 +642,6 @@ int pepa_open_connection_to_server(const char *address, int port, const char *na
 
 	return (sock);
 }
-
-/**
- * @author Sebastian Mountaniol (12/6/23)
- * @brief This function analyses accept() failure
- * @param int error_code Error code saver in errno
- * @return int PEPA_ERR_OK if the accept() should retry,
- *  	   a negative value if it should be aborted
- * @details 
- */
-
-#if 0 /* SEB */
-static int pepa_analyse_accept_error(const int error_code){
-	switch (error_code) {
-		case EAGAIN:
-		/* The socket is marked nonblocking and no connections are present to be accepted */
-		DE("The socket is marked nonblocking and no connections are present to be accepted\n");
-		return PEPA_ERR_OK;
-		case EBADF: /* sockfd is not an open file descriptor */
-		DE("sockfd is not an open file descriptor\n");
-		return -1;
-		break;
-		case ECONNABORTED: /* A connection has been aborted. */
-		DE("A connection has been aborted\n");
-		return -1;
-		break;
-		case EFAULT:  /* The addr argument is not in a writable part of the user address space. */
-		DE("The addr argument is not in a writable part of the user address space\n");
-		return -1;
-		break;
-		case EINTR:  /* The system call was interrupted by a signal that was caught before a valid connection arrived; see signal(7). */
-		DE("The system call was interrupted by a signal that was caught before a valid connection arrived\n");
-		return PEPA_ERR_OK;
-		break;
-		case EINVAL: /* Socket is not listening for connections, or addrlen is invalid (e.g., is negative). */
-		DE("Socket is not listening for connections, or addrlen is invalid (e.g., is negative)\n");
-		return -1;
-		break;
-		case EMFILE: /* The per-process limit on the number of open file descriptors has been reached. */
-		DE("The per-process limit on the number of open file descriptors has been reached\n");
-		return PEPA_ERR_OK;
-		break;
-		case ENFILE: /* The system-wide limit on the total number of open files has been reached. */
-		DE("The system-wide limit on the total number of open files has been reached\n");
-		return PEPA_ERR_OK;
-		break;
-		case ENOBUFS:
-		case ENOMEM:
-		DE("Not enough free memory\n");
-		return PEPA_ERR_OK;
-		/* Not enough free memory.
-		   This often means that the memory allocation is limited by the socket buffer limits,
-		   not by the system memory. */
-		break;
-		case ENOTSOCK: /* The file descriptor sockfd does not refer to a socket. */
-		DE("The file descriptor sockfd does not refer to a socket\n");
-		return -1;
-		break;
-		case EOPNOTSUPP: /* The referenced socket is not of type SOCK_STREAM.*/
-		DE("The referenced socket is not of type SOCK_STREAM\n");
-		return -1;
-		break;
-		case EPROTO: /* Protocol error. */
-		DE("Protocol error\n");
-		return PEPA_ERR_OK;
-		break;
-		case EPERM: /*  Firewall rules forbid connection. */
-		DE("Firewall rules forbid connection\n");
-		return PEPA_ERR_OK;
-		break;
-		default:
-		DE("Unknow error, should never see this message\n");
-		/* Unknown error */
-		return -1;
-	}
-
-	/* Again, never should be here */
-	abort();
-	return -1;
-}
-#endif
 
 int pepa_start_threads(void)
 {

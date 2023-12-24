@@ -35,12 +35,9 @@ static int pepa_out_wait_connection(int fd_listen)
 	const char         *my_name = "OUT-ACCEPT";
 	int                fd_read  = -1;
 	do {
-		//int       error_action;
 		DDD("%s: Starting accept() waiting\n", my_name);
 
 		fd_read = accept4(fd_listen, &s_addr, &addrlen, SOCK_CLOEXEC);
-//		       int accept4(int sockfd, struct sockaddr *addr,
-//                   socklen_t *addrlen, int flags);
 
 	} while (fd_read < 0);
 
@@ -67,9 +64,7 @@ static int pepa_out_thread_open_listening_socket(pepa_core_t *core, char *my_nam
 															  __func__);
 		if (core->sockets.out_listen < 0) {
 			DDE("%s: Can not open listening socket: %s\n", my_name, strerror(errno));
-			//usleep(timeout * 1000000);
 			waiting_time += timeout;
-			///DDD("%s: Wait for %d secs\n", my_name, waiting_time);
 		}
 	} while (core->sockets.out_listen < 0);
 	return PEPA_ERR_OK;
@@ -110,18 +105,6 @@ static int pepa_out_thread_close_write_socket(pepa_core_t *core, __attribute__((
 	DDD("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n");
 	return rc;
 }
-
-#if 0 /* SEB */
-static int pepa_out_thread_watch_write_socket(pepa_core_t *core, __attribute__((unused))char *my_name){
-	do {
-		if (PEPA_ERR_OK != pepa_test_fd(core->sockets.out_write)) {
-			return -1;
-		}
-		usleep(core->monitor_timeout);
-	} while (1);
-	return 0;
-}
-#endif
 
 /* Wait for signal; when SHVA is DOWN, return */
 static int pepa_out_thread_wait_fail(pepa_core_t *core, __attribute__((unused)) const char *my_name)

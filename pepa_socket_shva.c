@@ -40,35 +40,6 @@ static int pepa_open_shava_connection(void)
 	return pepa_open_connection_to_server(core->shva_thread.ip_string->data, core->shva_thread.port_int, __func__);
 }
 
-#if 0 /* SEB */
-static int pepa_shva_thread_start_transfer(pepa_core_t *core, __attribute__((unused)) const char *my_name){
-	pthread_t pthread_id;
-	int       rc         = pepa_test_fd(core->sockets.shva_rw);
-	if (rc < 0) {
-		DE("%s: SHVA connection is invalid and should be re-opened\n", my_name);
-		return -PEPA_ERR_BAD_SOCKET_READ;
-	}
-
-	pepa_fds_t *fds      = pepa_fds_t_alloc(core->sockets.shva_rw, /* Read from this socket */
-											core->sockets.out_write, /* Write into this socket*/
-											1, /* Do not close the reading socket on exit from thread */
-											NULL, /* Do not use any semaphor */
-											"SHVA", "SHVA", "OUT" /*Starter thread name */);
-
-	/* Start the new thread copying between this new read socket and writing to shva socket */
-	int        thread_rc = pthread_create(&pthread_id, NULL, pepa_one_direction_rw_thread, fds);
-	if (thread_rc < 0) {
-		DDE("SHVA: Could not start new thread\n");
-		return -PEPA_ERR_THREAD_CANNOT_CREATE;
-	}
-
-	core->shva_transfet_thread.thread_id = pthread_id;
-
-	DDD("%s: A new forwarding thread is up\n", my_name);
-	return PEPA_ERR_OK;
-}
-#endif
-
 static int pepa_shva_thread_open_connection(pepa_core_t *core, const char *my_name)
 {
 	/* Open connnection to the SHVA server */
@@ -88,7 +59,6 @@ static int pepa_shva_thread_open_connection(pepa_core_t *core, const char *my_na
 
 static int pepa_shva_thread_close_socket(pepa_core_t *core, __attribute__((unused)) const char *my_name)
 {
-	//int rc = pepa_close_socket(core->sockets.shva_rw, my_name);
 	int sock = core->sockets.shva_rw;
 	int rc   = close(sock);
 	if (rc < 0) {
@@ -100,7 +70,6 @@ static int pepa_shva_thread_close_socket(pepa_core_t *core, __attribute__((unuse
 	return 0;
 }
 
-/* TODO: This should be based on a signal from SHVA */
 static int pepa_shva_thread_wait_out(pepa_core_t *core, __attribute__((unused)) const char *my_name)
 {
 	while (1) {
@@ -115,27 +84,6 @@ static int pepa_shva_thread_wait_out(pepa_core_t *core, __attribute__((unused)) 
 	};
 	return 0;
 }
-
-#if 0 /* SEB */
-static int pepa_shva_thread_watch(pepa_core_t *core, __attribute__((unused)) const char *my_name){
-	do {
-		if (0 != pepa_test_fd(core->sockets.shva_rw)) {
-			DDD("SHVA socket is invalid\n");
-			return -1;
-		}
-
-		/* If the transfer thread is dead, we should restart it */
-		if (pthread_kill(core->shva_transfet_thread.thread_id, 0) < 0) {
-			core->shva_transfet_thread.thread_id = PTHREAD_DEAD;
-			DDD("SHVA transfering thread is terminated\n");
-			return 1;
-		}
-		usleep(1000);
-
-	} while (1);
-	return 0;
-}
-#endif
 
 /* Wait for signal; when SHVA is DOWN, return */
 static int pepa_shva_thread_wait_fail(pepa_core_t *core, __attribute__((unused)) const char *my_name)

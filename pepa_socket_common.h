@@ -177,10 +177,8 @@ void pepa_parse_pthread_create_error(const int rc);
 
 void *pepa_in_thread_new(__attribute__((unused))void *arg);
 
-//void *pepa_ctl_thread_new(__attribute__((unused))void *arg);
 void *pepa_out_thread(__attribute__((unused))void *arg);
 
-// void pepa_event_send(int fd, uint64_t code);
 void pepa_event_rm(int fd);
 void pepa_set_out_read_sock(pepa_core_t *core, int fd, const char *func, const int line);
 
