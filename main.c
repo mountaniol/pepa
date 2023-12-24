@@ -460,7 +460,7 @@ int main(int argi, char *argv[])
 
 
 	while (1) {
-		sleep(60);
+		sleep(120);
 	}
 	pepa_kill_all_threads();
 	sleep(1);

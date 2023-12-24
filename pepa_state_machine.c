@@ -28,11 +28,13 @@ static void pepa_thread_cancel(pthread_t pid, const char *name)
 	} else {
 		DDD("Canceled %s thread\n", name);
 	}
+#if 0 /* SEB */
 
 	while (0 == pthread_kill(pid, 0)) {
 		DDD("Waiting thread %s to terminate...\n", name);
-		usleep(1);
+		usleep(1000);
 	}
+#endif
 }
 
 static void pepa_socket_close(int fd, const char *socket_name)
@@ -46,8 +48,8 @@ static void pepa_socket_close(int fd, const char *socket_name)
 	}
 }
 
-int pepa_thread_is_ctl_up(void)
-{
+#if 0 /* SEB */
+int pepa_thread_is_ctl_up(void){
 	pepa_core_t          *core = pepa_get_core();
 	if (PTHREAD_DEAD == core->ctl_thread.thread_id ||
 		pthread_kill(core->ctl_thread.thread_id, 0) < 0) {
@@ -55,6 +57,7 @@ int pepa_thread_is_ctl_up(void)
 	}
 	return PEPA_ERR_OK;
 }
+#endif
 
 int pepa_thread_is_shva_up(void)
 {
@@ -76,10 +79,8 @@ int pepa_thread_is_in_up(void)
 		return -1;
 	}
 	if (pthread_kill(core->in_thread.thread_id, 0) < 0) {
-
 		DE("THREAD IN IS DEAD: kill = %d\n", pthread_kill(core->in_thread.thread_id, 0));
 		return -1;
-
 	}
 	return PEPA_ERR_OK;
 }
@@ -128,8 +129,8 @@ void pepa_thread_kill_in(void)
 	DD("#############################################\n");
 }
 
-void pepa_thread_kill_ctl(void)
-{
+#if 0 /* SEB */
+void pepa_thread_kill_ctl(void){
 	pepa_core_t          *core = pepa_get_core();
 	pepa_thread_cancel(core->ctl_thread.thread_id, "CTL");
 	core->in_thread.thread_id = PTHREAD_DEAD;
@@ -138,10 +139,11 @@ void pepa_thread_kill_ctl(void)
 	DD("##       THREAD CTL IS KILLED               ##\n");
 	DD("#############################################\n");
 }
+#endif
 
 
-void pepa_thread_start_ctl(void)
-{
+#if 0 /* SEB */
+void pepa_thread_start_ctl(void){
 	pepa_core_t          *core = pepa_get_core();
 	DDD("Starting CTL thread\n");
 	int rc    = pthread_create(&core->ctl_thread.thread_id, NULL, pepa_ctl_thread_new, NULL);
@@ -154,11 +156,16 @@ void pepa_thread_start_ctl(void)
 	DD("##       THREAD CTL IS STARTED             ##\n");
 	DD("#############################################\n");
 }
+#endif
 
 void pepa_thread_start_out(void)
 {
 	pepa_core_t          *core = pepa_get_core();
 	DDD("Starting OUT thread\n");
+	if (PEPA_ERR_OK == pepa_thread_is_out_up()) {
+		DDD("Thread OUT is UP already, finishing");
+		return;
+	}
 	int rc    = pthread_create(&core->out_thread.thread_id, NULL, pepa_out_thread, NULL);
 	if (0 != rc) {
 		pepa_parse_pthread_create_error(rc);
@@ -175,6 +182,11 @@ void pepa_thread_start_shva(void)
 {
 	pepa_core_t          *core = pepa_get_core();
 	DDD("Starting SHVA thread\n");
+	if (PEPA_ERR_OK == pepa_thread_is_shva_up()) {
+		DDD("Thread SHVA is UP already, finishing");
+		return;
+	}
+
 	int rc    = pthread_create(&core->shva_thread.thread_id, NULL, pepa_shva_thread_new, NULL);
 	if (0 != rc) {
 		pepa_parse_pthread_create_error(rc);
@@ -192,8 +204,10 @@ void pepa_thread_start_in(void)
 	pepa_core_t          *core = pepa_get_core();
 	DDD("Starting IN thread\n");
 	if (PEPA_ERR_OK == pepa_thread_is_in_up()) {
+		DDD("Thread IN is UP already, finishing");
 		return;
 	}
+
 	int rc = pthread_create(&core->in_thread.thread_id, NULL, pepa_in_thread_new, NULL);
 	if (0 != rc) {
 		pepa_parse_pthread_create_error(rc);
@@ -269,7 +283,7 @@ void pepa_kill_all_threads(void)
 
 	/*** Terminate threads ***/
 
-	pepa_thread_kill_ctl();
+	//pepa_thread_kill_ctl();
 	pepa_thread_kill_out();
 	pepa_thread_kill_in();
 	pepa_thread_kill_shva();
@@ -334,32 +348,33 @@ typedef enum {
 pepa_action_t;
 
 #endif
-const char *pepa_act_str(pepa_action_t p)
-{
+#if 0 /* SEB */
+const char *pepa_act_str(pepa_action_t p){
 	switch (p) {
-	case PEPA_ACT_NONE:
+		case PEPA_ACT_NONE:
 		return "PEPA_ACT_NONE";
-	case PEPA_ACT_START_OUT:
+		case PEPA_ACT_START_OUT:
 		return "PEPA_ACT_START_OUT";
-	case PEPA_ACT_START_IN:
+		case PEPA_ACT_START_IN:
 		return "PEPA_ACT_START_IN";
-	case PEPA_ACT_START_SHVA :
+		case PEPA_ACT_START_SHVA :
 		return "PEPA_ACT_START_SHVA";
-	case PEPA_ACT_STOP_OUT:
+		case PEPA_ACT_STOP_OUT:
 		return "PEPA_ACT_STOP_OUT";
-	case PEPA_ACT_STOP_IN:
+		case PEPA_ACT_STOP_IN:
 		return "PEPA_ACT_STOP_IN";
-	case PEPA_ACT_STOP_SHVA:
+		case PEPA_ACT_STOP_SHVA:
 		return "PEPA_ACT_STOP_SHVA";
-	case PEPA_ACT_RESTART_ALL:
+		case PEPA_ACT_RESTART_ALL:
 		return "PEPA_ACT_RESTART_ALL";
-	case PEPA_ACT_ABORT:
+		case PEPA_ACT_ABORT:
 		return "PEPA_ACT_ABORT";
-	case PEPA_ACT_MAX:
+		case PEPA_ACT_MAX:
 		return "PEPA_ACT_MAX";
 	}
 	return "NA";
 }
+#endif
 
 const char *pepa_pr_str(pepa_proc_t p)
 {
@@ -397,13 +412,13 @@ const char *pepa_sig_str(pepa_sig_t p)
 	return "NA";
 }
 
-static const int pepa_state_action[PEPA_PR_MAX][PEPA_ST_MAX] =
-{
+#if 0 /* SEB */
+static const int pepa_state_action[PEPA_PR_MAX][PEPA_ST_MAX] ={
 	/* OUT porcess actions */
 	{
 		/* {PEPA_PR_OUT}, {PEPA_ST_NONE}, == */ 			PEPA_ACT_NONE,
 		/* {PEPA_PR_OUT}, {PEPA_ST_RUN}, == */				PEPA_ACT_START_SHVA,
-		/* {PEPA_PR_OUT}, {PEPA_ST_FAIL}, == */ 			PEPA_ACT_RESTART_ALL,
+		/* {PEPA_PR_OUT}, {PEPA_ST_FAIL}, == */ 			PEPA_ACT_NONE,
 		/* {PEPA_PR_OUT}, {PEPA_ST_SOCKET_RESET}, == */ 	PEPA_ACT_NONE,
 	},
 
@@ -411,7 +426,7 @@ static const int pepa_state_action[PEPA_PR_MAX][PEPA_ST_MAX] =
 		/* SHVA porcess actions */
 		/* {PEPA_PR_SHVA}, {PEPA_ST_NONE}, == */ 			PEPA_ACT_NONE,
 		/* {PEPA_PR_SHVA}, {PEPA_ST_RUN}, == */ 			PEPA_ACT_START_IN,
-		/* {PEPA_PR_SHVA}, {PEPA_ST_FAIL}, == */ 			PEPA_ACT_RESTART_ALL,
+		/* {PEPA_PR_SHVA}, {PEPA_ST_FAIL}, == */ 			PEPA_ACT_NONE,
 		/* {PEPA_PR_SHVA}, {PEPA_ST_SOCKET_RESET}, == */ 	PEPA_ACT_NONE,
 	},
 
@@ -419,7 +434,7 @@ static const int pepa_state_action[PEPA_PR_MAX][PEPA_ST_MAX] =
 		/* IN porcess actions */
 		/* {PEPA_PR_IN}, {PEPA_ST_NONE}, == */ 				PEPA_ACT_NONE,
 		/* {PEPA_PR_IN}, {PEPA_ST_RUN}, == */ 				PEPA_ACT_NONE,
-		/* {PEPA_PR_IN}, {PEPA_ST_FAIL}, == */ 				PEPA_ACT_RESTART_ALL,
+		/* {PEPA_PR_IN}, {PEPA_ST_FAIL}, == */ 				PEPA_ACT_NONE,
 		/* {PEPA_PR_IN}, {PEPA_ST_SOCKET_RESET}, == */ 		PEPA_ACT_NONE,
 	},
 
@@ -431,22 +446,28 @@ static const int pepa_state_action[PEPA_PR_MAX][PEPA_ST_MAX] =
 		/* {PEPA_PR_CLT}, {PEPA_ST_SOCKET_RESET},  == */ 	PEPA_ACT_ABORT,
 	}
 };
+#endif
 
-void pepa_state_clear(pepa_core_t *core, int process)
-{
+#if 0 /* SEB */
+void pepa_state_clear(pepa_core_t *core, int process){
+	pthread_mutex_lock(&core->state.signals_sem);
 	core->state.signals[process] = PEPA_ST_NONE;
+	pthread_mutex_unlock(&core->state.signals_sem);
+	DDD("Cleared state of process %s\n", pepa_pr_str(process));
 }
+#endif
 
-void pepa_state_lock(pepa_core_t *core)
-{
+#if 0 /* SEB */
+void pepa_state_lock(pepa_core_t *core){
 	pthread_mutex_lock(&core->state.sync_sem);
 }
 
-void pepa_state_unlock(pepa_core_t *core)
-{
+void pepa_state_unlock(pepa_core_t *core){
 	pthread_mutex_unlock(&core->state.sync_sem);
 }
+#endif
 
+/* Wait on condition */
 void pepa_state_wait(pepa_core_t *core)
 {
 	pthread_mutex_lock(&core->state.sync_sem);
@@ -454,30 +475,113 @@ void pepa_state_wait(pepa_core_t *core)
 	pthread_mutex_unlock(&core->state.sync_sem);
 }
 
+/* Send the condition change to all listeners */
 void pepa_state_sig(pepa_core_t *core)
 {
 	pthread_mutex_lock(&core->state.sync_sem);
-	pthread_cond_signal(&core->state.sync);
+	pthread_cond_broadcast(&core->state.sync);
 	pthread_mutex_unlock(&core->state.sync_sem);
 }
 
-void pepa_state_set(pepa_core_t *core, int process, int state, const char *func, const int line)
+void pepa_state_shva_set(pepa_core_t *core, pepa_sig_t sig)
 {
+	pthread_mutex_lock(&core->state.signals_sem);
+	core->state.signals[PEPA_PR_SHVA] = sig;
+	pthread_mutex_unlock(&core->state.signals_sem);
+	pepa_state_sig(core);
+	DDD("Set SHVA state to %s\n", pepa_sig_str(sig));
+}
+
+void pepa_state_in_set(pepa_core_t *core, pepa_sig_t sig)
+{
+	pthread_mutex_lock(&core->state.signals_sem);
+	core->state.signals[PEPA_PR_IN] = sig;
+	pthread_mutex_unlock(&core->state.signals_sem);
+	pepa_state_sig(core);
+	DDD("Set IN state to %s\n", pepa_sig_str(sig));
+}
+
+void pepa_state_out_set(pepa_core_t *core, pepa_sig_t sig)
+{
+	pthread_mutex_lock(&core->state.signals_sem);
+	core->state.signals[PEPA_PR_OUT] = sig;
+	pthread_mutex_unlock(&core->state.signals_sem);
+	pepa_state_sig(core);
+	DDD("Set OUT state to %s\n", pepa_sig_str(sig));
+}
+
+
+
+int pepa_state_shva_get(pepa_core_t *core)
+{
+	int st;
+	pthread_mutex_lock(&core->state.signals_sem);
+	st = core->state.signals[PEPA_PR_SHVA];
+	pthread_mutex_unlock(&core->state.signals_sem);
+	DDD("Return SHVA state is %s\n", pepa_sig_str(st));
+	return st;
+}
+
+int pepa_state_in_get(pepa_core_t *core)
+{
+	int st;
+	pthread_mutex_lock(&core->state.signals_sem);
+	st = core->state.signals[PEPA_PR_IN];
+	pthread_mutex_unlock(&core->state.signals_sem);
+	DDD("Return IN state is %s\n", pepa_sig_str(st));
+	return st;
+}
+
+int pepa_state_out_get(pepa_core_t *core)
+{
+	int st;
+	pthread_mutex_lock(&core->state.signals_sem);
+	st = core->state.signals[PEPA_PR_OUT];
+	pthread_mutex_unlock(&core->state.signals_sem);
+	DDD("Return OUT state is %s\n", pepa_sig_str(st));
+	return st;
+}
+
+#if 0 /* SEB */
+int pepa_state_ctl_get(pepa_core_t *core){
+	int st;
+	pthread_mutex_lock(&core->state.signals_sem);
+	st = core->state.signals[PEPA_PR_CLT];
+	pthread_mutex_unlock(&core->state.signals_sem);
+	DDD("Return CTL state is %s\n", pepa_sig_str(st));
+	return st;
+}
+#endif
+
+
+
+#if 0 /* SEB */
+void pepa_state_set(pepa_core_t *core, int process, int state, const char *func, const int line){
 	DDD("Setting sig for process %s, state %s from %s line %d\n",
-	   pepa_pr_str(process), pepa_sig_str(state), func, line);
+		pepa_pr_str(process), pepa_sig_str(state), func, line);
+
+	pthread_mutex_lock(&core->state.signals_sem);
 	core->state.signals[process] = state;
+	pthread_mutex_unlock(&core->state.signals_sem);
 	pepa_state_sig(core);
 }
+#endif
 
-int pepa_state_get(pepa_core_t *core, int process)
-{
+#if 0 /* SEB */
+int pepa_state_get(pepa_core_t *core, int process){
+	int st;
+	pthread_mutex_lock(&core->state.signals_sem);
+	st = core->state.signals[process];
+	pthread_mutex_unlock(&core->state.signals_sem);
 	DDD("Returning sig for process %s, state %s\n",
-	   pepa_pr_str(process),
-	   pepa_sig_str(core->state.signals[process]));
-	return core->state.signals[process];
+		pepa_pr_str(process),
+		pepa_sig_str(core->state.signals[process]));
+	return st;
 }
+#endif
 
-int pepa_state_to_action(int process, int state)
-{
+#if 0 /* SEB */
+int pepa_state_to_action(int process, int state){
 	return pepa_state_action[process][state];
 }
+#endif

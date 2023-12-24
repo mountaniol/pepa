@@ -16,7 +16,6 @@
 #include <errno.h>
 #include <poll.h>
 #include <sys/epoll.h>
-#include <sys/epoll.h>
 
 #include "pepa_config.h"
 #include "pepa_socket_common.h"
@@ -26,6 +25,8 @@
 #include "pepa_state_machine.h"
 #include "buf_t/buf_t.h"
 #include "buf_t/se_debug.h"
+
+#define RX_TX_PRINT_DIVIDER (50000)
 
 #define handle_error_en(en, msg) \
                do { errno = en; perror(msg); exit(EXIT_FAILURE); } while (0)
@@ -44,7 +45,7 @@ void set_sig_handler(void)
 
 int pepa_pthread_init_phase(const char *name)
 {
-
+	DDD("####################################################\n");
 	DDD("Thread %s: Detaching\n", name);
 	if (0 != pthread_detach(pthread_self())) {
 		DE("Thread %s: can't detach myself\n", name);
@@ -53,6 +54,7 @@ int pepa_pthread_init_phase(const char *name)
 	}
 
 	DDD("Thread %s: Detached\n", name);
+	DDD("####################################################\n");
 
 	int rc = pthread_setname_np(pthread_self(), name);
 	if (0 != rc) {
@@ -124,13 +126,116 @@ uint32_t pepa_thread_counter(void)
 	return ++counter;
 }
 
+int pepa_one_direction_copy2(int fd_out, const char *name_out,
+							 int fd_in, const char *name_in,
+							 char *buf, size_t buf_size, int do_debug)
+{
+	int ret       = PEPA_ERR_OK;
+	int rx        = 0;
+	int tx_total  = 0;
+	int rx_total  = 0;
+	int iteration = 0;
+
+	if (do_debug) {
+		DDD0("Starrting transfering from %s to %s\n", name_in, name_out);
+	}
+
+	do {
+		int tx         = 0;
+		int tx_current = 0;
+
+		iteration++;
+		if (do_debug) {
+			DDD0("Iteration: %d\n", iteration);
+		}
+
+		/* Read one time, then we will transfer it possibly in pieces */
+		rx = read(fd_in, buf, buf_size);
+
+		if (do_debug) {
+			DDD0("Iteration: %d, finised read(), there is %d bytes\n", iteration, rx);
+		}
+
+		if (rx < 0) {
+			if (do_debug) {
+				DE("Could not read: from read sock %s [%d]: %s\n", name_in, fd_in, strerror(errno));
+			}
+			ret = -PEPA_ERR_BAD_SOCKET_READ;
+			goto endit;
+		}
+
+		/* nothing to read*/
+		if ((0 == rx) && (1 == iteration)) {
+			/* If we can not read on the first iteration, it probably means the fd was closed */
+			ret = -PEPA_ERR_BAD_SOCKET_READ;
+
+			if (do_debug) {
+				DE("Could not read on the first iteration: from read sock %s [%d]: %s\n", name_in, fd_in, strerror(errno));
+			}
+
+#if 0 /* SEB */
+			/* Try to wait a bit */
+			usleep(10000);
+
+			rx = read(fd_in, buf, buf_size);
+			if (0 == rx) {
+				ret = -PEPA_ERR_BAD_SOCKET_READ;
+			}
+#endif
+
+		}
+
+		if (PEPA_ERR_OK != ret) {
+			goto endit;
+		}
+
+
+		/* Write until transfer the whole received buffer */
+		do {
+			tx_current  = write(fd_out, buf, (rx - tx));
+
+			if (tx_current < 0) {
+				ret = -PEPA_ERR_BAD_SOCKET_WRITE;
+				if (do_debug) {
+					DDDE("Could not write to write to sock %s [%d]: returned -1: %s\n", name_out, fd_out, strerror(errno));
+				}
+				goto endit;
+			}
+
+			tx += tx_current;
+
+			/* If we still not transfered everything, give the TX socket some time to rest and finish the transfer */
+			if (tx < rx) {
+				usleep(10);
+			}
+
+		} while (tx < rx);
+
+		rx_total += rx;
+		tx_total += tx;
+		if (do_debug) {
+			DDD0("Iteration %d done: rx = %d, tx = %d\n", iteration, rx, tx);
+		}
+		//} while (rx > 0); /* Tun this loop as long as we have data on read socket */
+
+	} while ((int)buf_size == rx); /* Tun this loop as long as we have data on read socket */
+
+	ret = PEPA_ERR_OK;
+endit:
+	if (do_debug) {
+		DDD0("Finished transfering from %s to %s, returning %d, rx = %d, tx = %d, \n", name_in, name_out, ret, rx_total, tx_total);
+	}
+	return ret;
+}
+
+
 int pepa_one_direction_copy(pepa_fds_t *fdx, buf_t *buf)
 {
-	int ret        = PEPA_ERR_OK;
-	int rx         = 0;
-	int tx_total   = 0;
-	int rx_total   = 0;
-	int iteration  = 0;
+	int ret       = PEPA_ERR_OK;
+	int rx        = 0;
+	int tx_total  = 0;
+	int rx_total  = 0;
+	int iteration = 0;
 
 	do {
 		int tx         = 0;
@@ -154,9 +259,8 @@ int pepa_one_direction_copy(pepa_fds_t *fdx, buf_t *buf)
 		if (0 == rx) {
 			/* If we can not read on the first iteration, it probably means the fd was closed */
 			if (1 == iteration) {
-				//DE("Read descriptor is empty on the 1st iteration\n");
-				//ret = -PEPA_ERR_BAD_SOCKET_READ;
-				ret = PEPA_ERR_OK;
+				ret = -PEPA_ERR_BAD_SOCKET_READ;
+				// ret = PEPA_ERR_OK;
 			} else {
 				ret = PEPA_ERR_OK;
 			}
@@ -200,7 +304,7 @@ int pepa_one_direction_copy(pepa_fds_t *fdx, buf_t *buf)
 
 		rx_total += rx;
 		tx_total += tx;
-	} while (rx == buf->room); /* While we can read the whole buffer */
+	} while (rx > 0); /* Tun this loop as long as we have data on read socket */
 
 	ret = PEPA_ERR_OK;
 endit:
@@ -245,8 +349,8 @@ int epoll_ctl_add(int epfd, int fd, uint32_t events)
 	return 0;
 }
 
-static void pepa_one_direction_rw_thread_cleanup(void *arg)
-{
+#if 0 /* SEB */
+static void pepa_one_direction_rw_thread_cleanup(void *arg){
 	pepa_fds_t *fdx        = (pepa_fds_t *)arg;
 	DDD("Running RW THREAD EXIT [%s] cleanup routine\n", fdx->my_name);
 
@@ -275,9 +379,10 @@ static void pepa_one_direction_rw_thread_cleanup(void *arg)
 	/* Release struct */
 	pepa_fds_t_release(fdx);
 }
+#endif
 
-void *pepa_one_direction_rw_thread(void *arg)
-{
+#if 0 /* SEB */
+void *pepa_one_direction_rw_thread(void *arg){
 	int        i;
 	int        event_count;
 	buf_t      *buf        = buf_new(1024);
@@ -291,6 +396,7 @@ void *pepa_one_direction_rw_thread(void *arg)
 	/* Push cleanup structure */
 	pthread_cleanup_push(pepa_one_direction_rw_thread_cleanup, arg);
 
+	/* Init the pthread  */
 	rc = pepa_pthread_init_phase(fdx->my_name);
 	if (rc < 0) {
 		DE("%s:Could not init CTL\n", fdx->my_name);
@@ -310,14 +416,15 @@ void *pepa_one_direction_rw_thread(void *arg)
 	struct epoll_event events[2];
 	int                epoll_fd  = epoll_create1(EPOLL_CLOEXEC);
 
-	if (0 != epoll_ctl_add(epoll_fd, fdx->fd_read, EPOLLIN)) {
+	if (0 != epoll_ctl_add(epoll_fd, fdx->fd_read, EPOLLIN | EPOLLRDHUP | EPOLLHUP)) {
 		DDE("%s: Tried to add fdx->fd_read = %d and failed\n", fdx->my_name, fdx->fd_read);
 		pthread_exit(NULL);
 	}
 
 	fdx->fd_eventpoll = epoll_fd;
 
-	if (epoll_ctl_add(epoll_fd, fdx->fd_write, EPOLLOUT)) {
+	if (epoll_ctl_add(epoll_fd, fdx->fd_write, EPOLLOUT | EPOLLRDHUP | EPOLLHUP)) {
+		//if (epoll_ctl_add(epoll_fd, fdx->fd_write, EPOLLRDHUP | EPOLLHUP)) {
 		DDE("%s: Tried to add fdx->fd_write = %d and failed\n", fdx->my_name,  fdx->fd_write);
 		pthread_exit(NULL);
 	}
@@ -342,6 +449,7 @@ void *pepa_one_direction_rw_thread(void *arg)
 
 		for (i = 0; i < event_count; i++) {
 
+			/* If one of the read/write sockets is diconnected, exit the thread */
 			if (events[i].events & (EPOLLRDHUP | EPOLLHUP)) {
 				DDDE("%s: Connection |%s = %d| is closed, terminate thread: %s\n\n", fdx->my_name,
 					 (events[i].data.fd == fdx->fd_read) ? "read" : "write",
@@ -368,7 +476,7 @@ void *pepa_one_direction_rw_thread(void *arg)
 				continue;
 			}
 		}
-#if 0 /* SEB */
+	#if 1 /* SEB */
 		/* Test all descriptors, and exit thread if one of them is invalid */
 		if (0 != pepa_test_fd(fdx->fd_read)) {
 			DDE("%s: read fd is invalid, terminate\n", fdx->my_name);
@@ -379,9 +487,9 @@ void *pepa_one_direction_rw_thread(void *arg)
 			DDE("%s: write fd is invalid, terminate\n", fdx->my_name);
 			pthread_exit(NULL);
 		}
-#endif
+	#endif
 
-		if ((fdx->reads > 0) && (0 == (fdx->reads % 1000))) {
+		if ((fdx->reads > 0) && (0 == (fdx->reads % RX_TX_PRINT_DIVIDER))) {
 			DD("===== %-14s TRANSFER THREAD WORKING: TRANSFERED: reads: %-7lu writes: %-7lurx bytes: %-10lu Kb:%-8lu tx: bytes: %-10lu Kb:%-8lu =====\n",
 			   fdx->my_name, fdx->reads, fdx->writes, fdx->rx, fdx->rx / 1024, fdx->tx, fdx->tx / 1024);
 		}
@@ -391,6 +499,7 @@ void *pepa_one_direction_rw_thread(void *arg)
 	pthread_cleanup_pop(0);
 	return NULL;
 }
+#endif
 
 int pepa_socket_shutdown_and_close(int sock, const char *my_name)
 {
@@ -634,11 +743,13 @@ int pepa_start_threads(void)
 	close(fd);
 
 	/* Start CTL thread */
-	pepa_thread_start_ctl();
+	// pepa_thread_start_ctl();
 
 	/* Start SHVA thread */
 	//pepa_shva_start();
 	pepa_thread_start_out();
+	pepa_thread_start_shva();
+	pepa_thread_start_in();
 	return 0;
 }
 

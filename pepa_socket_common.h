@@ -61,7 +61,7 @@ x_conn_direction_t;
 void set_sig_handler(void);
 int pepa_pthread_init_phase(const char *name);
 void pepa_parse_pthread_create_error(const int rc);
-void *pepa_one_direction_rw_thread(void *arg);
+// void *pepa_one_direction_rw_thread(void *arg);
 
 __attribute__((nonnull(1, 2)))
 /**
@@ -109,6 +109,9 @@ pepa_fds_t *pepa_fds_t_alloc(int fd_read,
 void pepa_fds_t_release(pepa_fds_t *fdx);
 uint32_t pepa_thread_counter(void);
 int pepa_one_direction_copy(pepa_fds_t *fdx, buf_t *buf);
+int pepa_one_direction_copy2(int fd_out, const char *name_out,
+							 int fd_in, const char *name_in,
+							 char *buf, size_t buf_size, int do_debug);
 
 /**
  * @author Sebastian Mountaniol (12/14/23)
@@ -174,7 +177,7 @@ void pepa_parse_pthread_create_error(const int rc);
 
 void *pepa_in_thread_new(__attribute__((unused))void *arg);
 
-void *pepa_ctl_thread_new(__attribute__((unused))void *arg);
+//void *pepa_ctl_thread_new(__attribute__((unused))void *arg);
 void *pepa_out_thread(__attribute__((unused))void *arg);
 
 // void pepa_event_send(int fd, uint64_t code);

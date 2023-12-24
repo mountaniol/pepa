@@ -37,6 +37,9 @@ typedef enum {
 	PEPA_ERR_SOCKET_READ_CLOSED,
 	PEPA_ERR_SOCKET_WRITE,
 	PEPA_ERR_SOCKET_WRITE_CLOSED,
+
+	/* Treads related */
+	PEPA_ERR_THREAD_CANNOT_CREATE,
 } pepa_error_t;
 
 /**

@@ -22,4 +22,6 @@
 
 #define PTHREAD_DEAD ((pthread_t)0xBEEFDEAD)
 
+#define MONITOR_TIMEOUT_USEC (500000)
+
 #endif /* _PEPA_CONFIG_H_ */

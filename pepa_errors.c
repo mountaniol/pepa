@@ -78,6 +78,7 @@ const char *pepa_error_code_to_str(int code)
 	case PEPA_ERR_SOCKET_READ_CLOSED: return "Socked closed when tried to read from";
 	case PEPA_ERR_SOCKET_WRITE: return "Socked closed when tried to write to";
 	case PEPA_ERR_SOCKET_WRITE_CLOSED: return "Right socked closed when tried to write to";
+	case PEPA_ERR_THREAD_CANNOT_CREATE: return "Cannot create socket";
 	default: return "Unknown error code";
 	}
 

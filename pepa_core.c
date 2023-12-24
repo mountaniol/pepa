@@ -11,7 +11,7 @@
 #include "pepa_debug.h"
 #include "buf_t/se_debug.h"
 
-static pepa_core_t *g_pepa_core = NULL;
+pepa_core_t *g_pepa_core = NULL;
 
 /**
  * @author Sebastian Mountaniol (7/20/23)
@@ -100,7 +100,7 @@ static pepa_core_t *pepa_create_core_t(void)
 		return NULL;
 	}
 
-	core->ctl_thread.thread_id = PTHREAD_DEAD;
+	//core->ctl_thread.thread_id = PTHREAD_DEAD;
 	core->shva_thread.thread_id = PTHREAD_DEAD;
 	core->shva_transfet_thread.thread_id = PTHREAD_DEAD;
 	core->in_thread.thread_id = PTHREAD_DEAD;
@@ -119,8 +119,15 @@ static pepa_core_t *pepa_create_core_t(void)
 	// core->sockets.out_read = -1;
 	core->sockets.out_write = -1;
 	core->sockets.in_listen = -1;
+	core->monitor_timeout = MONITOR_TIMEOUT_USEC;
 
 	rc = pthread_mutex_init(&core->state.sync_sem, NULL);
+	if (rc < 0) {
+		DE("Can not init core->state.sync_sem\n");
+		abort();
+	}
+
+	rc = pthread_mutex_init(&core->state.signals_sem, NULL);
 	if (rc < 0) {
 		DE("Can not init core->state.sync_sem\n");
 		abort();
@@ -307,44 +314,71 @@ int pepa_if_abort(void)
 
 const char *pepa_out_thread_state_str(pepa_out_thread_state_t s)
 {
-	switch(s) {
-		case PEPA_TH_OUT_START: return("PEPA_TH_OUT_START"); /* Start thread routines */
-		case PEPA_TH_OUT_CREATE_LISTEN: return("PEPA_TH_OUT_CREATE_LISTEN");/* Create listening socket */
-		case PEPA_TH_OUT_ACCEPT: return("PEPA_TH_OUT_ACCEPT");/* Run accept() which creates Write socket */
-		case PEPA_TH_OUT_WATCH_WRITE_SOCK: return("PEPA_TH_OUT_WATCH_WRITE_SOCK");/* Watch the status of Write  socket */
-		case PEPA_TH_OUT_CLOSE_WRITE_SOCKET: return("PEPA_TH_OUT_CLOSE_WRITE_SOCKET");/* Close Write socket */
-		case PEPA_TH_OUT_CLOSE_LISTEN_SOCKET: return("PEPA_TH_OUT_CLOSE_LISTEN_SOCKET");/* Close listening socket */
-		case PEPA_TH_OUT_TERMINATE: return("PEPA_TH_OUT_TERMINATE");/* Terminate thread */
+	switch (s) {
+	case PEPA_TH_OUT_START:
+		return ("PEPA_TH_OUT_START"); /* Start thread routines */
+	case PEPA_TH_OUT_CREATE_LISTEN:
+		return ("PEPA_TH_OUT_CREATE_LISTEN"); /* Create listening socket */
+	case PEPA_TH_OUT_ACCEPT:
+		return ("PEPA_TH_OUT_ACCEPT"); /* Run accept() which creates Write socket */
+	case PEPA_TH_OUT_WATCH_WRITE_SOCK:
+		return ("PEPA_TH_OUT_WATCH_WRITE_SOCK"); /* Watch the status of Write  socket */
+	case PEPA_TH_OUT_CLOSE_WRITE_SOCKET:
+		return ("PEPA_TH_OUT_CLOSE_WRITE_SOCKET"); /* Close Write socket */
+	case PEPA_TH_OUT_CLOSE_LISTEN_SOCKET:
+		return ("PEPA_TH_OUT_CLOSE_LISTEN_SOCKET"); /* Close listening socket */
+	case PEPA_TH_OUT_TERMINATE:
+		return ("PEPA_TH_OUT_TERMINATE"); /* Terminate thread */
 	}
 	return "UNKNOWN";
 }
 
 const char *pepa_shva_thread_state_str(pepa_shva_thread_state_t s)
 {
-	switch(s) {
-		case PEPA_TH_SHVA_START: return("PEPA_TH_SHVA_START"); /* Start thread routines */
-		case PEPA_TH_SHVA_OPEN_CONNECTION: return("PEPA_TH_SHVA_OPEN_CONNECTION"); /* Start thread routines */
-		case PEPA_TH_SHVA_WAIT_OUT: return("PEPA_TH_SHVA_WAIT_OUT");
-		case PEPA_TH_SHVA_START_TRANSFER: return("PEPA_TH_SHVA_START_TRANSFER");/* Start transfering thread */
-		case PEPA_TH_SHVA_WATCH_SOCKET: return("PEPA_TH_SHVA_WATCH_SOCKET");/* Watch the status of Write  socket */
-		case PEPA_TH_SHVA_CLOSE_SOCKET: return("PEPA_TH_SHVA_CLOSE_SOCKET");/* Close Write socket */
-		case PEPA_TH_SHVA_TERMINATE: return("PEPA_TH_SHVA_TERMINATE");/* Close listening socket */
+	switch (s) {
+	case PEPA_TH_SHVA_START:
+		return ("PEPA_TH_SHVA_START"); /* Start thread routines */
+	case PEPA_TH_SHVA_OPEN_CONNECTION:
+		return ("PEPA_TH_SHVA_OPEN_CONNECTION"); /* Start thread routines */
+	case PEPA_TH_SHVA_WAIT_OUT:
+		return ("PEPA_TH_SHVA_WAIT_OUT");
+	case PEPA_TH_SHVA_START_TRANSFER:
+		return ("PEPA_TH_SHVA_START_TRANSFER"); /* Start transfering thread */
+	case PEPA_TH_SHVA_WATCH_SOCKET:
+		return ("PEPA_TH_SHVA_WATCH_SOCKET"); /* Watch the status of Write  socket */
+	case PEPA_TH_SHVA_CLOSE_SOCKET:
+		return ("PEPA_TH_SHVA_CLOSE_SOCKET"); /* Close Write socket */
+	case PEPA_TH_SHVA_TERMINATE:
+		return ("PEPA_TH_SHVA_TERMINATE"); /* Close listening socket */
 	}
 	return "UNKNOWN";
 }
 
 const char *pepa_in_thread_state_str(pepa_in_thread_state_t s)
 {
-	switch(s) {
-		case PEPA_TH_IN_START: return("PEPA_TH_IN_START"); /* Start thread routines */
-		case PEPA_TH_IN_CREATE_LISTEN: return("PEPA_TH_IN_CREATE_LISTEN");/* Run accept() which creates Write socket */
-		case PEPA_TH_IN_CLOSE_LISTEN: return("PEPA_TH_IN_CLOSE_LISTEN");/* Run accept() which creates Write socket */
-		case PEPA_TH_IN_TEST_LISTEN_SOCKET: return("PEPA_TH_IN_TEST_LISTEN_SOCKET");/* Start transfering thread */
-		case PEPA_TH_IN_WAIT_SHVA: return("PEPA_TH_IN_WAIT_SHVA");/* Watch the status of Write  socket */
-		case PEPA_TH_IN_CREATE_WATCHDOG: return("PEPA_TH_IN_CREATE_WATCHDOG");/* Close Write socket */
-		case PEPA_TH_IN_ACCEPT: return("PEPA_TH_IN_ACCEPT");/* Close listening socket */
-		case PEPA_TH_IN_START_TRANSFER: return("PEPA_TH_IN_START_TRANSFER");/* Close listening socket */
-		case PEPA_TH_IN_TERMINATE: return("PEPA_TH_IN_TERMINATE");/* Close listening socket */
+	switch (s) {
+	case PEPA_TH_IN_START:
+		return ("PEPA_TH_IN_START"); /* Start thread routines */
+	case PEPA_TH_IN_CREATE_LISTEN:
+		return ("PEPA_TH_IN_CREATE_LISTEN"); /* Run accept() which creates Write socket */
+	case PEPA_TH_IN_CLOSE_LISTEN:
+		return ("PEPA_TH_IN_CLOSE_LISTEN"); /* Run accept() which creates Write socket */
+	case PEPA_TH_IN_TEST_LISTEN_SOCKET:
+		return ("PEPA_TH_IN_TEST_LISTEN_SOCKET"); /* Start transfering thread */
+	case PEPA_TH_IN_WAIT_SHVA_UP:
+		return ("PEPA_TH_IN_WAIT_SHVA_UP"); /* Watch the status of Write  socket */
+	case PEPA_TH_IN_WAIT_SHVA_DOWN:
+		return ("PEPA_TH_IN_WAIT_SHVA_DOWN"); /* Watch the status of Write  socket */
+#if 0 /* SEB */
+	case PEPA_TH_IN_CREATE_WATCHDOG:
+		return ("PEPA_TH_IN_CREATE_WATCHDOG"); /* Close Write socket */
+	case PEPA_TH_IN_ACCEPT:
+		return ("PEPA_TH_IN_ACCEPT"); /* Close listening socket */
+#endif
+	case PEPA_TH_IN_START_TRANSFER:
+		return ("PEPA_TH_IN_START_TRANSFER"); /* Close listening socket */
+	case PEPA_TH_IN_TERMINATE:
+		return ("PEPA_TH_IN_TERMINATE"); /* Close listening socket */
 	}
 	return "UNKNOWN";
 }

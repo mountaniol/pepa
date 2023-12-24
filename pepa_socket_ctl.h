@@ -8,6 +8,6 @@
 #include "buf_t/buf_t.h"
 #include "pepa_core.h"
 
-void *pepa_ctl_thread_new(__attribute__((unused))void *arg);
+//void *pepa_ctl_thread_new(__attribute__((unused))void *arg);
 
 #endif /* _PEPA_SOCKET_CTL_H__ */

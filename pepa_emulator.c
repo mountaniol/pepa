@@ -36,6 +36,7 @@
 /* THe next two are needed for send() */
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/epoll.h>
 #include <errno.h>
 
 
@@ -52,8 +53,9 @@
 #include "pepa_state_machine.h"
 #include "pepa_version.h"
 
-#define SHUTDOWN_DIVIDER (1077711)
+#define SHUTDOWN_DIVIDER (100003573)
 #define SHOULD_EMULATE_DISCONNECT() (0 == (rand() % SHUTDOWN_DIVIDER))
+#define RX_TX_PRINT_DIVIDER (1000000)
 
 int        shva_to_out     = 0;
 int        in_to_shva      = 0;
@@ -188,9 +190,44 @@ static int pepa_emulator_parse_arguments(int argi, char *argv[])
 	return 0;
 }
 
+uint64_t head_counter(void)
+{
+	static uint64_t counter = 0;
+	return counter++;
+}
+
+typedef struct {
+	uint64_t counter;
+	uint64_t buf_len;
+} __attribute__((packed)) buf_head_t;
+
+
+int pepa_emulator_buf_count(buf_t *buf)
+{
+	buf_head_t *head = (buf_head_t *)buf->data;
+	return head->counter;
+}
+
+void pepa_emulator_buf_validate_size(buf_t *buf)
+{
+	buf_head_t *head = (buf_head_t *)buf->data;
+	if (head->buf_len != (uint64_t)buf->used) {
+		DE("Wrong buffer size: expected %ld buf it is %lu\n", head->buf_len, buf->used);
+	}
+}
+
+void pepa_emulator_disconnect_mes(const char *name)
+{
+	DDD("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n");
+	DDD("EMU: Emulating %s disconnect\n", name);
+	DDD("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n");
+}
+
+
 int pepa_emulator_generate_buffer_buf(buf_t *buf, int64_t buffer_size)
 {
-	int rc = 0;
+	int        rc   = 0;
+	buf_head_t head;
 	TESTP(buf, -1);
 	buf->used = 0;
 
@@ -202,9 +239,17 @@ int pepa_emulator_generate_buffer_buf(buf_t *buf, int64_t buffer_size)
 		abort();
 	}
 
+	head.counter = head_counter();
+	head.buf_len = buffer_size;
+	rc = buf_add(buf, (const char *)&head, sizeof(head));
+	if (rc < 0) {
+		DE("Failed to add to buf_t\n");
+	}
+
 	DDD0("Buf allocated room\n");
 
-	uint64_t rest = buffer_size;
+
+	uint64_t rest = buffer_size - sizeof(buf_head_t);
 
 	DDD0("Starting copying into buf\n");
 
@@ -239,47 +284,6 @@ buf_t *pepa_emulator_generate_buffer(uint64_t buffer_size)
 	return NULL;
 }
 
-static int pepa_emulator_try_to_read_from_fd(int fd, buf_t *buf)
-{
-	int            rc;
-	fd_set         read_set;
-	struct timeval tv;
-
-	tv.tv_sec = 1;
-	tv.tv_usec = 0;
-
-	/* Socket sets */
-	FD_ZERO(&read_set);
-
-	/* Read set, signaling when there is data to read */
-	FD_SET(fd, &read_set);
-
-	rc = select(fd + 1, &read_set, NULL, NULL, &tv);
-
-	if (!FD_ISSET(fd, &read_set)) {
-		DDD("No data in the socket\n");
-		return (0);
-	}
-
-	rc = read(fd, buf->data, buf->room);
-
-	if (rc < 0) {
-		DDE("An error on receive, error: %s\n", strerror(errno));
-		return -1;
-	}
-
-	if (0 == rc) {
-		DDD("No buffer received, no error\n");
-		return 0;
-	}
-
-	if (rc > 0) {
-		DDD("Recevied %d bytes buffer\n", rc);
-	}
-
-	return rc;
-}
-
 static int out_start_connection(void)
 {
 	int         sock;
@@ -295,61 +299,103 @@ static int out_start_connection(void)
 	return sock;
 }
 
-/* Connect 1 reading socket to PEPA OUT listening socket and receive packets */
+void pepa_emulator_out_thread_cleanup(__attribute__((unused))void *arg)
+{
+	int         *event_fd = (int *)arg;
+	pepa_core_t *core     = pepa_get_core();
+	close(core->sockets.out_write);
+	close(*event_fd);
+}
+
+/* Create 1 read socket to emulate OUT connection */
 void *pepa_emulator_out_thread(__attribute__((unused))void *arg)
 {
-	buf_t *buf = buf_new(2048);
-	int   rc   = -1;
-	int   sock = -1;
+	int         rc          = -1;
+	pepa_core_t *core       = pepa_get_core();
+	int         event_count;
+	int         i;
 
-	while (1) {
-		sock = out_start_connection();
+	uint64_t    reads       = 0;
+	uint64_t    rx          = 0;
+	int         epoll_fd;
 
-		DD("Emu OUT: Connected to OUT\n");
+	pthread_cleanup_push(pepa_emulator_out_thread_cleanup, (void *)&epoll_fd);
 
-		while (1) {
-			rc = pepa_emulator_try_to_read_from_fd(sock, buf);
-			if (rc > 0) {
-				DD(" ~~~~>>> Emu OUT: Read from OUT %d bytes\n", rc);
-				//sleep(rand() % 3);
-				//usleep(rand() % 10000);
+	/* In this thread we read from socket as fast as we can */
 
-				/* Sometimes emulate broken connection: break the loop, then the socket will be closed */
-				if (SHOULD_EMULATE_DISCONNECT()) {
-					DD("OUT: EMULATING DISCONNECT\n");
-					break;
-				}
+	buf_t       *buf        = buf_new(2048);
+
+	do {
+		//int                sock      = out_start_connection();
+		core->sockets.out_write      = out_start_connection();
+
+		struct epoll_event events[2];
+		epoll_fd  = epoll_create1(EPOLL_CLOEXEC);
+
+		if (0 != epoll_ctl_add(epoll_fd, core->sockets.out_write, EPOLLIN | EPOLLRDHUP | EPOLLHUP)) {
+			DDE("    OUT: Tried to add sock fd = %d and failed\n", core->sockets.out_write);
+			goto closeit;
+		}
+
+		do {
+			event_count = epoll_wait(epoll_fd, events, 1, 300000);
+			int err = errno;
+			/* Nothing to do, exited by timeout */
+			if (0 == event_count) {
 				continue;
 			}
 
-			if (rc == 0) {
-				DE("Could not read from OUT: rc = %d, %s\n", rc, strerror(errno));
-				//sleep(1);
-				//continue;
+			/* Interrupted by a signal */
+			if (event_count < 0 && EINTR == err) {
+				continue;
+			}
+
+			if (event_count < 0) {
+				DDE("    OUT: error on wait: %s\n", strerror(err));
+				goto closeit;
+			}
+
+			for (i = 0; i < event_count; i++) {
+				if (events[i].events & (EPOLLRDHUP | EPOLLHUP)) {
+					DDE("    OUT: The remote disconnected: %s\n", strerror(err));
+					goto closeit;
+				}
+
+				/* Read from socket */
+				if (events[i].events & EPOLLIN) {
+					do {
+						reads++;
+						rc = read(core->sockets.out_write, buf->data, buf->room);
+						if (rc < 0) {
+							DDE("    OUT: Read/Write op between sockets failure: %s\n", strerror(errno));
+							goto closeit;
+						}
+						rx += rc;
+						if (0 == (reads % RX_TX_PRINT_DIVIDER)) {
+							DD("     OUT: %-7lu reads, bytes: %-7lu, Kb: %-7lu\n", reads, rx, (rx / 1024));
+						}
+					} while (rc == buf->room);
+
+					continue;
+				} /* for (i = 0; i < event_count; i++) */
+			}
+
+			/* Sometimes emulate broken connection: break the loop, then the socket will be closed */
+			if (SHOULD_EMULATE_DISCONNECT()) {
+				//DD("OUT      : EMULATING DISCONNECT\n");
+				pepa_emulator_disconnect_mes("OUT");
 				break;
 			}
 
-			if (rc <= 0) {
-				DE("Could not read to OUT: rc = %d\n", rc);
-			}
-
-			close(sock);
-			//pepa_close_socket(sock, "EMU");
-			sock = out_start_connection();
-
-			sleep(rand() % 7);
-		}
-
-		DD("Emulating OUT broken connection\n");
-		close(sock);
-		//pepa_close_socket(sock, "EMU");
-		usleep(rand() % 1000000);
-		sock = -1;
-	}
-
-	return NULL;
+		} while (1); /* epoll loop */
+	closeit:
+		close(epoll_fd);
+		close(core->sockets.out_write)/*__fd*/;
+	} while (1);
+	/* Now we can start send and recv */
+	pthread_cleanup_pop(0);
+	pthread_exit(NULL);;
 }
-
 
 typedef struct {
 	pthread_t shva_read_t;
@@ -359,141 +405,146 @@ typedef struct {
 /* Create 1 read/write listening socket to emulate SHVA server */
 void *pepa_emulator_shva_reader_thread(__attribute__((unused))void *arg)
 {
-	int                reinit      = 0;
 	int                rc          = -1;
 	pepa_core_t        *core       = pepa_get_core();
-	struct sockaddr_in s_addr;
-	int                sock_listen = -1;
-	int                sock_rw     = -1;
+	int                event_count;
+	int                i;
 
-	shva_args_t shargs = (shva_args_t *)arg;
+	uint64_t           reads       = 0;
+	uint64_t           tx          = 0;
 
 	/* In this thread we read from socket as fast as we can */
 
-	buf_t              *buf        = NULL;
+	buf_t              *buf        = buf_new(2048);
+
+	struct epoll_event events[2];
+	int                epoll_fd    = epoll_create1(EPOLL_CLOEXEC);
+
+	if (0 != epoll_ctl_add(epoll_fd, core->sockets.shva_rw, EPOLLIN)) {
+		DDE("SHVA READ: Tried to add shva fd = %d and failed\n", core->sockets.shva_rw);
+		pthread_exit(NULL);
+	}
 
 	do {
-		if (NULL != buf) {
-			if (BUFT_OK != buf_free(buf)) {
-				DE("Can not free buffer: %s\n", buf_error_code_to_string(rc));
-			}
+		event_count = epoll_wait(epoll_fd, events, 1, 300000);
+		int err = errno;
+		/* Nothing to do, exited by timeout */
+		if (0 == event_count) {
+			continue;
 		}
-		reinit = 0;
-		do {
-			DDD("Emu SHVA: OPEN LISTENING SOCKET\n");
-			sock_listen = pepa_open_listening_socket(&s_addr, core->shva_thread.ip_string, core->shva_thread.port_int, 1, __func__);
-			if (sock_listen < 0) {
-				DDE("Emu SHVA: Could not open listening socket, waiting...\n");
-				sleep(1);
-			}
-		} while (sock_listen < 0); /* Opening listening soket */
 
-		DDD("Emu SHVA: Opened listening socket\n");
+		/* Interrupted by a signal */
+		if (event_count < 0 && EINTR == err) {
+			continue;
+		}
 
-		socklen_t addrlen      = sizeof(struct sockaddr);
+		if (event_count < 0) {
+			DDE("SHVA READ: error on wait: %s\n", strerror(err));
+			close(epoll_fd);
+			pthread_exit(NULL);
+		}
 
-		do {
-			DDD("Emu SHVA: ACCEPTING\n");
-			sock_rw = accept(sock_listen, &s_addr, &addrlen);
-			if (sock_rw < 0) {
-				DE("Emu SHVA: Could not accept\n");
-				sleep(1);
-			}
-		} while (sock_rw < 0);
-
-		DDD("Emu SHVA: Accepted connection\n");
-
-		buf = buf_new(2048);
-
-		do {
-			DDD0("Trying to read\n");
-			rc = pepa_emulator_try_to_read_from_fd(sock_rw, buf);
-			if (rc < 0) {
-				DDE("SHVA: Error on receive; restart connection\n");
-				break;
-			}
-			if (rc > 0) {
-				DD("~~~~>>> Emu SHVA: Read %d bytes\n", rc);
+		for (i = 0; i < event_count; i++) {
+			if (events[i].events & (EPOLLRDHUP | EPOLLHUP)) {
+				DDE("SHVA READ: THe remote disconnected: %s\n", strerror(err));
+				close(epoll_fd);
+				pthread_exit(NULL);
 			}
 
-			/* Emulate writing */
-			DDD0("SHVA: Entering writing\n");
+			/* Read from socket */
+			if (events[i].events & EPOLLIN) {
+				do {
+					reads++;
+					rc = read(core->sockets.shva_rw, buf->data, buf->room);
+					if (rc < 0) {
+						DDE("SHVA READ: Read/Write op between sockets failure: %s\n", strerror(errno));
+						close(epoll_fd);
+						pthread_exit(NULL);
+					}
+					tx += rc;
+					if (0 == (reads % RX_TX_PRINT_DIVIDER)) {
+						DD("SHVA READ: %-7lu reads, bytes: %-7lu, Kb: %-7lu\n", reads, tx, (tx / 1024));
+					}
+				} while (rc == buf->room);
 
-			if (0 != pepa_emulator_generate_buffer_buf(buf, (rand() % 750) + 16)) {
-				DE("Can't generate buf\n");
-				abort();
-			}
+				continue;
+			} /* for (i = 0; i < event_count; i++) */
+		}
 
-			DDD0("SHVA: A buffer generated, going to write: sock = %d, room = %ld, used = %ld\n",
-			   sock_rw, buf->room, buf->used);
-
-			DDD0("SHVA: Trying to write\n");
-			rc = write(sock_rw, buf->data, buf->used);
-
-			if (rc < 0) {
-				reinit = 1;
-				DDE("SHVA: Could not send buffer to SHVA, error: %s\n", strerror(errno));
-				break;
-			}
-
-			if (0 == rc) {
-				DDE("SHVA: Send 0 bytes to SHVA, error: %s\n", strerror(errno));
-				usleep(100000);
-			}
-
-			if (rc > 0) {
-				DD("~~~~>>> Emu SHVA: Written %d bytes\n", rc);
-			}
-
-			/* Emulate socket closing */
-			if (SHOULD_EMULATE_DISCONNECT()) {
-				DD("SHVA: EMULATING DISCONNECT\n");
-				break;
-			}
-
-
-			if (reinit != 0) {
-				break;
-			}
-
-			//usleep(rand() % 10000);
-			reinit = 0;
-
-		} while (1); /* Generating and sending data */
-
-		/* Emulate broken connection */
-
-		/* Close rw socket */
-		close(sock_rw);
-		//pepa_close_socket(sock_rw, "EMU");
-		//close(sock_listen);
-		pepa_socket_shutdown_and_close(sock_listen, "EMU");
-		sleep(5);
-
-	} while (1); /* Opening connection and acceptiny */
-
+	} while (1);
 	/* Now we can start send and recv */
 	return NULL;
 }
+
+
+/* Create 1 read/write listening socket to emulate SHVA server */
+void *pepa_emulator_shva_writer_thread(__attribute__((unused))void *arg)
+{
+	int         rc     = -1;
+	pepa_core_t *core  = pepa_get_core();
+	uint64_t    writes = 0;
+	uint64_t    rx     = 0;
+
+	/* In this thread we read from socket as fast as we can */
+
+	buf_t       *buf   = buf_new(2048);
+
+	do {
+		if (0 != pepa_emulator_generate_buffer_buf(buf, (rand() % 750) + 16)) {
+			DE("SHVA WRITE: Can't generate buf\n");
+			pthread_exit(NULL);
+		}
+
+		DDD0("SHVA WRITE: : A buffer generated, going to write: sock = %d, room = %ld, used = %ld\n",
+			 core->sockets.shva_rw, buf->room, buf->used);
+
+		DDD0("SHVA WRITE: : Trying to write\n");
+		rc = write(core->sockets.shva_rw, buf->data, buf->used);
+		writes++;
+
+		if (rc < 0) {
+			DDE("SHVA WRITE: : Could not send buffer to SHVA, error: %s\n", strerror(errno));
+			break;
+		}
+
+		if (0 == rc) {
+			DDE("SHVA WRITE: Send 0 bytes to SHVA, error: %s\n", strerror(errno));
+			usleep(100000);
+		}
+
+		//DD("SHVA WRITE: ~~~~>>> Written %d bytes\n", rc);
+		rx += rc;
+
+		if (0 == (writes % RX_TX_PRINT_DIVIDER)) {
+			DD("SHVA WRITE: %-7lu reads, bytes: %-7lu, Kb: %-7lu\n", writes, rx, (rx / 1024));
+		}
+
+	} while (1); /* Generating and sending data */
+	pthread_exit(NULL);
+}
+
+void pepa_emulator_shva_thread_cleanup(__attribute__((unused))void *arg)
+{
+	int         *sock_listen = (int *)arg;
+	pepa_core_t *core        = pepa_get_core();
+	pepa_socket_shutdown_and_close(*sock_listen, "EMU SHVA");
+	close(core->sockets.shva_rw);
+}
+
 /* Create 1 read/write listening socket to emulate SHVA server */
 void *pepa_emulator_shva_thread(__attribute__((unused))void *arg)
 {
-	int                reinit      = 0;
+	pthread_t          shva_reader;
+	pthread_t          shva_writer;
 	int                rc          = -1;
 	pepa_core_t        *core       = pepa_get_core();
 	struct sockaddr_in s_addr;
 	int                sock_listen = -1;
-	int                sock_rw     = -1;
+	// int                sock_rw     = -1;
 
-	buf_t              *buf        = NULL;
+	pthread_cleanup_push(pepa_emulator_shva_thread_cleanup, &sock_listen);
 
 	do {
-		if (NULL != buf) {
-			if (BUFT_OK != buf_free(buf)) {
-				DE("Can not free buffer: %s\n", buf_error_code_to_string(rc));
-			}
-		}
-		reinit = 0;
 		do {
 			DDD("Emu SHVA: OPEN LISTENING SOCKET\n");
 			sock_listen = pepa_open_listening_socket(&s_addr, core->shva_thread.ip_string, core->shva_thread.port_int, 1, __func__);
@@ -508,87 +559,61 @@ void *pepa_emulator_shva_thread(__attribute__((unused))void *arg)
 		socklen_t addrlen      = sizeof(struct sockaddr);
 
 		do {
-			DDD("Emu SHVA: ACCEPTING\n");
-			sock_rw = accept(sock_listen, &s_addr, &addrlen);
-			if (sock_rw < 0) {
+			DDD("Emu SHVA: STARTING    ACCEPTING\n");
+			core->sockets.shva_rw = accept(sock_listen, &s_addr, &addrlen);
+			DDD("Emu SHVA: EXITED FROM ACCEPTING\n");
+			if (core->sockets.shva_rw < 0) {
 				DE("Emu SHVA: Could not accept\n");
 				sleep(1);
 			}
-		} while (sock_rw < 0);
+		} while (core->sockets.shva_rw < 0);
 
-		DDD("Emu SHVA: Accepted connection\n");
+		DDD("Emu SHVA: Accepted connection, fd = %d\n", core->sockets.shva_rw);
 
-		buf = buf_new(2048);
+		/* Start read/write threads */
+		rc = pthread_create(&shva_writer, NULL, pepa_emulator_shva_writer_thread, NULL);
+		if (rc < 0) {
+			DE("Could not create SHVA READ thread");
+			pthread_exit(NULL);
+		}
 
+		rc = pthread_create(&shva_reader, NULL, pepa_emulator_shva_reader_thread, NULL);
+		if (rc < 0) {
+			DE("Could not create SHVA WRITE thread");
+			pthread_exit(NULL);
+		}
+
+		/* Wait in loop, check whether the threads alive; if not, reconnect */
 		do {
-			DDD0("Trying to read\n");
-			rc = pepa_emulator_try_to_read_from_fd(sock_rw, buf);
-			if (rc < 0) {
-				DDE("SHVA: Error on receive; restart connection\n");
-				break;
-			}
-			if (rc > 0) {
-				DD("~~~~>>> Emu SHVA: Read %d bytes\n", rc);
-			}
-
-			/* Emulate writing */
-			DDD0("SHVA: Entering writing\n");
-
-			if (0 != pepa_emulator_generate_buffer_buf(buf, (rand() % 750) + 16)) {
-				DE("Can't generate buf\n");
-				abort();
-			}
-
-			DDD0("SHVA: A buffer generated, going to write: sock = %d, room = %ld, used = %ld\n",
-			   sock_rw, buf->room, buf->used);
-
-			DDD0("SHVA: Trying to write\n");
-			rc = write(sock_rw, buf->data, buf->used);
-
-			if (rc < 0) {
-				reinit = 1;
-				DDE("SHVA: Could not send buffer to SHVA, error: %s\n", strerror(errno));
+			if ((pthread_kill(shva_reader, 0) < 0) ||
+				(pthread_kill(shva_writer, 0) < 0)) {
+				pthread_cancel(shva_reader);
+				pthread_cancel(shva_writer);
 				break;
 			}
 
-			if (0 == rc) {
-				DDE("SHVA: Send 0 bytes to SHVA, error: %s\n", strerror(errno));
-				usleep(100000);
-			}
-
-			if (rc > 0) {
-				DD("~~~~>>> Emu SHVA: Written %d bytes\n", rc);
-			}
+			usleep(10000);
 
 			/* Emulate socket closing */
 			if (SHOULD_EMULATE_DISCONNECT()) {
-				DD("SHVA: EMULATING DISCONNECT\n");
+				// DD("SHVA: EMULATING DISCONNECT\n");
+				pepa_emulator_disconnect_mes("SHVA");
 				break;
 			}
-
-
-			if (reinit != 0) {
-				break;
-			}
-
-			//usleep(rand() % 10000);
-			reinit = 0;
-
-		} while (1); /* Generating and sending data */
+		} while (1);
 
 		/* Emulate broken connection */
 
 		/* Close rw socket */
-		close(sock_rw);
-		//pepa_close_socket(sock_rw, "EMU");
-		//close(sock_listen);
+		close(core->sockets.shva_rw);
 		pepa_socket_shutdown_and_close(sock_listen, "EMU");
 		sleep(5);
-
 	} while (1); /* Opening connection and acceptiny */
 
 	/* Now we can start send and recv */
-	return NULL;
+
+	pthread_cleanup_pop(0);
+	pthread_exit(NULL);
 }
 
 int in_start_connection(void)
@@ -605,68 +630,83 @@ int in_start_connection(void)
 	return sock;
 }
 
-/* Connect N writing sockets to PEPA IN listening socket and send packets */
+void pepa_emulator_in_thread_cleanup(__attribute__((unused))void *arg)
+{
+	DDD("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n");
+	DDD("$$$$$$$    IN_FORWARD CLEANUP            $$$$$$$$$\n");
+	pepa_core_t *core  = pepa_get_core();
+	close(core->sockets.in_listen);
+	core->sockets.in_listen = -1;
+	DDD("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n");
+}
+
+/* Create 1 read/write listening socket to emulate SHVA server */
 void *pepa_emulator_in_thread(__attribute__((unused))void *arg)
 {
-	int rc   = 0;
-	int sock = -1;
+	int         rc     = -1;
+	pepa_core_t *core  = pepa_get_core();
+	//int         sock;
+//	int         event_count;
+//	int         i;
 
-	while (1) {
-		sock = in_start_connection();
-		DDD0("Emu IN: Connected to IN: fd = %d\n", sock);
+	uint64_t    writes = 0;
+	uint64_t    rx     = 0;
 
-		while (1) {
-			int to_write;
+	pthread_cleanup_push(pepa_emulator_in_thread_cleanup, NULL);
 
-			if (0 != pepa_test_fd(sock)) {
-				DDE("Socket IN is invalid\n");
+	/* In this thread we read from socket as fast as we can */
+
+	buf_t       *buf   = buf_new(2048);
+
+	do {
+		core->sockets.in_listen = in_start_connection();
+		DDD("     IN: Connected to IN: fd = %d\n", core->sockets.in_listen);
+
+		do {
+			if (0 != pepa_emulator_generate_buffer_buf(buf, (rand() % 750) + 16)) {
+				DE("     IN: Can't generate buf\n");
 				break;
 			}
 
-			buf_t *buf = pepa_emulator_generate_buffer(rand() % 1024);
-			if (NULL == buf) {
-				DDE("Emu IN: Could not generate buf\n");
-				//usleep(rand() % 100000);
-				continue;
-			}
+			DDD0("     IN:    A buffer generated, going to write: sock = %d, room = %ld, used = %ld\n",
+				 core->sockets.in_listen, buf->room, buf->used);
 
-			to_write = buf->used;
-			DD0("Emu IN: Generated buffer %ld len\n", buf->used);
-
-			rc = write(sock, buf->data, buf->used);
-			if (BUFT_OK != buf_free(buf)) {
-				DE("Can not free buffer: %s\n", buf_error_code_to_string(rc));
-			}
-
-			buf = NULL;
-
-			if (to_write == rc) {
-				DDD("~~~~>>> Emu IN: Sent to IN %d bytes\n", rc);
-				// usleep(rand() % 100000);
-
-				/* Once a while emulate broken connection*/
-				if (SHOULD_EMULATE_DISCONNECT()) {
-					DDD("IN: EMULATING DISCONNECT\n");
-					break;
-				}
-				continue;
-			}
+			DDD0("     IN: Trying to write\n");
+			rc = write(core->sockets.in_listen, buf->data, buf->used);
+			writes++;
 
 			if (rc < 0) {
-				DE("Emu IN: Could not send buffer\n");
-			} else {
-				DE("Emu IN: Sent to buffer\n");
+				DDE("     IN: Could not send buffer to SHVA, error: %s\n", strerror(errno));
+				break;
 			}
 
-			break;
-		}
+			if (0 == rc) {
+				DDE("     IN: Send 0 bytes to SHVA, error: %s\n", strerror(errno));
+				usleep(10000);
+				break;
+			}
 
-		DDD("Emu IN: Closing connection\n");
-		close(sock);
-		//pepa_close_socket(sock, "EMU");
+			//DD("SHVA WRITE: ~~~~>>> Written %d bytes\n", rc);
+			rx += rc;
+
+			if (0 == (writes % RX_TX_PRINT_DIVIDER)) {
+				DD("     IN: %-7lu writes, bytes: %-7lu, Kb: %-7lu\n", writes, rx, (rx / 1024));
+			}
+
+			/* Emulate socket closing */
+			if (SHOULD_EMULATE_DISCONNECT()) {
+				pepa_emulator_disconnect_mes("IN");
+				break;
+			}
+
+		} while (1); /* Generating and sending data */
+
+		close(core->sockets.in_listen);
 		sleep(5);
-	}
-	return NULL;
+	} while (1);
+
+	pthread_cleanup_pop(0);
+	pthread_exit(NULL);
 }
 
 #define handle_error_en(en, msg) \
@@ -755,6 +795,8 @@ int main(int argi, char *argv[])
 		}
 	}
 
+	usleep(500000);
+
 	if (NULL != core->shva_thread.ip_string) {
 		DD("Starting SHVA thread\n");
 		rc = pthread_create(&core->shva_thread.thread_id, NULL, pepa_emulator_shva_thread, NULL);
@@ -765,6 +807,8 @@ int main(int argi, char *argv[])
 			return -1;
 		}
 	}
+
+	usleep(500000);
 
 	if (NULL != core->in_thread.ip_string) {
 		DD("Starting IN thread\n");

@@ -65,9 +65,12 @@ typedef enum {
 	PEPA_TH_IN_CREATE_LISTEN, /* Create listening socket */
 	PEPA_TH_IN_CLOSE_LISTEN, /* Create listening socket */
 	PEPA_TH_IN_TEST_LISTEN_SOCKET, /* Create listening socket */
-	PEPA_TH_IN_WAIT_SHVA, /* Wait until SHVA is connected  */
+	PEPA_TH_IN_WAIT_SHVA_UP, /* Wait until SHVA is connected  */
+	PEPA_TH_IN_WAIT_SHVA_DOWN, /* Wait until SHVA is connected  */
+#if 0 /* SEB */
 	PEPA_TH_IN_CREATE_WATCHDOG, /* Create a thread watchin Listen and SHVA sockets */
 	PEPA_TH_IN_ACCEPT, /* Run accept() which creates Write socket */
+#endif	
 	PEPA_TH_IN_START_TRANSFER, /* Start transfering thread */
 	PEPA_TH_IN_TERMINATE /* Terminate thread */
 } pepa_in_thread_state_t;
@@ -82,9 +85,9 @@ typedef enum {
 
 typedef enum {
 	PEPA_PR_OUT = 0,
-	PEPA_PR_SHVA,
-	PEPA_PR_IN,
-	PEPA_PR_CLT,
+	PEPA_PR_SHVA, /* Only SHVA writes to this register */
+	PEPA_PR_IN, /* Only PEPA_PR_IN writes to this register */
+	PEPA_PR_CLT, /* Only CTL writes to this register */
 	PEPA_PR_MAX
 } pepa_proc_t;
 
@@ -102,7 +105,8 @@ typedef enum {
 } pepa_action_t;
 
 typedef struct {
-	int signals[PEPA_PR_MAX];
+	pepa_sig_t signals[PEPA_PR_MAX];
+	pthread_mutex_t signals_sem;
 	pthread_cond_t sync;
 	pthread_mutex_t sync_sem;
 } pepa_status_t;
@@ -117,7 +121,7 @@ typedef struct {
 typedef struct {
 	sem_t mutex; /**< A semaphor used to sync the core struct between multiple threads */
 
-	thread_vars_t ctl_thread; /**< Configuration of SHVA thread */
+	//thread_vars_t ctl_thread; /**< Configuration of SHVA thread */
 	thread_vars_t shva_thread; /**< Configuration of SHVA thread */
 	thread_vars_t shva_transfet_thread; /**< Configuration of SHVA thread */
 	thread_vars_t in_thread; /**< Configuration of IN thread */
@@ -125,6 +129,7 @@ typedef struct {
 	int internal_buf_size; /**< Size of buffer used to pass packages, by defaiult COPY_BUF_SIZE bytes, see pepa_config.h */
 	int abort_flag; /**< Abort flag, if enabled, PEPA file abort on errors; for debug only */
 	pepa_sockets_t sockets;
+	int monitor_timeout; /**< How many microseconds to sleep between tests in microseconds */
 	pepa_status_t state;
 } pepa_core_t;
 
