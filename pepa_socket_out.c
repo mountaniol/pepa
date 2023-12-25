@@ -64,6 +64,7 @@ static int pepa_out_thread_open_listening_socket(pepa_core_t *core, char *my_nam
 															  core->out_thread.clients,
 															  __func__);
 		if (core->sockets.out_listen < 0) {
+			core->sockets.out_listen = -1;
 			slog_warn("%s: Can not open listening socket: %s", my_name, strerror(errno));
 			waiting_time += timeout;
 		}
@@ -115,8 +116,6 @@ static int pepa_out_thread_close_listen(pepa_core_t *core, __attribute__((unused
 	return PEPA_ERR_OK;
 }
 
-
-
 /* Wait for signal; when SHVA is DOWN, return */
 static int pepa_out_thread_wait_fail(pepa_core_t *core, __attribute__((unused)) const char *my_name)
 {
@@ -144,6 +143,8 @@ void *pepa_out_thread(__attribute__((unused))void *arg)
 	char                    *my_name  = "OUT";
 	int                     rc;
 	pepa_core_t             *core     = pepa_get_core();
+
+	set_sig_handler();
 
 	do {
 		pepa_out_thread_state_t this_step = next_step;

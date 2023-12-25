@@ -38,7 +38,7 @@ void pepa_print_version(void)
 	printf("Compiled at %s by %s@%s\n", PEPA_COMP_DATE, PEPA_USER, PEPA_HOST);
 }
 
-static void pepa_show_help(void)
+void pepa_show_help(void)
 {
 	printf("Use:\n"
 		   "--shva    | -s IP:PORT - address of SHVA server to connect to in form: '1.2.3.4:7887'\n"
@@ -296,28 +296,28 @@ int pepa_parse_arguments(int argi, char *argv[])
 
 			switch (log) {
 			case 0:
-				core->slog_level = 0;
+				core->slog_flags = 0;
 				break;
 			case 1:
-				core->slog_level = SLOG_LEVEL_1;
+				core->slog_flags = SLOG_LEVEL_1;
 				break;
 			case 2:
-				core->slog_level = SLOG_LEVEL_2;
+				core->slog_flags = SLOG_LEVEL_2;
 				break;
 			case 3:
-				core->slog_level = SLOG_LEVEL_3;
+				core->slog_flags = SLOG_LEVEL_3;
 				break;
 			case 4:
-				core->slog_level = SLOG_LEVEL_4;
+				core->slog_flags = SLOG_LEVEL_4;
 				break;
 			case 5:
-				core->slog_level = SLOG_LEVEL_5;
+				core->slog_flags = SLOG_LEVEL_5;
 				break;
 			case 6:
-				core->slog_level = SLOG_LEVEL_6;
+				core->slog_flags = SLOG_LEVEL_6;
 				break;
 			case 7:
-				core->slog_level = SLOG_LEVEL_7;
+				core->slog_flags = SLOG_LEVEL_7;
 				break;
 			}
 
@@ -357,3 +357,37 @@ int pepa_parse_arguments(int argi, char *argv[])
 	return PEPA_ERR_OK;
 }
 
+
+int pepa_config_slogger(pepa_core_t *core)
+{
+	slog_config_t cfg;
+	slog_config_get(&cfg);
+
+	cfg.nTraceTid = 1;
+	cfg.eDateControl = SLOG_DATE_FULL;
+
+	if (NULL != core->slog_file) {
+		cfg.nToFile = 1;
+		cfg.nKeepOpen = 1;
+		cfg.nFlush = 1;
+		strcpy(cfg.sFileName, core->slog_file);
+	} else {
+		slog_note("No log file given");
+	}
+
+	if (NULL != core->slog_dir) {
+		strcpy(cfg.sFilePath, core->slog_dir);
+	}
+
+	if (0 == core->slog_print) {
+		cfg.nToScreen = 0;
+	}
+
+	slog_config_set(&cfg);
+	slog_enable(SLOG_TRACE);
+	//slog_init("pepa", core->slog_level, 1);
+	slog_config_set(&cfg);
+	slog_disable(SLOG_FLAGS_ALL);
+	slog_enable(core->slog_flags);
+	return PEPA_ERR_OK;
+}

@@ -29,4 +29,13 @@ void pepa_state_out_set(pepa_core_t *core, pepa_sig_t sig);
 int pepa_state_shva_get(pepa_core_t *core);
 int pepa_state_in_get(pepa_core_t *core);
 int pepa_state_out_get(pepa_core_t *core);
+
+/**
+ * @author Sebastian Mountaniol (12/10/23)
+ * @brief Start threads / state machine 
+ * @return int PEPA_ERR_OK on success, a negative value on an
+ *  	   error
+ */
+int pepa_start_threads(void);
+
 #endif /* _PEPA_STATE_MACHINE_H_ */

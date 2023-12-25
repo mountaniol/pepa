@@ -49,7 +49,6 @@ static void pepa_in_thread_listen_socket(pepa_core_t *core, const char *my_name)
 	while (1) {
 		slog_note("%s: Opening listening socket", my_name);
 		/* Just try to close it */
-		PEPA_SOCK_LOCK(core->sockets.in_listen, core);
 		pepa_in_thread_close_listen(core, __func__);
 
 		core->sockets.in_listen = pepa_open_listening_socket(&s_addr,
@@ -57,8 +56,6 @@ static void pepa_in_thread_listen_socket(pepa_core_t *core, const char *my_name)
 															 core->in_thread.port_int,
 															 core->in_thread.clients,
 															 __func__);
-		PEPA_SOCK_UNLOCK(core->sockets.in_listen, core);
-
 		if (core->sockets.in_listen >= 0) {
 			return;
 		}
@@ -290,6 +287,8 @@ void *pepa_in_thread_new(__attribute__((unused))void *arg)
 	const char             *my_name             = "IN";
 	int                    rc;
 	pepa_core_t            *core                = pepa_get_core();
+
+	set_sig_handler();
 
 	do {
 		pepa_in_thread_state_t this_step = next_step;

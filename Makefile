@@ -4,7 +4,7 @@
 #GCC=clang-10
 GCC=gcc
 #GCC=gcc-10
-CFLAGS=-Wall -Wextra -O2 -Wswitch-enum -Wimplicit-fallthrough
+CFLAGS=-Wall -Wextra -O2 -Wswitch-enum -Wimplicit-fallthrough -Wno-error=unused-but-set-variable -Wswitch -Wreturn-type 
 #CFLAGS=-Wall -Wextra -O2
 DEBUG=-DDEBUG3
 # Static GCC-10 analyzer

@@ -1,6 +1,8 @@
 #ifndef _PEPA_PARSE_H__
 #define _PEPA_PARSE_H__
 
+void pepa_show_help(void);
+
 long int pepa_string_to_int_strict(char *s, int *err);
 
 /**
@@ -36,6 +38,8 @@ buf_t *pepa_parse_ip_string_get_ip(const char *_argument);
  * @details 
  */
 int pepa_parse_arguments(int argi, char *argv[]);
+
+int pepa_config_slogger(pepa_core_t *core);
 
 void pepa_print_version(void);
 

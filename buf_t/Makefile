@@ -6,7 +6,7 @@ AR=ar
 #GCC=clang-10
 CFLAGS=-Wall -Wextra -Wpedantic -rdynamic -O2 -Wswitch-enum
 #DEBUG=-DDEBUG2
-DEBUG=-DDEBUG2
+#DEBUG=-DDEBUG2
 #DEBUG += -DDERROR
 #CFLAGS += -fanalyzer
 

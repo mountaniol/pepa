@@ -645,24 +645,5 @@ int pepa_open_connection_to_server(const char *address, int port, const char *na
 	return (sock);
 }
 
-int pepa_start_threads(void)
-{
-	set_sig_handler();
-
-	/* Slose STDIN */
-	int fd = open("/dev/null", O_WRONLY);
-	dup2(fd, 0);
-	close(fd);
-
-	/* Start CTL thread */
-	// pepa_thread_start_ctl();
-
-	/* Start SHVA thread */
-	//pepa_shva_start();
-	pepa_thread_start_out();
-	pepa_thread_start_shva();
-	pepa_thread_start_in();
-	return PEPA_ERR_OK;
-}
 
 

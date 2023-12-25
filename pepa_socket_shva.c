@@ -48,6 +48,7 @@ static int pepa_shva_thread_open_connection(pepa_core_t *core, const char *my_na
 		core->sockets.shva_rw = pepa_open_shava_connection();
 
 		if (core->sockets.shva_rw < 0) {
+			core->sockets.shva_rw = -1;
 			slog_warn("%s: Can not open connection to SHVA server; wait 1 seconds and try over", my_name);
 			usleep(1 * 1000000);
 			continue;
@@ -116,6 +117,8 @@ void *pepa_shva_thread_new(__attribute__((unused))void *arg)
 	pepa_core_t              *core          = pepa_get_core();
 	// int                      read_sock = -1;
 	pepa_shva_thread_state_t next_step      = PEPA_TH_SHVA_START;
+
+	set_sig_handler();
 
 	do {
 		pepa_shva_thread_state_t this_step = next_step;

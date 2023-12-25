@@ -28,16 +28,9 @@ typedef struct {
  */
 typedef struct {
 	int shva_rw;
-	sem_t shva_rw_mutex;
-
 	int out_listen;
-	sem_t out_listen_mutex;
-
 	int out_write;
-	sem_t out_write_mutex;
-
 	int in_listen;
-	sem_t in_listen_mutex;
 } pepa_sockets_t;
 
 typedef enum {
@@ -67,10 +60,6 @@ typedef enum {
 	PEPA_TH_IN_TEST_LISTEN_SOCKET, /* Create listening socket */
 	PEPA_TH_IN_WAIT_SHVA_UP, /* Wait until SHVA is connected  */
 	PEPA_TH_IN_WAIT_SHVA_DOWN, /* Wait until SHVA is connected  */
-#if 0 /* SEB */
-	PEPA_TH_IN_CREATE_WATCHDOG, /* Create a thread watchin Listen and SHVA sockets */
-	PEPA_TH_IN_ACCEPT, /* Run accept() which creates Write socket */
-#endif	
 	PEPA_TH_IN_START_TRANSFER, /* Start transfering thread */
 	PEPA_TH_IN_TERMINATE /* Terminate thread */
 } pepa_in_thread_state_t;
@@ -91,19 +80,6 @@ typedef enum {
 	PEPA_PR_MAX
 } pepa_proc_t;
 
-typedef enum {
-	PEPA_ACT_NONE = 0,
-	PEPA_ACT_START_OUT,
-	PEPA_ACT_START_IN,
-	PEPA_ACT_START_SHVA,
-	PEPA_ACT_STOP_OUT,
-	PEPA_ACT_STOP_IN,
-	PEPA_ACT_STOP_SHVA,
-	PEPA_ACT_RESTART_ALL,
-	PEPA_ACT_ABORT,
-	PEPA_ACT_MAX,
-} pepa_action_t;
-
 typedef struct {
 	pepa_sig_t signals[PEPA_PR_MAX];
 	pthread_mutex_t signals_sem;
@@ -121,7 +97,7 @@ typedef struct {
 typedef struct {
 	sem_t mutex; /**< A semaphor used to sync the core struct between multiple threads */
 
-	int slog_level; /* Keep slog logger verbosity level*/
+	int slog_flags; /* Keep slog logger verbosity level*/
 	char *slog_file; /* Keep slog output file name; if given, log will be saved there */
 	char *slog_dir; /* Keep slog output file in this directory */
 	int slog_print; /* Show slog output on terminal */

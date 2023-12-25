@@ -30,10 +30,6 @@ static int pepa_core_sem_init(pepa_core_t *core)
 {
 	TESTP(core, -1);
 	int sem_rc = sem_init(&core->mutex, 0, 1);
-	sem_rc += sem_init(&core->sockets.shva_rw_mutex, 0, 1);
-	sem_rc += sem_init(&core->sockets.out_listen_mutex, 0, 1);
-	sem_rc += sem_init(&core->sockets.out_write_mutex, 0, 1);
-	sem_rc += sem_init(&core->sockets.in_listen_mutex, 0, 1);
 
 	if (0 != sem_rc) {
 		slog_fatal("Could not init mutexes");
@@ -72,7 +68,7 @@ static void pepa_core_set_default_values(pepa_core_t *core)
 {
 	TESTP_VOID(core);
 	// core->shva_thread.fd_listen = -1;
-	core->sockets.in_listen = -1;
+	core->sockets.shva_rw = -1;
 	core->sockets.out_listen = -1;
 	core->sockets.in_listen = -1;
 }
@@ -118,10 +114,9 @@ static pepa_core_t *pepa_create_core_t(void)
 	core->sockets.shva_rw = -1;
 	core->sockets.out_listen = -1;
 	// core->sockets.out_read = -1;
-	core->sockets.out_write = -1;
 	core->sockets.in_listen = -1;
 	core->monitor_timeout = MONITOR_TIMEOUT_USEC;
-	core->slog_level = 0;
+	core->slog_flags = 0;
 	core->slog_file = NULL;
 	core->slog_dir = NULL;
 	core->slog_print = 1;
@@ -210,6 +205,7 @@ static int pepa_destroy_core_t(pepa_core_t *core)
 
 	if (core->sockets.in_listen > 0) {
 		close(core->sockets.in_listen);
+		core->sockets.in_listen = -1;
 	}
 
 	if (core->out_thread.ip_string) {
@@ -222,6 +218,7 @@ static int pepa_destroy_core_t(pepa_core_t *core)
 
 	if (core->sockets.out_listen > 0) {
 		close(core->sockets.out_listen);
+		core->sockets.out_listen = -1;
 	}
 
 	/* Clean the core before release it, secure reasons */

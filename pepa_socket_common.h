@@ -7,21 +7,6 @@
 #include "buf_t/buf_t.h"
 #include "pepa_core.h"
 
-/* Size of the xross buffer (for reading from / writing to cross socket */
-#define X_BUF_SIZE (1024)
-
-#define PEPA_SOCK_LOCK(_sock_name, _core) do \
-	{	DDD0("Locking %s from: %s +%d\n", #_sock_name, __func__, __LINE__);\
-		sem_wait(&_sock_name##_mutex); \
-		DDD0("Locked %s from: %s +%d\n", #_sock_name, __func__, __LINE__); \
-	} while (0)
-
-#define PEPA_SOCK_UNLOCK(_sock_name, _core) do \
-	{	DDD0("Unlocking %s from: %s +%d\n", #_sock_name, __func__, __LINE__);\
-		sem_post(&_sock_name##_mutex); \
-		DDD0("Unlocked %s from: %s +%d\n", #_sock_name, __func__, __LINE__); \
-	} while (0)
-
 typedef struct {
 	char my_name[32];
 	int fd_read; /**< Read from this fd */
@@ -134,14 +119,6 @@ int pepa_open_listening_socket(struct sockaddr_in *s_addr, const buf_t *ip_addre
  * @return int Opened socket >= 0, negative core on an error
  */
 int pepa_open_connection_to_server(const char *address, int port, const char *name);
-
-/**
- * @author Sebastian Mountaniol (12/10/23)
- * @brief Start threads / state machine 
- * @return int PEPA_ERR_OK on success, a negative value on an
- *  	   error
- */
-int pepa_start_threads(void);
 
 void *pepa_shva_thread_new(__attribute__((unused))void *arg);
 

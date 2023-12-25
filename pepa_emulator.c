@@ -1,41 +1,38 @@
 #define _GNU_SOURCE
-#include <arpa/inet.h>
-//#include <assert.h>
-//#include <errno.h>
-//#include <fcntl.h>
-#include <getopt.h>
-#include <ifaddrs.h>
-#include <limits.h>
-#include <netdb.h>
-#include <netinet/in.h>
+//#include <arpa/inet.h>
+//#include <getopt.h>
+//#include <ifaddrs.h>
+//#include <limits.h>
+//#include <netdb.h>
+//#include <netinet/in.h>
 #include <pthread.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/eventfd.h> /* For eventfd */
+//#include <stdint.h>
+//#include <stdio.h>
+//#include <stdlib.h>
+//#include <string.h>
+//#include <sys/eventfd.h> /* For eventfd */
 #include <sys/param.h>
-#include <sys/select.h>
-#include <sys/socket.h>
-#include <sys/stat.h>
-#include <sys/time.h>
-#include <sys/types.h>
-#include <syslog.h>
-#include <unistd.h>
-#include <unistd.h> /* For read() */
-#include <semaphore.h>
-#include <pthread.h>
+//#include <sys/select.h>
+//#include <sys/socket.h>
+//#include <sys/stat.h>
+//#include <sys/time.h>
+//#include <sys/types.h>
+//#include <syslog.h>
+//#include <unistd.h>
+//#include <unistd.h> /* For read() */
+//#include <semaphore.h>
+//#include <pthread.h>
 
-#include <arpa/inet.h>
-#include <ifaddrs.h>
-#include <netdb.h>
-#include <pthread.h>
-#include <syslog.h>
+//#include <arpa/inet.h>
+//#include <ifaddrs.h>
+//#include <netdb.h>
+//#include <pthread.h>
+//#include <syslog.h>
 #include <unistd.h> /* For read() */
-#include <sys/eventfd.h> /* For eventfd */
+//#include <sys/eventfd.h> /* For eventfd */
 /* THe next two are needed for send() */
-#include <sys/types.h>
-#include <sys/socket.h>
+//#include <sys/types.h>
+//#include <sys/socket.h>
 #include <sys/epoll.h>
 #include <errno.h>
 
@@ -74,122 +71,6 @@ buf_t      *buf_in_sent    = NULL;
 buf_t      *buf_shva_sent  = NULL;
 
 
-static void pepa_emilator_show_help(void)
-{
-	printf("Use:\n"
-		   "--shva    | -s - address of SHVA server to listen in form: '1.2.3.4:7887'\n"
-		   "--out     | -o - address of OUT server to connect to, in form '1.2.3.4:9779'\n"
-		   "--in      | -i - address of IN server to connect, waiting for OUT stram connnection, in form '1.2.3.4:3748'\n"
-		   "--inim    | -n - max number of IN clients to connect to, by default 1024\n"
-		   "--abort   | -a - abort on errors, for debug\n"
-		   "--bsize   | -b - size of internal buffer, in bytes; if not given, 1024 byte will be set\n"
-		   "--version | -v - show version + git revision + compilation time\n"
-		   "--help    | -h - show this help\n");
-}
-
-static int pepa_emulator_parse_arguments(int argi, char *argv[])
-{
-	pepa_core_t          *core          = pepa_get_core();
-	/* Long options. Address should be given in form addr:port*/
-	static struct option long_options[] = {
-		/* These options set a flag. */
-		{"help",             no_argument,            0, 'h'},
-		{"shva",             required_argument,      0, 's'},
-		{"out",              required_argument,      0, 'o'},
-		{"in",               required_argument,      0, 'i'},
-		{"inim",             required_argument,      0, 'n'},
-		{"abort",            no_argument,            0, 'a'},
-		{"bsize",            no_argument,            0, 'b'},
-		{"version",          no_argument,            0, 'v'},
-		{0, 0, 0, 0}
-	};
-
-
-	int                  opt;
-	int                  option_index   = 0;
-	while ((opt = getopt_long(argi, argv, "s:o:i:n:hav", long_options, &option_index)) != -1) {
-		switch (opt) {
-		case 's': /* SHVA Server address to connect to */
-			core->shva_thread.ip_string = pepa_parse_ip_string_get_ip(optarg);
-			if (NULL == core->shva_thread.ip_string) {
-				slog_fatal("Could not parse SHVA ip address");
-				abort();
-			}
-			core->shva_thread.port_int = pepa_parse_ip_string_get_port(optarg);
-			slog_debug("SHVA Addr OK: |%s| : |%d|", core->shva_thread.ip_string->data, core->shva_thread.port_int);
-			break;
-		case 'o': /* Output socket where packets from SHVA should be transfered */
-			core->out_thread.ip_string = pepa_parse_ip_string_get_ip(optarg);
-			if (NULL == core->out_thread.ip_string) {
-				slog_fatal("Could not parse OUT ip address");
-				abort();
-			}
-			core->out_thread.port_int = pepa_parse_ip_string_get_port(optarg);
-			slog_debug("OUT Addr OK: |%s| : |%d|", core->out_thread.ip_string->data, core->out_thread.port_int);
-			break;
-		case 'i': /* Input socket - read and send to SHVA */
-			core->in_thread.ip_string = pepa_parse_ip_string_get_ip(optarg);
-			if (NULL == core->in_thread.ip_string) {
-				slog_fatal("Could not parse IN ip address");
-				abort();
-			}
-			core->in_thread.port_int = pepa_parse_ip_string_get_port(optarg);
-			slog_debug("IN Addr OK: |%s| : |%d|", core->in_thread.ip_string->data, core->in_thread.port_int);
-			break;
-		case 'n':
-		{
-			int err;
-			core->in_thread.clients = pepa_string_to_int_strict(optarg, &err);
-			if (err < 0) {
-				slog_fatal("Could not parse number of client: %s", optarg);
-				abort();
-			}
-			slog_debug("Number of client of IN socket: %d", core->in_thread.clients);
-		}
-			break;
-		case 'b':
-		{
-			int err;
-			core->internal_buf_size = pepa_string_to_int_strict(optarg, &err);
-			if (err < 0) {
-				slog_fatal("Could not parse internal buffer size: %s", optarg);
-				abort();
-			}
-			slog_debug("Internal buffer size is set to: %d", core->internal_buf_size);
-		}
-			break;
-		case 'a':
-			/* Set abort flag*/
-			core->abort_flag = 1;
-			break;
-		case 'h': /* Show help */
-			pepa_emilator_show_help();
-			exit(0);
-		case 'v': /* Show help */
-			pepa_print_version();
-			exit(0);
-		default:
-			printf("Unknown argument: %c\n", opt);
-			pepa_emilator_show_help();
-			return -PEPA_ERR_ERROR_OUT_OF_RANGE;
-		}
-	}
-
-	if (NULL == core->out_thread.ip_string) {
-		slog_fatal("Not inited OUT arguments");
-	}
-
-	if (NULL == core->in_thread.ip_string) {
-		slog_fatal("Not inited IN arguments");
-	}
-
-	if (NULL == core->out_thread.ip_string) {
-		slog_fatal("Not inited SHVA arguments");
-	}
-
-	return PEPA_ERR_OK;
-}
-
 uint64_t head_counter(void)
 {
 	static uint64_t counter = 0;
@@ -218,11 +99,10 @@ void pepa_emulator_buf_validate_size(buf_t *buf)
 
 void pepa_emulator_disconnect_mes(const char *name)
 {
-	slogn("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$");
-	slogn("EMU: Emulating %s disconnect", name);
-	slogn("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$");
+	slog_note("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$");
+	slog_note("EMU: Emulating %s disconnect", name);
+	slog_note("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$");
 }
-
 
 int pepa_emulator_generate_buffer_buf(buf_t *buf, int64_t buffer_size)
 {
@@ -246,12 +126,11 @@ int pepa_emulator_generate_buffer_buf(buf_t *buf, int64_t buffer_size)
 		slog_fatal("Failed to add to buf_t");
 	}
 
-	slogn("Buf allocated room");
-
+	slog_note("Buf allocated room");
 
 	uint64_t rest = buffer_size - sizeof(buf_head_t);
 
-	slogn("Starting copying into buf");
+	slog_note("Starting copying into buf");
 
 	while (rest > 0) {
 		uint64_t to_copy_size = PEPA_MIN(lorem_ipsum_len, rest);
@@ -263,7 +142,7 @@ int pepa_emulator_generate_buffer_buf(buf_t *buf, int64_t buffer_size)
 		}
 		rest -= to_copy_size;
 	}
-	slogn("Finished copying into buf");
+	slog_note("Finished copying into buf");
 
 	return PEPA_ERR_OK;
 }
@@ -529,6 +408,7 @@ void pepa_emulator_shva_thread_cleanup(__attribute__((unused))void *arg)
 	pepa_core_t *core        = pepa_get_core();
 	pepa_socket_shutdown_and_close(*sock_listen, "EMU SHVA");
 	close(core->sockets.shva_rw);
+	core->sockets.shva_rw = -1;
 }
 
 /* Create 1 read/write listening socket to emulate SHVA server */
@@ -563,7 +443,8 @@ void *pepa_emulator_shva_thread(__attribute__((unused))void *arg)
 			core->sockets.shva_rw = accept(sock_listen, &s_addr, &addrlen);
 			slog_note("Emu SHVA: EXITED FROM ACCEPTING");
 			if (core->sockets.shva_rw < 0) {
-				slog_error("Emu SHVA: Could not accept");
+				slog_error("Emu SHVA: Could not accept: %s", strerror(errno));
+				core->sockets.shva_rw = -1;
 				sleep(1);
 			}
 		} while (core->sockets.shva_rw < 0);
@@ -606,6 +487,7 @@ void *pepa_emulator_shva_thread(__attribute__((unused))void *arg)
 
 		/* Close rw socket */
 		close(core->sockets.shva_rw);
+		core->sockets.shva_rw = -1;
 		pepa_socket_shutdown_and_close(sock_listen, "EMU");
 		sleep(5);
 	} while (1); /* Opening connection and acceptiny */
@@ -645,9 +527,6 @@ void *pepa_emulator_in_thread(__attribute__((unused))void *arg)
 {
 	int         rc     = -1;
 	pepa_core_t *core  = pepa_get_core();
-	//int         sock;
-//	int         event_count;
-//	int         i;
 
 	uint64_t    writes = 0;
 	uint64_t    rx     = 0;
@@ -659,6 +538,7 @@ void *pepa_emulator_in_thread(__attribute__((unused))void *arg)
 	buf_t       *buf   = buf_new(2048);
 
 	do {
+		/* Note: the in_start_connection() function can not fail; it blocking until connection opened */
 		core->sockets.in_listen = in_start_connection();
 		slog_note("     IN: Connected to IN: fd = %d", core->sockets.in_listen);
 
@@ -702,6 +582,7 @@ void *pepa_emulator_in_thread(__attribute__((unused))void *arg)
 		} while (1); /* Generating and sending data */
 
 		close(core->sockets.in_listen);
+		core->sockets.in_listen = -1;
 		sleep(5);
 	} while (1);
 
@@ -709,37 +590,24 @@ void *pepa_emulator_in_thread(__attribute__((unused))void *arg)
 	pthread_exit(NULL);
 }
 
-#define handle_error_en(en, msg) \
-               do { errno = en; perror(msg); exit(EXIT_FAILURE); } while (0)
-
 /* Catch Signal Handler functio */
-static void signal_callback_handler(int signum)
+static void signal_callback_handler(int signum, __attribute__((unused))siginfo_t *info, __attribute__((unused))void *extra)
 {
-	//printf("Caught signal SIGPIPE %d", signum);
+	printf("Caught signal %d\n", signum);
 	if (signum == SIGINT) {
+		printf("Caught signal SIGINT: %d\n", signum);
+		pepa_back_to_disconnected_state_new();
 		exit(0);
 	}
 }
 
-static void emu_set_sig_handler(void)
+void emu_set_int_signal_handler(void)
 {
-	sigset_t set;
-	sigfillset(&set);
+    struct sigaction action;
 
-	int rc = pthread_sigmask(SIG_BLOCK, &set, NULL);
-	if (rc != 0) {
-		handle_error_en(rc, "pthread_sigmask");
-		exit(-1);
-	}
-
-	rc = sigprocmask(SIG_SETMASK, &set, NULL);
-	if (rc != 0) {
-		handle_error_en(rc, "process_mask");
-		exit(-1);
-	}
-
-	signal(SIGPIPE, signal_callback_handler);
-	signal(SIGINT, signal_callback_handler);
+    action.sa_flags = SA_SIGINFO;     
+    action.sa_sigaction = signal_callback_handler;
+    sigaction(SIGINT, &action, NULL);
 }
 
 int main(int argi, char *argv[])
@@ -748,11 +616,14 @@ int main(int argi, char *argv[])
 	slog_init("EMU", SLOG_FLAGS_ALL, 0);
 	pepa_core_init();
 	pepa_core_t *core = pepa_get_core();
-	int         rc    = pepa_emulator_parse_arguments(argi, argv);
+	//int         rc    = pepa_emulator_parse_arguments(argi, argv);
+	int         rc    = pepa_parse_arguments(argi, argv);
 	if (rc < 0) {
 		slog_fatal("Could not parse");
 		return rc;
 	}
+
+	pepa_config_slogger(core);
 
 	/* Keep buffers sent from OUT */
 	buf_out_sent  = buf_array(sizeof(void *), 0);
@@ -765,14 +636,8 @@ int main(int argi, char *argv[])
 
 	lorem_ipsum_len = strlen(lorem_ipsum);
 
-#if 0 /* SEB */
-	sigset_t set;
-	sigfillset(&set);
-#endif
-	emu_set_sig_handler();
+	emu_set_int_signal_handler();
 
-
-	// rc = pthread_sigmask(SIG_BLOCK, &set, NULL);
 	if (rc != 0) {
 		sloge("Can not install pthread ignore sig");
 		exit(-1);
