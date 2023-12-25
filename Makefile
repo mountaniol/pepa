@@ -33,34 +33,40 @@ PEPA_O=pepa_state_machine.o pepa_parser.o main.o pepa_core.o \
 		pepa_server.o pepa_errors.o \
 		pepa_socket_common.o pepa_socket_in.o \
 		pepa_socket_out.o pepa_socket_shva.o 
-		#pepa_socket_ctl.o
 		
 PEPA_T=pepa-ng
 BUFT_AR=buf_t/buf_t.a
+SLOG_AR=slog/libslog.a
+ARS=$(BUFT_AR) $(SLOG_AR)
 
 EMU_O=pepa_emulator.o pepa_state_machine.o pepa_parser.o \
 	pepa_core.o pepa_server.o pepa_errors.o \
 	pepa_socket_common.o pepa_socket_in.o \
 	pepa_socket_out.o pepa_socket_shva.o 
-	#pepa_socket_ctl.o
+
 EMU_T=emu
 
 all: pepa emu
 
-pepa: buf_t $(PEPA_O)
-	$(GCC) $(CFLAGS) -ggdb $(DEBUG) $(PEPA_O) $(BUFT_AR) -o $(PEPA_T) -lpthread
+pepa: slog buf_t $(PEPA_O)
+	$(GCC) $(CFLAGS) -ggdb $(DEBUG) $(PEPA_O) $(ARS) -o $(PEPA_T) -lpthread
 
 .PHONY:buf_t
 buf_t:
 	make -C buf_t
 
 .PHONY:emu
-emu: buf_t $(EMU_O)
-	$(GCC) $(CFLAGS) -ggdb $(DEBUG) $(EMU_O) $(BUFT_AR) -o $(EMU_T) -lpthread
+emu: buf_t slog $(EMU_O)
+	$(GCC) $(CFLAGS) -ggdb $(DEBUG) $(EMU_O) $(ARS) -o $(EMU_T) -lpthread
+
+.PHONY:slog
+slog:
+	make -C slog
 
 clean:
 	rm -f $(PEPA_T) $(PEPA_O) $(EMU_T) $(EMU_O)
 	make -C buf_t clean
+	make -C slog clean
 
 %.o:%.c
 	@echo "|>" $@...

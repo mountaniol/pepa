@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <sys/eventfd.h> /* For eventfd */
 
+#include "slog/src/slog.h"
 #include "pepa_core.h"
 #include "pepa_config.h"
 #include "pepa_errors.h"
@@ -35,7 +36,7 @@ static int pepa_core_sem_init(pepa_core_t *core)
 	sem_rc += sem_init(&core->sockets.in_listen_mutex, 0, 1);
 
 	if (0 != sem_rc) {
-		DE("Could not init mutexes\n");
+		slog_fatal("Could not init mutexes");
 		perror("sem init failure: ");
 		PEPA_TRY_ABORT();
 		return (-PEPA_ERR_INIT_MITEX);
@@ -59,7 +60,7 @@ static int pepa_core_sem_destroy(pepa_core_t *core)
 	TESTP(core, -1);
 	const int sem_rc = sem_destroy(&core->mutex);
 	if (0 != sem_rc) {
-		DE("Could not destroy mutex\n");
+		slog_fatal("Could not destroy mutex");
 		perror("sem destroy failure: ");
 		PEPA_TRY_ABORT();
 		return (-PEPA_ERR_DESTROY_MITEX);
@@ -94,7 +95,7 @@ static pepa_core_t *pepa_create_core_t(void)
 	pepa_core_set_default_values(core);
 	rc = pepa_core_sem_init(core);
 	if (rc) {
-		DE("Could not init mutex - returning NULL\n");
+		slog_fatal("Could not init mutex - returning NULL");
 		free(core);
 		PEPA_TRY_ABORT();
 		return NULL;
@@ -120,22 +121,26 @@ static pepa_core_t *pepa_create_core_t(void)
 	core->sockets.out_write = -1;
 	core->sockets.in_listen = -1;
 	core->monitor_timeout = MONITOR_TIMEOUT_USEC;
+	core->slog_level = 0;
+	core->slog_file = NULL;
+	core->slog_dir = NULL;
+	core->slog_print = 1;
 
 	rc = pthread_mutex_init(&core->state.sync_sem, NULL);
 	if (rc < 0) {
-		DE("Can not init core->state.sync_sem\n");
+		slog_fatal("Can not init core->state.sync_sem");
 		abort();
 	}
 
 	rc = pthread_mutex_init(&core->state.signals_sem, NULL);
 	if (rc < 0) {
-		DE("Can not init core->state.sync_sem\n");
+		slog_fatal("Can not init core->state.sync_sem");
 		abort();
 	}
 
 	rc = pthread_cond_init(&core->state.sync, NULL);
 	if (rc < 0) {
-		DE("Can not init core->state.sync\n");
+		slog_fatal("Can not init core->state.sync");
 		abort();
 	}
 
@@ -158,7 +163,7 @@ static int pepa_clean_core_t(pepa_core_t *core)
 	/* Release mutex */
 	const int sem_rc = pepa_core_sem_destroy(core);
 	if (0 != sem_rc) {
-		DE("Could not destroy mutex\n");
+		slog_fatal("Could not destroy mutex");
 		PEPA_TRY_ABORT();
 		return (sem_rc);
 	}
@@ -183,14 +188,14 @@ static int pepa_destroy_core_t(pepa_core_t *core)
 	int       rc;
 	const int clean_rc = pepa_clean_core_t(core);
 	if (0 != clean_rc) {
-		DE("Could not clean core - return error\n");
+		slog_fatal("Could not clean core - return error");
 		return clean_rc;
 	}
 
 	if (core->shva_thread.ip_string) {
 		rc = buf_free(core->shva_thread.ip_string);
 		if (BUFT_OK != rc) {
-			DE("Could not free buf_t\n");
+			slog_fatal("Could not free buf_t");
 			PEPA_TRY_ABORT();
 		}
 	}
@@ -198,7 +203,7 @@ static int pepa_destroy_core_t(pepa_core_t *core)
 	if (core->in_thread.ip_string) {
 		rc = buf_free(core->in_thread.ip_string);
 		if (BUFT_OK != rc) {
-			DE("Could not free buf_t\n");
+			slog_fatal("Could not free buf_t");
 			PEPA_TRY_ABORT();
 		}
 	}
@@ -210,7 +215,7 @@ static int pepa_destroy_core_t(pepa_core_t *core)
 	if (core->out_thread.ip_string) {
 		rc = buf_free(core->out_thread.ip_string);
 		if (BUFT_OK != rc) {
-			DE("Could not free buf_t\n");
+			slog_fatal("Could not free buf_t");
 			PEPA_TRY_ABORT();
 		}
 	}
@@ -231,7 +236,7 @@ int pepa_core_init(void)
 {
 	g_pepa_core = pepa_create_core_t();
 	if (NULL == g_pepa_core) {
-		DE("Can not create core\n");
+		slog_fatal("Can not create core");
 		PEPA_TRY_ABORT();
 		return (-PEPA_ERR_CORE_CREATE);
 	}
@@ -241,7 +246,7 @@ int pepa_core_init(void)
 int pepa_core_finish(void)
 {
 	if (NULL == g_pepa_core) {
-		DE("Can not destroy core, it is NULL already!\n");
+		slog_fatal("Can not destroy core, it is NULL already!");
 		PEPA_TRY_ABORT();
 		return (-PEPA_ERR_CORE_DESTROY);
 	}
@@ -262,15 +267,14 @@ int pepa_core_lock(void)
 	TESTP_ASSERT(g_pepa_core, "Core is NULL!");
 	sem_getvalue(&g_pepa_core->mutex, &rc);
 	if (rc > 1) {
-		DE("Semaphor count is too high: %d > 1\n", rc);
+		slog_fatal("Semaphor count is too high: %d > 1", rc);
 		PEPA_TRY_ABORT();
 		abort();
 	}
 
-	//DD("Gettin sem\n\r");
 	rc = sem_wait(&g_pepa_core->mutex);
 	if (0 != rc) {
-		DE("Can't wait on semaphore; abort\n");
+		slog_fatal("Can't wait on semaphore; abort");
 		perror("Can't wait on semaphore; abort");
 		PEPA_TRY_ABORT();
 		abort();
@@ -285,15 +289,14 @@ int pepa_core_unlock(void)
 	TESTP_ASSERT(g_pepa_core, "Core is NULL!");
 	sem_getvalue(&g_pepa_core->mutex, &rc);
 	if (rc > 0) {
-		DE("Tried to unlock not locked left semaphor\n\r");
+		slog_fatal("Tried to unlock not locked left semaphor\r");
 		PEPA_TRY_ABORT();
 		abort();
 	}
 
-	// DD("Putting sem\n\r");
 	rc = sem_post(&g_pepa_core->mutex);
 	if (0 != rc) {
-		DE("Can't unlock semaphore: abort\n");
+		slog_fatal("Can't unlock semaphore: abort");
 		perror("Can't unlock semaphore: abort");
 		PEPA_TRY_ABORT();
 		abort();
@@ -369,12 +372,6 @@ const char *pepa_in_thread_state_str(pepa_in_thread_state_t s)
 		return ("PEPA_TH_IN_WAIT_SHVA_UP"); /* Watch the status of Write  socket */
 	case PEPA_TH_IN_WAIT_SHVA_DOWN:
 		return ("PEPA_TH_IN_WAIT_SHVA_DOWN"); /* Watch the status of Write  socket */
-#if 0 /* SEB */
-	case PEPA_TH_IN_CREATE_WATCHDOG:
-		return ("PEPA_TH_IN_CREATE_WATCHDOG"); /* Close Write socket */
-	case PEPA_TH_IN_ACCEPT:
-		return ("PEPA_TH_IN_ACCEPT"); /* Close listening socket */
-#endif
 	case PEPA_TH_IN_START_TRANSFER:
 		return ("PEPA_TH_IN_START_TRANSFER"); /* Close listening socket */
 	case PEPA_TH_IN_TERMINATE:

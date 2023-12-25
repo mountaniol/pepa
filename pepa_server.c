@@ -10,6 +10,7 @@
 #include <sys/types.h>
 #include <errno.h>
 
+#include "slog/src/slog.h"
 #include "pepa_core.h"
 #include "buf_t/se_debug.h"
 #if 0 /* SEB */

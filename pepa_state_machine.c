@@ -5,6 +5,7 @@
 #include <pthread.h>
 #include <semaphore.h>
 
+#include "slog/src/slog.h"
 #include "pepa_config.h"
 #include "pepa_errors.h"
 #include "pepa_core.h"
@@ -17,15 +18,15 @@
 static void pepa_thread_cancel(pthread_t pid, const char *name)
 {
 	if (PTHREAD_DEAD == pid || pthread_kill(pid, 0) < 0) {
-		DE("Can not cancel %s thread, it is not alive\n", name);
+		slog_error("Can not cancel %s thread, it is not alive", name);
 		return;
 	}
 
 	int rc = pthread_cancel(pid);
 	if (0 != rc) {
-		DE("Can not cancel %s thread\n", name);
+		slog_fatal("Can not cancel %s thread", name);
 	} else {
-		DDD("Canceled %s thread\n", name);
+		slog_note("Canceled %s thread", name);
 	}
 }
 
@@ -34,7 +35,7 @@ static void pepa_socket_close(int fd, const char *socket_name)
 	if (fd > 0) {
 		int rc = close(fd);
 		if (0 != rc) {
-			DE("Can not close %s, error %d\n",
+			slog_error("Can not close %s, error %d",
 			   socket_name, rc);
 		}
 	}
@@ -54,13 +55,13 @@ int pepa_thread_is_in_up(void)
 {
 	pepa_core_t          *core = pepa_get_core();
 
-	DDD("core->in_thread.thread_id = %lX\n", core->in_thread.thread_id);
+	slog_note("core->in_thread.thread_id = %lX", core->in_thread.thread_id);
 	if (PTHREAD_DEAD == core->in_thread.thread_id) {
-		DE("THREAD IN IS DEAD: core->in_thread.thread_id = %lX\n", core->in_thread.thread_id);
+		slog_error("THREAD IN IS DEAD: core->in_thread.thread_id = %lX", core->in_thread.thread_id);
 		return -PEPA_ERR_THREAD_DEAD;
 	}
 	if (pthread_kill(core->in_thread.thread_id, 0) < 0) {
-		DE("THREAD IN IS DEAD: kill = %d\n", pthread_kill(core->in_thread.thread_id, 0));
+		slog_error("THREAD IN IS DEAD: kill = %d", pthread_kill(core->in_thread.thread_id, 0));
 		return -PEPA_ERR_THREAD_DEAD;
 	}
 	return PEPA_ERR_OK;
@@ -83,9 +84,9 @@ void pepa_thread_kill_shva(void)
 	pepa_thread_cancel(core->shva_thread.thread_id, "SHVA");
 	core->shva_thread.thread_id = PTHREAD_DEAD;
 
-	DD("#############################################\n");
-	DD("##       THREAD SHVA IS KILLED             ##\n");
-	DD("#############################################\n");
+	slog_debug("#############################################");
+	slog_debug("##       THREAD SHVA IS KILLED             ##");
+	slog_debug("#############################################");
 }
 
 void pepa_thread_kill_out(void)
@@ -94,9 +95,9 @@ void pepa_thread_kill_out(void)
 	pepa_thread_cancel(core->out_thread.thread_id, "OUT");
 	core->out_thread.thread_id = PTHREAD_DEAD;
 
-	DD("#############################################\n");
-	DD("##       THREAD OUT IS KILLED              ##\n");
-	DD("#############################################\n");
+	slog_debug("#############################################");
+	slog_debug("##       THREAD OUT IS KILLED              ##");
+	slog_debug("#############################################");
 }
 
 void pepa_thread_kill_in(void)
@@ -105,17 +106,17 @@ void pepa_thread_kill_in(void)
 	pepa_thread_cancel(core->in_thread.thread_id, "IN");
 	core->in_thread.thread_id = PTHREAD_DEAD;
 
-	DD("#############################################\n");
-	DD("##       THREAD IN IS KILLED                ##\n");
-	DD("#############################################\n");
+	slog_debug("#############################################");
+	slog_debug("##       THREAD IN IS KILLED                ##");
+	slog_debug("#############################################");
 }
 
 void pepa_thread_start_out(void)
 {
 	pepa_core_t          *core = pepa_get_core();
-	DDD("Starting OUT thread\n");
+	slog_note("Starting OUT thread");
 	if (PEPA_ERR_OK == pepa_thread_is_out_up()) {
-		DDD("Thread OUT is UP already, finishing");
+		slog_note("Thread OUT is UP already, finishing");
 		return;
 	}
 	int rc    = pthread_create(&core->out_thread.thread_id, NULL, pepa_out_thread, NULL);
@@ -124,18 +125,18 @@ void pepa_thread_start_out(void)
 		abort();
 	}
 
-	DD("#############################################\n");
-	DD("##       THREAD OUT IS STARTED              ##\n");
-	DD("#############################################\n");
+	slog_debug("#############################################");
+	slog_debug("##       THREAD OUT IS STARTED              ##");
+	slog_debug("#############################################");
 
 }
 
 void pepa_thread_start_shva(void)
 {
 	pepa_core_t          *core = pepa_get_core();
-	DDD("Starting SHVA thread\n");
+	slog_note("Starting SHVA thread");
 	if (PEPA_ERR_OK == pepa_thread_is_shva_up()) {
-		DDD("Thread SHVA is UP already, finishing");
+		slog_note("Thread SHVA is UP already, finishing");
 		return;
 	}
 
@@ -145,18 +146,18 @@ void pepa_thread_start_shva(void)
 		abort();
 	}
 
-	DD("#############################################\n");
-	DD("##       THREAD SHVA IS STARTED            ##\n");
-	DD("#############################################\n");
+	slog_debug("#############################################");
+	slog_debug("##       THREAD SHVA IS STARTED            ##");
+	slog_debug("#############################################");
 
 }
 
 void pepa_thread_start_in(void)
 {
 	pepa_core_t          *core = pepa_get_core();
-	DDD("Starting IN thread\n");
+	slog_note("Starting IN thread");
 	if (PEPA_ERR_OK == pepa_thread_is_in_up()) {
-		DDD("Thread IN is UP already, finishing");
+		slog_note("Thread IN is UP already, finishing");
 		return;
 	}
 
@@ -166,9 +167,9 @@ void pepa_thread_start_in(void)
 		abort();
 	}
 
-	DD("#############################################\n");
-	DD("##       THREAD IN IS STARTED              ##\n");
-	DD("#############################################\n");
+	slog_debug("#############################################");
+	slog_debug("##       THREAD IN IS STARTED              ##");
+	slog_debug("#############################################");
 }
 
 void pepa_back_to_disconnected_state_new(void)
@@ -176,13 +177,13 @@ void pepa_back_to_disconnected_state_new(void)
 	static int  counter = 0;
 	pepa_core_t *core   = pepa_get_core();
 
-	DD("#############################################\n");
-	DD("#############################################\n");
-	DD("#############################################\n");
-	DD("##       BACK TO DISCONNECTED STATE        ##\n");
-	DD("#############################################\n");
-	DD("#############################################\n");
-	DD("#############################################\n");
+	slog_debug("#############################################");
+	slog_debug("#############################################");
+	slog_debug("#############################################");
+	slog_debug("##       BACK TO DISCONNECTED STATE        ##");
+	slog_debug("#############################################");
+	slog_debug("#############################################");
+	slog_debug("#############################################");
 
 	pepa_core_lock();
 
@@ -223,13 +224,13 @@ void pepa_kill_all_threads(void)
 	static int  counter = 0;
 	pepa_core_t *core   = pepa_get_core();
 
-	DD("#############################################\n");
-	DD("#############################################\n");
-	DD("#############################################\n");
-	DD("##       BACK TO DISCONNECTED STATE        ##\n");
-	DD("#############################################\n");
-	DD("#############################################\n");
-	DD("#############################################\n");
+	slog_debug("#############################################");
+	slog_debug("#############################################");
+	slog_debug("#############################################");
+	slog_debug("##       BACK TO DISCONNECTED STATE        ##");
+	slog_debug("#############################################");
+	slog_debug("#############################################");
+	slog_debug("#############################################");
 
 	pepa_core_lock();
 
@@ -326,7 +327,7 @@ void pepa_state_shva_set(pepa_core_t *core, pepa_sig_t sig)
 	core->state.signals[PEPA_PR_SHVA] = sig;
 	pthread_mutex_unlock(&core->state.signals_sem);
 	pepa_state_sig(core);
-	DDD("Set SHVA state to %s\n", pepa_sig_str(sig));
+	slog_note("Set SHVA state to %s", pepa_sig_str(sig));
 }
 
 void pepa_state_in_set(pepa_core_t *core, pepa_sig_t sig)
@@ -335,7 +336,7 @@ void pepa_state_in_set(pepa_core_t *core, pepa_sig_t sig)
 	core->state.signals[PEPA_PR_IN] = sig;
 	pthread_mutex_unlock(&core->state.signals_sem);
 	pepa_state_sig(core);
-	DDD("Set IN state to %s\n", pepa_sig_str(sig));
+	slog_note("Set IN state to %s", pepa_sig_str(sig));
 }
 
 void pepa_state_out_set(pepa_core_t *core, pepa_sig_t sig)
@@ -344,7 +345,7 @@ void pepa_state_out_set(pepa_core_t *core, pepa_sig_t sig)
 	core->state.signals[PEPA_PR_OUT] = sig;
 	pthread_mutex_unlock(&core->state.signals_sem);
 	pepa_state_sig(core);
-	DDD("Set OUT state to %s\n", pepa_sig_str(sig));
+	slog_note("Set OUT state to %s", pepa_sig_str(sig));
 }
 
 
@@ -355,7 +356,7 @@ int pepa_state_shva_get(pepa_core_t *core)
 	pthread_mutex_lock(&core->state.signals_sem);
 	st = core->state.signals[PEPA_PR_SHVA];
 	pthread_mutex_unlock(&core->state.signals_sem);
-	DDD("Return SHVA state is %s\n", pepa_sig_str(st));
+	slog_note("Return SHVA state is %s", pepa_sig_str(st));
 	return st;
 }
 
@@ -365,7 +366,7 @@ int pepa_state_in_get(pepa_core_t *core)
 	pthread_mutex_lock(&core->state.signals_sem);
 	st = core->state.signals[PEPA_PR_IN];
 	pthread_mutex_unlock(&core->state.signals_sem);
-	DDD("Return IN state is %s\n", pepa_sig_str(st));
+	slog_note("Return IN state is %s", pepa_sig_str(st));
 	return st;
 }
 
@@ -375,7 +376,7 @@ int pepa_state_out_get(pepa_core_t *core)
 	pthread_mutex_lock(&core->state.signals_sem);
 	st = core->state.signals[PEPA_PR_OUT];
 	pthread_mutex_unlock(&core->state.signals_sem);
-	DDD("Return OUT state is %s\n", pepa_sig_str(st));
+	slog_note("Return OUT state is %s", pepa_sig_str(st));
 	return st;
 }
 

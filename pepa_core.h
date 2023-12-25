@@ -121,7 +121,11 @@ typedef struct {
 typedef struct {
 	sem_t mutex; /**< A semaphor used to sync the core struct between multiple threads */
 
-	//thread_vars_t ctl_thread; /**< Configuration of SHVA thread */
+	int slog_level; /* Keep slog logger verbosity level*/
+	char *slog_file; /* Keep slog output file name; if given, log will be saved there */
+	char *slog_dir; /* Keep slog output file in this directory */
+	int slog_print; /* Show slog output on terminal */
+
 	thread_vars_t shva_thread; /**< Configuration of SHVA thread */
 	thread_vars_t shva_transfet_thread; /**< Configuration of SHVA thread */
 	thread_vars_t in_thread; /**< Configuration of IN thread */
