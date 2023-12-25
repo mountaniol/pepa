@@ -1,54 +1,18 @@
 #define _GNU_SOURCE
-//#include <arpa/inet.h>
-//#include <getopt.h>
-//#include <ifaddrs.h>
-//#include <limits.h>
-//#include <netdb.h>
-//#include <netinet/in.h>
 #include <pthread.h>
-//#include <stdint.h>
-//#include <stdio.h>
-//#include <stdlib.h>
-//#include <string.h>
-//#include <sys/eventfd.h> /* For eventfd */
 #include <sys/param.h>
-//#include <sys/select.h>
-//#include <sys/socket.h>
-//#include <sys/stat.h>
-//#include <sys/time.h>
-//#include <sys/types.h>
-//#include <syslog.h>
-//#include <unistd.h>
-//#include <unistd.h> /* For read() */
-//#include <semaphore.h>
-//#include <pthread.h>
-
-//#include <arpa/inet.h>
-//#include <ifaddrs.h>
-//#include <netdb.h>
-//#include <pthread.h>
-//#include <syslog.h>
 #include <unistd.h> /* For read() */
-//#include <sys/eventfd.h> /* For eventfd */
-/* THe next two are needed for send() */
-//#include <sys/types.h>
-//#include <sys/socket.h>
 #include <sys/epoll.h>
 #include <errno.h>
 
-
 #include "buf_t/buf_t.h"
-#include "buf_t/se_debug.h"
 #include "pepa_config.h"
 #include "pepa_core.h"
-#include "pepa_debug.h"
+#include "slog/src/slog.h"
 #include "pepa_errors.h"
-#include "pepa_ip_struct.h"
 #include "pepa_parser.h"
-//#include "pepa_socket.h"
 #include "pepa_socket_common.h"
 #include "pepa_state_machine.h"
-#include "pepa_version.h"
 
 #define SHUTDOWN_DIVIDER (100003573)
 #define SHOULD_EMULATE_DISCONNECT() (0 == (rand() % SHUTDOWN_DIVIDER))

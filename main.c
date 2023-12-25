@@ -1,34 +1,10 @@
-#include <errno.h>
-#include <arpa/inet.h>
-#include <assert.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <getopt.h>
-#include <limits.h>
-#include <netdb.h>
-#include <netinet/in.h>
-#include <pthread.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/socket.h>
-#include <sys/stat.h>
-#include <sys/time.h>
-#include <sys/types.h>
 #include <unistd.h>
 #include <sys/param.h>
-#include <sys/select.h>
 
 #include "slog/src/slog.h"
-#include "buf_t/se_debug.h"
-#include "pepa_config.h"
-#include "pepa_ip_struct.h"
 #include "pepa_core.h"
 #include "pepa_errors.h"
 #include "pepa_parser.h"
-#include "pepa_socket_common.h"
-#include "pepa_version.h"
 #include "pepa_state_machine.h"
 
 void bye(void)
@@ -99,7 +75,6 @@ int main(int argi, char *argv[])
 	slog_note("Threads are started");
 
 	pepa_set_int_signal_handler();
-
 
 	while (1) {
 		sleep(120);

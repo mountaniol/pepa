@@ -1,10 +1,6 @@
-#include <sys/types.h>
 #include <signal.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <pthread.h>
-#include <pthread.h>
-#include <semaphore.h>
 #include <errno.h>
 
 #include "slog/src/slog.h"
@@ -12,10 +8,6 @@
 #include "pepa_errors.h"
 #include "pepa_core.h"
 #include "pepa_socket_common.h"
-#include "pepa_socket_out.h"
-#include "pepa_socket_shva.h"
-#include "pepa_socket_in.h"
-#include "buf_t/se_debug.h"
 
 static void pepa_thread_cancel(pthread_t pid, const char *name)
 {

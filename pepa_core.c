@@ -1,16 +1,10 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <semaphore.h>
-#include <string.h>
 #include <unistd.h>
-#include <sys/eventfd.h> /* For eventfd */
 
 #include "slog/src/slog.h"
 #include "pepa_core.h"
 #include "pepa_config.h"
 #include "pepa_errors.h"
 #include "pepa_debug.h"
-#include "buf_t/se_debug.h"
 
 pepa_core_t *g_pepa_core = NULL;
 

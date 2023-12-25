@@ -1,33 +1,11 @@
 #define _GNU_SOURCE
-#include <arpa/inet.h>
-#include <ifaddrs.h>
-#include <netdb.h>
-#include <pthread.h>
-#include <syslog.h>
-#include <unistd.h> /* For read() */
-#include <sys/eventfd.h> /* For eventfd */
-/* THe next two are needed for send() */
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <signal.h>
-#include <fcntl.h>
 #include <unistd.h>
-#include <fcntl.h>
 #include <errno.h>
-#include <poll.h>
-#include <sys/epoll.h>
-#include <sys/epoll.h>
 
 #include "slog/src/slog.h"
-#include "pepa_config.h"
 #include "pepa_socket_common.h"
-#include "pepa_socket_out.h"
 #include "pepa_errors.h"
-#include "pepa_core.h"
-#include "pepa_debug.h"
 #include "pepa_state_machine.h"
-#include "buf_t/buf_t.h"
-#include "buf_t/se_debug.h"
 
 static int pepa_out_wait_connection(int fd_listen)
 {
