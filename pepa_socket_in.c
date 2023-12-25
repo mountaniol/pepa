@@ -74,7 +74,7 @@ static int pepa_in_thread_wait_shva_ready(pepa_core_t *core, __attribute__((unus
 		int st = pepa_state_shva_get(core);
 		if (PEPA_ST_RUN == st) {
 			DDD("%s: SHVA became UP: %d\n", my_name, st);
-			return 0;
+			return PEPA_ERR_OK;
 		}
 
 		DDD("%s: SHVA is not UP: [%d] %s\n", my_name, st, pepa_sig_str(st));
@@ -83,171 +83,34 @@ static int pepa_in_thread_wait_shva_ready(pepa_core_t *core, __attribute__((unus
 		pepa_state_wait(core);
 		DDD("IN GOT SIGNAL\n");
 	};
-	return 0;
+	return PEPA_ERR_OK;
 }
 
 /* Wait for signal; when SHVA is DOWN, return */
 static int pepa_in_thread_wait_fail_event(pepa_core_t *core, __attribute__((unused)) const char *my_name)
 {
-
 	while (1) {
 		if (PEPA_ST_RUN != pepa_state_shva_get(core)) {
 			DDD("%s: SHVA became DOWN\n", my_name);
-			return 0;
+			return -PEPA_ERR_THREAD_SHVA_DOWN;
 		}
 
 		int st = pepa_state_in_get(core);
 		if (PEPA_ST_FAIL == st) {
 			DDD("%s: IN became DOWN\n", my_name);
-			return 1;
+			return -PEPA_ERR_THREAD_IN_DOWN;
 		}
 
 		if (PEPA_ST_SOCKET_RESET == st) {
 			DDD("%s: IN became DOWN\n", my_name);
-			return 2;
+			return -PEPA_ERR_THREAD_IN_SOCKET_RESET;
 		}
 
 		/* We exit this wait only when SHVA is ready */
 		pepa_state_wait(core);
 		DDD("IN GOT SIGNAL\n");
 	};
-	return 0;
-}
-
-
-void *pepa_in_thread_new_forward(__attribute__((unused))void *arg);
-
-void *pepa_in_thread_new(__attribute__((unused))void *arg)
-{
-	pthread_t              forwarder_pthread_id = 0xDEADBEED;
-	//int                    read_sock            = -1;
-	pepa_in_thread_state_t next_step            = PEPA_TH_IN_START;
-	const char             *my_name             = "IN";
-	int                    rc;
-	pepa_core_t            *core                = pepa_get_core();
-
-	do {
-		pepa_in_thread_state_t this_step = next_step;
-		switch (next_step) {
-			/*
-			 * Start the thread
-			 */
-		case 	PEPA_TH_IN_START:
-			DDD("START STEP: %s\n", pepa_in_thread_state_str(next_step));
-			next_step = PEPA_TH_IN_CREATE_LISTEN;
-			rc = pepa_pthread_init_phase(my_name);
-			if (rc < 0) {
-				DE("%s: Could not init the thread\n", my_name);
-				pepa_state_in_set(core, PEPA_ST_FAIL);
-				next_step = PEPA_TH_IN_TERMINATE;
-			}
-			DDD("END STEP:   %s\n", pepa_in_thread_state_str(this_step));
-			break;
-
-		case PEPA_TH_IN_CREATE_LISTEN:
-			/*
-			 * Create Listening socket
-			 */
-
-			DDD("START STEP: %s\n", pepa_in_thread_state_str(next_step));
-			next_step = PEPA_TH_IN_WAIT_SHVA_UP;
-			pepa_in_thread_listen_socket(core, my_name);
-			DDD("END STEP:   %s\n", pepa_in_thread_state_str(this_step));
-			break;
-
-		case PEPA_TH_IN_CLOSE_LISTEN:
-			DDD("START STEP: %s\n", pepa_in_thread_state_str(next_step));
-
-			next_step = PEPA_TH_IN_CREATE_LISTEN;
-			pepa_in_thread_close_listen(core,  my_name);
-
-			DDD("END STEP:   %s\n", pepa_in_thread_state_str(this_step));
-			break;
-
-		case PEPA_TH_IN_TEST_LISTEN_SOCKET:
-			DDD("START STEP: %s\n", pepa_in_thread_state_str(next_step));
-			/*
-			 * Test Listening socket; if it not valid,
-			 * close the file descriptor and recreate the Listening socket
-			 */
-
-			next_step = PEPA_TH_IN_WAIT_SHVA_UP;
-			if (pepa_test_fd(core->sockets.in_listen) < 0) {
-				DE("%s: Listening socked is invalid, restart it\n", my_name);
-				next_step = PEPA_TH_IN_CLOSE_LISTEN;
-			} else {
-				DE("%s: IN: Listening socked is OK, reuse it\n", my_name);
-			}
-			DDD("END STEP:   %s\n", pepa_in_thread_state_str(this_step));
-			break;
-
-		case PEPA_TH_IN_WAIT_SHVA_UP:
-			DDD("START STEP: %s\n", pepa_in_thread_state_str(next_step));
-			/*
-			 * Blocking wait until SHVA becomes available.
-			 * This step happens before ACCEPT
-			 */
-			rc = pepa_in_thread_wait_shva_ready(core, my_name);
-
-			next_step = PEPA_TH_IN_START_TRANSFER;
-			DDD("END STEP:   %s\n", pepa_in_thread_state_str(this_step));
-			break;
-
-		case PEPA_TH_IN_WAIT_SHVA_DOWN:
-			DDD("START STEP: %s\n", pepa_in_thread_state_str(next_step));
-			/*
-			 * Blocking wait until SHVA is DOWN.
-			 * While SHVA is alive, we run transfer between IN and SHVA 
-			 */
-			rc = pepa_in_thread_wait_fail_event(core, my_name);
-
-			if (0 == pthread_kill(forwarder_pthread_id, 0)) {
-				rc = pthread_cancel(forwarder_pthread_id);
-			}
-			next_step = PEPA_TH_IN_WAIT_SHVA_UP;
-
-			if (2 == rc) {
-				DDE("%s: Could not terminate forwarding thread: %s\n", my_name, strerror(errno));
-				next_step = PEPA_TH_IN_CLOSE_LISTEN;
-			}
-
-			DDD("END STEP:   %s\n", pepa_in_thread_state_str(this_step));
-			break;
-
-		case PEPA_TH_IN_START_TRANSFER:
-			DDD("START STEP: %s\n", pepa_in_thread_state_str(next_step));
-
-			rc = pthread_create(&forwarder_pthread_id, NULL, pepa_in_thread_new_forward, NULL);
-			if (rc < 0) {
-				DE("Could not start subthread\n");
-			}
-			pepa_state_in_set(core, PEPA_ST_RUN);
-			next_step = PEPA_TH_IN_WAIT_SHVA_DOWN;
-			DDD("END STEP:   %s\n", pepa_in_thread_state_str(this_step));
-			break;
-
-		case PEPA_TH_IN_TERMINATE:
-			DDD("START STEP: %s\n", pepa_in_thread_state_str(next_step));
-			rc = pthread_cancel(forwarder_pthread_id);
-			if (rc < 0) {
-				DDE("%s: Could not terminate forwarding thread: %s\n", my_name, strerror(errno));
-			}
-			pepa_state_in_set(core, PEPA_ST_FAIL);
-			sleep(10);
-			DDD("END STEP:   %s\n", pepa_in_thread_state_str(this_step));
-			break;
-
-		default:
-			DDD("%s: Should never be here: next_steps = %d\n", my_name, next_step);
-			abort();
-			break;
-		}
-	} while (1);
-	DE("Should never be here\n");
-	abort();
-	pthread_exit(NULL);
-
-	return NULL;
+	return PEPA_ERR_OK;
 }
 
 #define MAX_CLIENTS (512)
@@ -416,5 +279,138 @@ void *pepa_in_thread_new_forward(__attribute__((unused))void *arg)
 
 	pthread_cleanup_pop(0);
 	pthread_exit(NULL);
+}
+
+void *pepa_in_thread_new(__attribute__((unused))void *arg)
+{
+	pthread_t              forwarder_pthread_id = 0xDEADBEED;
+	//int                    read_sock            = -1;
+	pepa_in_thread_state_t next_step            = PEPA_TH_IN_START;
+	const char             *my_name             = "IN";
+	int                    rc;
+	pepa_core_t            *core                = pepa_get_core();
+
+	do {
+		pepa_in_thread_state_t this_step = next_step;
+		switch (next_step) {
+			/*
+			 * Start the thread
+			 */
+		case 	PEPA_TH_IN_START:
+			DDD("START STEP: %s\n", pepa_in_thread_state_str(next_step));
+			next_step = PEPA_TH_IN_CREATE_LISTEN;
+			rc = pepa_pthread_init_phase(my_name);
+			if (rc < 0) {
+				DE("%s: Could not init the thread\n", my_name);
+				pepa_state_in_set(core, PEPA_ST_FAIL);
+				next_step = PEPA_TH_IN_TERMINATE;
+			}
+			DDD("END STEP:   %s\n", pepa_in_thread_state_str(this_step));
+			break;
+
+		case PEPA_TH_IN_CREATE_LISTEN:
+			/*
+			 * Create Listening socket
+			 */
+
+			DDD("START STEP: %s\n", pepa_in_thread_state_str(next_step));
+			next_step = PEPA_TH_IN_WAIT_SHVA_UP;
+			pepa_in_thread_listen_socket(core, my_name);
+			DDD("END STEP:   %s\n", pepa_in_thread_state_str(this_step));
+			break;
+
+		case PEPA_TH_IN_CLOSE_LISTEN:
+			DDD("START STEP: %s\n", pepa_in_thread_state_str(next_step));
+
+			next_step = PEPA_TH_IN_CREATE_LISTEN;
+			pepa_in_thread_close_listen(core,  my_name);
+
+			DDD("END STEP:   %s\n", pepa_in_thread_state_str(this_step));
+			break;
+
+		case PEPA_TH_IN_TEST_LISTEN_SOCKET:
+			DDD("START STEP: %s\n", pepa_in_thread_state_str(next_step));
+			/*
+			 * Test Listening socket; if it not valid,
+			 * close the file descriptor and recreate the Listening socket
+			 */
+
+			next_step = PEPA_TH_IN_WAIT_SHVA_UP;
+			if (pepa_test_fd(core->sockets.in_listen) < 0) {
+				DE("%s: Listening socked is invalid, restart it\n", my_name);
+				next_step = PEPA_TH_IN_CLOSE_LISTEN;
+			} else {
+				DE("%s: IN: Listening socked is OK, reuse it\n", my_name);
+			}
+			DDD("END STEP:   %s\n", pepa_in_thread_state_str(this_step));
+			break;
+
+		case PEPA_TH_IN_WAIT_SHVA_UP:
+			DDD("START STEP: %s\n", pepa_in_thread_state_str(next_step));
+			/*
+			 * Blocking wait until SHVA becomes available.
+			 * This step happens before ACCEPT
+			 */
+			rc = pepa_in_thread_wait_shva_ready(core, my_name);
+
+			next_step = PEPA_TH_IN_START_TRANSFER;
+			DDD("END STEP:   %s\n", pepa_in_thread_state_str(this_step));
+			break;
+
+		case PEPA_TH_IN_WAIT_SHVA_DOWN:
+			DDD("START STEP: %s\n", pepa_in_thread_state_str(next_step));
+			/*
+			 * Blocking wait until SHVA is DOWN.
+			 * While SHVA is alive, we run transfer between IN and SHVA 
+			 */
+			rc = pepa_in_thread_wait_fail_event(core, my_name);
+
+			if (0 == pthread_kill(forwarder_pthread_id, 0)) {
+				rc = pthread_cancel(forwarder_pthread_id);
+			}
+			next_step = PEPA_TH_IN_WAIT_SHVA_UP;
+
+			if (2 == rc) {
+				DDE("%s: Could not terminate forwarding thread: %s\n", my_name, strerror(errno));
+				next_step = PEPA_TH_IN_CLOSE_LISTEN;
+			}
+
+			DDD("END STEP:   %s\n", pepa_in_thread_state_str(this_step));
+			break;
+
+		case PEPA_TH_IN_START_TRANSFER:
+			DDD("START STEP: %s\n", pepa_in_thread_state_str(next_step));
+
+			rc = pthread_create(&forwarder_pthread_id, NULL, pepa_in_thread_new_forward, NULL);
+			if (rc < 0) {
+				DE("Could not start subthread\n");
+			}
+			pepa_state_in_set(core, PEPA_ST_RUN);
+			next_step = PEPA_TH_IN_WAIT_SHVA_DOWN;
+			DDD("END STEP:   %s\n", pepa_in_thread_state_str(this_step));
+			break;
+
+		case PEPA_TH_IN_TERMINATE:
+			DDD("START STEP: %s\n", pepa_in_thread_state_str(next_step));
+			rc = pthread_cancel(forwarder_pthread_id);
+			if (rc < 0) {
+				DDE("%s: Could not terminate forwarding thread: %s\n", my_name, strerror(errno));
+			}
+			pepa_state_in_set(core, PEPA_ST_FAIL);
+			sleep(10);
+			DDD("END STEP:   %s\n", pepa_in_thread_state_str(this_step));
+			break;
+
+		default:
+			DDD("%s: Should never be here: next_steps = %d\n", my_name, next_step);
+			abort();
+			break;
+		}
+	} while (1);
+	DE("Should never be here\n");
+	abort();
+	pthread_exit(NULL);
+
+	return NULL;
 }
 

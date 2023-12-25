@@ -63,11 +63,11 @@ static int pepa_shva_thread_close_socket(pepa_core_t *core, __attribute__((unuse
 	int rc   = close(sock);
 	if (rc < 0) {
 		DDDE0("%s: Could not close the socket: fd: %d, %s\n", my_name, sock, strerror(errno));
-		return -1;
+		return -PEPA_ERR_SOCKET_CLOSE;
 	}
 
 	core->sockets.shva_rw = -1;
-	return 0;
+	return PEPA_ERR_OK;
 }
 
 static int pepa_shva_thread_wait_out(pepa_core_t *core, __attribute__((unused)) const char *my_name)
@@ -75,14 +75,14 @@ static int pepa_shva_thread_wait_out(pepa_core_t *core, __attribute__((unused)) 
 	while (1) {
 		if (PEPA_ST_RUN == pepa_state_out_get(core)) {
 			DDD("%s: OUT is UP\n", my_name);
-			return 0;
+			return PEPA_ERR_OK;
 		}
 
 		/* We exit this wait only when SHVA is ready */
 		pepa_state_wait(core);
 		DDD("SHVA GOT SIGNAL\n");
 	};
-	return 0;
+	return PEPA_ERR_OK;
 }
 
 /* Wait for signal; when SHVA is DOWN, return */
@@ -91,19 +91,19 @@ static int pepa_shva_thread_wait_fail(pepa_core_t *core, __attribute__((unused))
 	while (1) {
 		if (PEPA_ST_FAIL == pepa_state_out_get(core)) {
 			DDD("%s: OUT became DOWN\n", my_name);
-			return 0;
+			return PEPA_ERR_OK;
 		}
 
 		if (PEPA_ST_FAIL == pepa_state_shva_get(core)) {
 			DDD("%s: SHVA became DOWN\n", my_name);
-			return 0;
+			return PEPA_ERR_OK;
 		}
 
 		/* We exit this wait only when SHVA is ready */
 		pepa_state_wait(core);
 		DDD("SHVA GOT SIGNAL\n");
 	};
-	return 0;
+	return PEPA_ERR_OK;
 }
 
 void *pepa_shva_thread_new_forward(__attribute__((unused))void *arg);

@@ -306,7 +306,7 @@ int pepa_core_unlock(void)
 int pepa_if_abort(void)
 {
 	if (NULL == g_pepa_core) {
-		return 0;
+		return PEPA_ERR_OK;
 	}
 
 	return g_pepa_core->abort_flag;

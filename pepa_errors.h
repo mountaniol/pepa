@@ -8,9 +8,24 @@ typedef enum {
 	PEPA_ERR_EVENT, /* This is code telling an event received on event fd  */
 	PEPA_ERR_STOP, /* This is code telling to thread to stop */
 
+	/* Situative statuses */
+	PEPA_ERR_THREAD_SHVA_DOWN,
+	PEPA_ERR_THREAD_IN_DOWN,
+	PEPA_ERR_THREAD_IN_SOCKET_RESET,
+	PEPA_ERR_THREAD_OUT_DOWN,
+
 	/* Memory related errors */
 	PEPA_ERR_NULL_POINTER,
 	PEPA_ERR_ALLOCATION,
+	PEPA_ERR_BUF_ALLOCATION,
+
+	/* File related */
+	PEPA_ERR_CANNOT_CLOSE, /* Can not close file or socket */
+	PEPA_ERR_FILE_DESCRIPTOR, /* Invalid file (or socket) descriptor */
+	PEPA_ERR_EPOLL_CANNOT_ADD, /* Can not add file desriptor to epoll */
+
+	/* String and parse related */
+	PEPA_ERR_INVALID_INPUT,
 
 	/* Core related errors */
 	PEPA_ERR_INIT_MITEX,
@@ -26,6 +41,8 @@ typedef enum {
 	PEPA_ERR_SOCKET_LISTEN,
 	PEPA_ERR_SOCK_CONNECT,
 	PEPA_ERR_CONVERT_ADDR,
+	PEPA_ERR_SOCKET_CLOSE,
+	PEPA_ERR_CANNOT_SHUTDOWN,
 
 	/* Data transfer */
 	PEPA_ERR_SELECT_EXCEPTION_LEFT,
@@ -40,6 +57,11 @@ typedef enum {
 
 	/* Treads related */
 	PEPA_ERR_THREAD_CANNOT_CREATE,
+	PEPA_ERR_THREAD_DEAD,
+	PEPA_ERR_THREAD_DETOUCH,
+
+	/* Unknown error number */
+	PEPA_ERR_ERROR_OUT_OF_RANGE,
 } pepa_error_t;
 
 /**

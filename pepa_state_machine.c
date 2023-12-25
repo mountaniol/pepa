@@ -9,7 +9,6 @@
 #include "pepa_errors.h"
 #include "pepa_core.h"
 #include "pepa_socket_common.h"
-#include "pepa_socket_ctl.h"
 #include "pepa_socket_out.h"
 #include "pepa_socket_shva.h"
 #include "pepa_socket_in.h"
@@ -46,7 +45,7 @@ int pepa_thread_is_shva_up(void)
 	pepa_core_t          *core = pepa_get_core();
 	if (PTHREAD_DEAD == core->shva_thread.thread_id ||
 		pthread_kill(core->shva_thread.thread_id, 0) < 0) {
-		return -1;
+		return -PEPA_ERR_THREAD_DEAD;
 	}
 	return PEPA_ERR_OK;
 }
@@ -58,11 +57,11 @@ int pepa_thread_is_in_up(void)
 	DDD("core->in_thread.thread_id = %lX\n", core->in_thread.thread_id);
 	if (PTHREAD_DEAD == core->in_thread.thread_id) {
 		DE("THREAD IN IS DEAD: core->in_thread.thread_id = %lX\n", core->in_thread.thread_id);
-		return -1;
+		return -PEPA_ERR_THREAD_DEAD;
 	}
 	if (pthread_kill(core->in_thread.thread_id, 0) < 0) {
 		DE("THREAD IN IS DEAD: kill = %d\n", pthread_kill(core->in_thread.thread_id, 0));
-		return -1;
+		return -PEPA_ERR_THREAD_DEAD;
 	}
 	return PEPA_ERR_OK;
 }
@@ -73,7 +72,7 @@ int pepa_thread_is_out_up(void)
 
 	if (PTHREAD_DEAD == core->out_thread.thread_id ||
 		pthread_kill(core->out_thread.thread_id, 0) < 0) {
-		return -1;
+		return -PEPA_ERR_THREAD_DEAD;
 	}
 	return PEPA_ERR_OK;
 }
@@ -268,23 +267,24 @@ void pepa_kill_all_threads(void)
 	}
 }
 
-const char *pepa_pr_str(pepa_proc_t p)
-{
+#if 0 /* SEB */
+const char *pepa_pr_str(pepa_proc_t p){
 	switch (p) {
-	case PEPA_PR_OUT:
+		case PEPA_PR_OUT:
 		return "PEPA_PR_OUT";
-	case PEPA_PR_SHVA:
+		case PEPA_PR_SHVA:
 		return "PEPA_PR_SHVA";
-	case PEPA_PR_IN:
+		case PEPA_PR_IN:
 		return "PEPA_PR_IN";
-	case PEPA_PR_CLT :
+		case PEPA_PR_CLT :
 		return "PEPA_PR_CLT";
-	case PEPA_PR_MAX:
+		case PEPA_PR_MAX:
 		return "PEPA_PR_MAX";
 	}
 
 	return "NA";
 }
+#endif
 
 const char *pepa_sig_str(pepa_sig_t p)
 {

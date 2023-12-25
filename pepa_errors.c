@@ -9,9 +9,24 @@ const char *pepa_error_code_to_str(int code)
 	case PEPA_ERR_EVENT: return "And event received on event fd desciptor";
 	case PEPA_ERR_STOP: return "Thread must stop and terminate";
 
+		/* Situative statuses */
+	case PEPA_ERR_THREAD_SHVA_DOWN: return "SHVA thread is in FAIL state";
+	case PEPA_ERR_THREAD_IN_DOWN: return "IN thread is in FAIL state";
+	case PEPA_ERR_THREAD_IN_SOCKET_RESET: return "IN thread should reset listening socket";
+	case PEPA_ERR_THREAD_OUT_DOWN: return "OUT thread is in FAIL state";
+
 	/* Memory related errors */
 	case PEPA_ERR_NULL_POINTER: return "An argument is NULL pointer";
 	case PEPA_ERR_ALLOCATION: return "Can not allocate memory";
+	case PEPA_ERR_BUF_ALLOCATION: return "Can not allocate buf_t";
+
+	/* File related */
+	case PEPA_ERR_CANNOT_CLOSE: return "GIven file descriptor looks valid but cannot be closed";
+	case PEPA_ERR_FILE_DESCRIPTOR: return "An invalid file descriptor, for example, a negative";
+	case PEPA_ERR_EPOLL_CANNOT_ADD: return "epoll() can not add given file descriptor to its watch set";
+
+	/* String and parse related */
+	case PEPA_ERR_INVALID_INPUT: return "Invalid input given to parser";
 
 	/* Core related errors */
 	case PEPA_ERR_INIT_MITEX: return "Can not init semaphore object";
@@ -27,6 +42,8 @@ const char *pepa_error_code_to_str(int code)
 	case PEPA_ERR_SOCKET_LISTEN: return "Can not listen on socket";
 	case PEPA_ERR_SOCK_CONNECT: return "Can not connect socket";
 	case PEPA_ERR_CONVERT_ADDR: return "Can not convert IP address from string to binary";
+	case PEPA_ERR_SOCKET_CLOSE: return "Can not close the socket";
+	case PEPA_ERR_CANNOT_SHUTDOWN: return "Can not shotdown() a listening socket";
 
 	/* Data transfer */
 	case PEPA_ERR_SELECT_EXCEPTION_LEFT: return "An exception happened on 'left' file descriptor";
@@ -38,7 +55,15 @@ const char *pepa_error_code_to_str(int code)
 	case PEPA_ERR_SOCKET_READ_CLOSED: return "Socked closed when tried to read from";
 	case PEPA_ERR_SOCKET_WRITE: return "Socked closed when tried to write to";
 	case PEPA_ERR_SOCKET_WRITE_CLOSED: return "Right socked closed when tried to write to";
+
 	case PEPA_ERR_THREAD_CANNOT_CREATE: return "Cannot create socket";
+	case PEPA_ERR_THREAD_DEAD: return "The thread is dead";
+	case PEPA_ERR_THREAD_DETOUCH: return "Cannot detouch new thread";
+
+	/* Unknown error number */
+	case PEPA_ERR_ERROR_OUT_OF_RANGE: return "Unknown PEPA error code was provided";
+
+
 	default: return "Unknown error code";
 	}
 

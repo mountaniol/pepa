@@ -61,23 +61,8 @@ x_conn_direction_t;
 void set_sig_handler(void);
 int pepa_pthread_init_phase(const char *name);
 void pepa_parse_pthread_create_error(const int rc);
-// void *pepa_one_direction_rw_thread(void *arg);
 
-__attribute__((nonnull(1, 2)))
-/**
- * @author Sebastian Mountaniol (12/7/23)
- * @brief Open a socket with all possible error checks
- * @param struct sockaddr_in* s_addr        
- * @param buf_t* ip_address    
- * @param int port          
- * @param int num_of_clients
- * @return int Opened socked file descriptor; a negative error
- *  	   code on error
- * @details 
- */
-int pepa_open_listening_socket(struct sockaddr_in *s_addr, const buf_t *ip_address, const int port, const int num_of_clients, const char *name);
 int pepa_open_connection_to_server(const char *address, int port, const char *name);
-
 
 /**
  * @author Sebastian Mountaniol (12/13/23)
@@ -108,23 +93,22 @@ pepa_fds_t *pepa_fds_t_alloc(int fd_read,
 
 void pepa_fds_t_release(pepa_fds_t *fdx);
 uint32_t pepa_thread_counter(void);
-int pepa_one_direction_copy(pepa_fds_t *fdx, buf_t *buf);
+//int pepa_one_direction_copy(pepa_fds_t *fdx, buf_t *buf);
 int pepa_one_direction_copy2(int fd_out, const char *name_out,
 							 int fd_in, const char *name_in,
 							 char *buf, size_t buf_size, int do_debug);
 
 /**
  * @author Sebastian Mountaniol (12/14/23)
- * @brief Test file descriptor. If it opened, return 0,
- *  	  if it closed, return -1
+ * @brief Test file descriptor. If it opened, return PEPA_ERR_OK,
+ *  	  if it closed, returns -PEPA_ERR_FILE_DESCRIPTOR
  * @param int fd    
  * @return int 
  * @details 
  */
 int pepa_test_fd(int fd);
+
 int epoll_ctl_add(int epfd, int fd, uint32_t events);
-
-
 
 __attribute__((nonnull(1, 2)))
 /**
@@ -159,18 +143,6 @@ int pepa_open_connection_to_server(const char *address, int port, const char *na
  */
 int pepa_start_threads(void);
 
-/**
- * @author Sebastian Mountaniol (12/10/23)
- * @brief Stop threads, close all file descriptors et cetera;
- *  	  not implemented for today 
- * @param  void  
- * @return int PEPA_ERR_OK on success, a negative value on an
- *  	   error
- * @details 
- */
-int pepa_stop_threads(void);
-
-
 void *pepa_shva_thread_new(__attribute__((unused))void *arg);
 
 void pepa_parse_pthread_create_error(const int rc);
@@ -178,9 +150,6 @@ void pepa_parse_pthread_create_error(const int rc);
 void *pepa_in_thread_new(__attribute__((unused))void *arg);
 
 void *pepa_out_thread(__attribute__((unused))void *arg);
-
-void pepa_event_rm(int fd);
-void pepa_set_out_read_sock(pepa_core_t *core, int fd, const char *func, const int line);
 
 int pepa_socket_shutdown_and_close(int sock, const char *my_name);
 

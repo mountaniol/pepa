@@ -171,7 +171,7 @@ static int pepa_emulator_parse_arguments(int argi, char *argv[])
 		default:
 			printf("Unknown argument: %c\n", opt);
 			pepa_emilator_show_help();
-			return -1;
+			return -PEPA_ERR_ERROR_OUT_OF_RANGE;
 		}
 	}
 
@@ -187,7 +187,7 @@ static int pepa_emulator_parse_arguments(int argi, char *argv[])
 		DE("Not inited SHVA arguments\n");
 	}
 
-	return 0;
+	return PEPA_ERR_OK;
 }
 
 uint64_t head_counter(void)
@@ -259,20 +259,20 @@ int pepa_emulator_generate_buffer_buf(buf_t *buf, int64_t buffer_size)
 
 		if (rc != BUFT_OK) {
 			DE("Could not create text buffer: %s\n", buf_error_code_to_string(rc));
-			return -1;
+			return -PEPA_ERR_BUF_ALLOCATION;
 		}
 		rest -= to_copy_size;
 	}
 	DD0("Finished copying into buf\n");
 
-	return 0;
+	return PEPA_ERR_OK;
 }
 
 buf_t *pepa_emulator_generate_buffer(uint64_t buffer_size)
 {
 	int   rc;
 	buf_t *buf = buf_new(buffer_size);
-	if (0 == pepa_emulator_generate_buffer_buf(buf, buffer_size)) {
+	if (PEPA_ERR_OK == pepa_emulator_generate_buffer_buf(buf, buffer_size)) {
 		return buf;
 	}
 
@@ -791,7 +791,7 @@ int main(int argi, char *argv[])
 			DDD("SHVA thread is started\n");
 		} else {
 			pepa_parse_pthread_create_error(rc);
-			return -1;
+			return -PEPA_ERR_THREAD_CANNOT_CREATE;
 		}
 	}
 
@@ -804,7 +804,7 @@ int main(int argi, char *argv[])
 			DDD("SHVA thread is started\n");
 		} else {
 			pepa_parse_pthread_create_error(rc);
-			return -1;
+			return -PEPA_ERR_THREAD_CANNOT_CREATE;
 		}
 	}
 
@@ -817,7 +817,7 @@ int main(int argi, char *argv[])
 			DDD("SHVA thread is started\n");
 		} else {
 			pepa_parse_pthread_create_error(rc);
-			return -1;
+			return -PEPA_ERR_THREAD_CANNOT_CREATE;
 		}
 	}
 

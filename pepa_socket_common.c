@@ -50,7 +50,7 @@ int pepa_pthread_init_phase(const char *name)
 	if (0 != pthread_detach(pthread_self())) {
 		DE("Thread %s: can't detach myself\n", name);
 		perror("Thread : can't detach myself");
-		return -1;
+		return -PEPA_ERR_THREAD_DETOUCH;
 	}
 
 	DDD("Thread %s: Detached\n", name);
@@ -219,8 +219,8 @@ endit:
 }
 
 
-int pepa_one_direction_copy(pepa_fds_t *fdx, buf_t *buf)
-{
+#if 0 /* SEB */
+int pepa_one_direction_copy(pepa_fds_t *fdx, buf_t *buf){
 	int ret       = PEPA_ERR_OK;
 	int rx        = 0;
 	int tx_total  = 0;
@@ -297,24 +297,25 @@ int pepa_one_direction_copy(pepa_fds_t *fdx, buf_t *buf)
 	} while (rx > 0); /* Tun this loop as long as we have data on read socket */
 
 	ret = PEPA_ERR_OK;
-endit:
+	endit:
 	fdx->rx += rx_total;
 	fdx->tx += tx_total;
-#if 0 /* SEB */
+	#if 0 /* SEB */
 	if (written_acc + rd_acc > 0) {
 		DDD("%s -> %s written_acc %d, rd_acc = %d\n", fdx->name_read, fdx->name_write, written_acc, rd_acc);
 	}
-#endif
+	#endif
 	return ret;
 }
+#endif
 
 int pepa_test_fd(int fd)
 {
 	if ((fcntl(fd, F_GETFL) < 0) && (EBADF == errno)) {
 		//DE("File descriptor %d is invalid: %s\n", fd, strerror(errno));
-		return -1;
+		return -PEPA_ERR_FILE_DESCRIPTOR;
 	}
-	return 0;
+	return PEPA_ERR_OK;
 }
 
 int epoll_ctl_add(int epfd, int fd, uint32_t events)
@@ -323,7 +324,7 @@ int epoll_ctl_add(int epfd, int fd, uint32_t events)
 
 	if (fd < 0) {
 		DE("Tryed to add fd < 0: %d\n", fd);
-		return -1;
+		return -PEPA_ERR_FILE_DESCRIPTOR;
 	}
 
 	ev.events = events;
@@ -333,10 +334,10 @@ int epoll_ctl_add(int epfd, int fd, uint32_t events)
 		DE("Can not add fd %d to epoll: %s\n", fd, strerror(errno));
 		// perror("epoll_ctl()\n");
 		//exit(1);
-		return -1;
+		return -PEPA_ERR_EPOLL_CANNOT_ADD;
 	}
 
-	return 0;
+	return PEPA_ERR_OK;
 }
 
 #if 0 /* SEB */
@@ -494,24 +495,24 @@ void *pepa_one_direction_rw_thread(void *arg){
 int pepa_socket_shutdown_and_close(int sock, const char *my_name)
 {
 	if (sock < 0) {
-		return -1;
+		return -PEPA_ERR_FILE_DESCRIPTOR;
 	}
 
 	int rc = shutdown(sock, SHUT_RDWR);
 	if (rc < 0) {
 		DDDE("%s: Could not shutdown the socket: fd: %d, %s\n", my_name, sock, strerror(errno));
-		return -1;
+		return -PEPA_ERR_FILE_DESCRIPTOR;
 	}
 
 	rc = close(sock);
 	if (rc < 0) {
 		DDDE("%s: Could not close the socket: fd: %d, %s\n", my_name, sock, strerror(errno));
-		return -1;
+		return -PEPA_ERR_CANNOT_CLOSE;
 	}
 
 	close(sock);
 	DDD("%s: Closed socket %d\n", my_name, sock);
-	return 0;
+	return PEPA_ERR_OK;
 }
 
 __attribute__((nonnull(1, 2)))
@@ -660,12 +661,7 @@ int pepa_start_threads(void)
 	pepa_thread_start_out();
 	pepa_thread_start_shva();
 	pepa_thread_start_in();
-	return 0;
+	return PEPA_ERR_OK;
 }
 
-int pepa_stop_threads(void)
-{
-	/* TODO */
-	return -1;
-}
 

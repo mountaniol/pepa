@@ -62,21 +62,21 @@ long int pepa_string_to_int_strict(char *s, int *err)
 		perror("strtol");
 		*err = errno;
 		PEPA_TRY_ABORT();
-		return -1;
+		return -PEPA_ERR_INVALID_INPUT;
 	}
 
 	if (endptr == s) {
 		DE("Invalid input %s\n", s);
 		*err = 1;
 		PEPA_TRY_ABORT();
-		return -2;
+		return -PEPA_ERR_INVALID_INPUT;
 	}
 
 	if ((size_t)(endptr - s) != strlen(s)) {
 		DE("Only part of the string '%s' converted: strlen = %zd, converted %zd\n", s, strlen(s), (size_t)(endptr - s));
 		*err = 1;
 		PEPA_TRY_ABORT();
-		return -3;
+		return -PEPA_ERR_INVALID_INPUT;
 	}
 
 	*err = PEPA_ERR_OK;
@@ -105,7 +105,7 @@ int pepa_parse_ip_string_get_port(const char *argument)
 	if (NULL == colon_ptr) {
 		DE("Can not find : between IP and PORT: IP:PORT\n");
 		PEPA_TRY_ABORT();
-		return -1;
+		return -PEPA_ERR_INVALID_INPUT;
 	}
 
 	int port = pepa_string_to_int_strict(colon_ptr + 1, &_err);
@@ -113,7 +113,7 @@ int pepa_parse_ip_string_get_port(const char *argument)
 	if (_err) {
 		DE("Can't convert port value from string to int: %s\n", colon_ptr);
 		PEPA_TRY_ABORT();
-		return -1;
+		return -PEPA_ERR_INVALID_INPUT;
 	}
 
 	return port;
@@ -264,7 +264,7 @@ int pepa_parse_arguments(int argi, char *argv[])
 		default:
 			printf("Unknown argument: %c\n", opt);
 			pepa_show_help();
-			return -1;
+			return -PEPA_ERR_ERROR_OUT_OF_RANGE;
 		}
 	}
 
@@ -272,19 +272,19 @@ int pepa_parse_arguments(int argi, char *argv[])
 	if (NULL == core->shva_thread.ip_string || core->shva_thread.port_int < 1) {
 		DE("SHVA config is missed or incomplete\n");
 		PEPA_TRY_ABORT();
-		return -1;
+		return -PEPA_ERR_INVALID_INPUT;
 	}
 
 	if (NULL == core->out_thread.ip_string || core->out_thread.port_int < 1) {
 		DE("OUT config is missed or incomplete\n");
 		PEPA_TRY_ABORT();
-		return -1;
+		return -PEPA_ERR_INVALID_INPUT;
 	}
 
 	if (NULL == core->in_thread.ip_string || core->in_thread.port_int < 1) {
 		DE("IN config is missed or incomplete\n");
 		PEPA_TRY_ABORT();
-		return -1;
+		return -PEPA_ERR_INVALID_INPUT;
 	}
 
 	return PEPA_ERR_OK;
