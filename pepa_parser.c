@@ -32,6 +32,7 @@ void pepa_show_help(void)
 		   "--log     | -l N - log level, accumulative: 0 = no log, 7 includes also {1-6}\n"
 		   "          ~        0: none, 1: falal, 2: trace, 3: error, 4: debug, 5: warn, 6: info, 7: note\n"
 		   "          ~        The same log level works for printing onto display and to the log file\n"
+		   "--monitor | -m - Run  monitor, it will print status every 5 seconds\n"
 		   "--version | -v - show version + git revision + compilation time\n"
 		   "--help    | -h - show this help\n");
 }
@@ -183,6 +184,7 @@ int pepa_parse_arguments(int argi, char *argv[])
 		{"noprint",          no_argument,            0, 'p'},
 		{"abort",            no_argument,            0, 'a'},
 		{"bsize",            no_argument,            0, 'b'},
+		{"monitor",          no_argument,            0, 'm'},
 		{"version",          no_argument,            0, 'v'},
 		{0, 0, 0, 0}
 	};
@@ -192,7 +194,7 @@ int pepa_parse_arguments(int argi, char *argv[])
 	int                  log;
 	int                  opt;
 	int                  option_index   = 0;
-	while ((opt = getopt_long(argi, argv, "s:o:i:n:l:f:d:phav", long_options, &option_index)) != -1) {
+	while ((opt = getopt_long(argi, argv, "s:o:i:n:l:f:d:phavm", long_options, &option_index)) != -1) {
 		switch (opt) {
 		case 's': /* SHVA Server address to connect to */
 			core->shva_thread.ip_string = pepa_parse_ip_string_get_ip(optarg);
@@ -307,6 +309,9 @@ int pepa_parse_arguments(int argi, char *argv[])
 		case 'v': /* Show help */
 			pepa_print_version();
 			exit(0);
+		case 'm': /* Show help */
+			core->monitor.onoff = 1;
+			break;
 		default:
 			printf("Unknown argument: %c\n", opt);
 			pepa_show_help();

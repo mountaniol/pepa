@@ -88,6 +88,7 @@ typedef struct {
 } pepa_status_t;
 
 typedef struct {
+	int onoff;
 	uint64_t shva_rx;
 	uint64_t shva_tx;
 	uint64_t out_rx;

@@ -412,22 +412,21 @@ int pepa_state_out_get(pepa_core_t *core)
 
 int pepa_start_threads(void)
 {
-	//set_sig_handler();
 
 	/* Slose STDIN */
 	int fd = open("/dev/null", O_WRONLY);
 	dup2(fd, 0);
 	close(fd);
 
-	/* Start CTL thread */
-	// pepa_thread_start_ctl();
+	pepa_core_t *core = pepa_get_core();
 
-	/* Start SHVA thread */
-	//pepa_shva_start();
 	pepa_thread_start_out();
 	pepa_thread_start_shva();
 	pepa_thread_start_in();
-	pepa_thread_start_monitor();
+
+	if (core->monitor.onoff) {
+		pepa_thread_start_monitor();
+	}
 	return PEPA_ERR_OK;
 }
 
