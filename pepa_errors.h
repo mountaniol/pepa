@@ -64,6 +64,7 @@ typedef enum {
 	PEPA_ERR_ERROR_OUT_OF_RANGE,
 } pepa_error_t;
 
+__attribute__((warn_unused_result))
 /**
  * @author Sebastian Mountaniol (12/7/23)
  * @brief Convert PEPA internal error code to string describing

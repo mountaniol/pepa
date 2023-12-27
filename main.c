@@ -45,34 +45,34 @@ int main(int argi, char *argv[])
 	slog_init("pepa", SLOG_FLAGS_ALL, 0);
 	pepa_print_version();
 
-	slog_note("Going to init core");
+	slog_note_l("Going to init core");
 	rc = pepa_core_init();
 	if (PEPA_ERR_OK != rc) {
-		slog_fatal("Can not init core");
+		slog_fatal_l("Can not init core");
 		abort();
 	}
-	slog_note("Core inited");
+	slog_note_l("Core inited");
 
 	pepa_core_t *core = pepa_get_core();
 
-	slog_note("Going to parse arguments");
+	slog_note_l("Going to parse arguments");
 	rc = pepa_parse_arguments(argi, argv);
 	if (rc < 0) {
-		slog_fatal("Could not parse arguments: %s", pepa_error_code_to_str(rc));
+		slog_fatal_l("Could not parse arguments: %s", pepa_error_code_to_str(rc));
 		exit(-11);
 	}
 
 	pepa_config_slogger(core);
-	slog_note("Arguments parsed");
+	slog_note_l("Arguments parsed");
 
-	slog_note("Going to start threads");
+	slog_note_l("Going to start threads");
 	rc = pepa_start_threads();
 	if (rc < 0) {
-		slog_fatal("Could not start threads");
+		slog_fatal_l("Could not start threads");
 		exit(-11);
 	}
 
-	slog_note("Threads are started");
+	slog_note_l("Threads are started");
 
 	pepa_set_int_signal_handler();
 
@@ -81,7 +81,7 @@ int main(int argi, char *argv[])
 	}
 	pepa_kill_all_threads();
 	sleep(1);
-	slog_note("PEPA Exit");
+	slog_note_l("PEPA Exit");
 	return (0);
 }
 

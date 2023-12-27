@@ -137,6 +137,13 @@ typedef enum
 #define slog_trace_wn(...) slog_display(SLOG_TRACE, 0, SLOG_THROW_LOCATION __VA_ARGS__)
 #define slog_fatal_wn(...) slog_display(SLOG_FATAL, 0, SLOG_THROW_LOCATION __VA_ARGS__)
 
+#define slog_note_l(fmt, ...)  slog_note(fmt " [%s +%d]" , ##__VA_ARGS__,  __func__, __LINE__)
+#define slog_info_l(fmt, ...)  slog_info(fmt " [%s +%d]" , ##__VA_ARGS__,  __func__, __LINE__)
+#define slog_warn_l(fmt, ...)  slog_warn(fmt " [%s +%d]" , ##__VA_ARGS__,  __func__, __LINE__)
+#define slog_debug_l(fmt, ...) slog_debug(fmt " [%s +%d]" , ##__VA_ARGS__,  __func__, __LINE__)
+#define slog_error_l(fmt, ...) slog_error(fmt " [%s +%d]" , ##__VA_ARGS__,  __func__, __LINE__)
+#define slog_trace_l(fmt, ...) slog_trace(fmt " [%s +%d]" , ##__VA_ARGS__,  __func__, __LINE__)
+#define slog_fatal_l(fmt, ...) slog_fatal(fmt " [%s +%d]" , ##__VA_ARGS__,  __func__, __LINE__)
 /* Short name definitions */
 #define slogn(...) slog_note(__VA_ARGS__)
 #define slogi(...) slog_info(__VA_ARGS__)

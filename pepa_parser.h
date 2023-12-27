@@ -3,6 +3,8 @@
 
 void pepa_show_help(void);
 
+
+__attribute__((warn_unused_result))
 long int pepa_string_to_int_strict(char *s, int *err);
 
 /**
@@ -15,8 +17,10 @@ long int pepa_string_to_int_strict(char *s, int *err);
  *  	   argument as an integer; A negative value on error
  */
 
+__attribute__((warn_unused_result))
 int pepa_parse_ip_string_get_port(const char *argument);
 
+__attribute__((warn_unused_result))
 /**
  * @author Sebastian Mountaniol (12/10/23)
  * @brief Get argument IP:PORT, extract IP as a string,
@@ -28,6 +32,7 @@ int pepa_parse_ip_string_get_port(const char *argument);
  */
 buf_t *pepa_parse_ip_string_get_ip(const char *_argument);
 
+__attribute__((warn_unused_result))
 /**
  * @author Sebastian Mountaniol (12/10/23)
  * @brief Parse command line arguments, init pepa_core_t values
@@ -39,6 +44,7 @@ buf_t *pepa_parse_ip_string_get_ip(const char *_argument);
  */
 int pepa_parse_arguments(int argi, char *argv[]);
 
+__attribute__((warn_unused_result))
 int pepa_config_slogger(pepa_core_t *core);
 
 void pepa_print_version(void);

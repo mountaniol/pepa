@@ -44,7 +44,7 @@ long int pepa_string_to_int_strict(char *s, int *err)
 	/* strtol detects '0x' and '0' prefixes */
 	res = strtol(s, &endptr, 0);
 	if ((errno == ERANGE && (res == LONG_MAX || res == LONG_MIN)) || (errno != 0 && res == 0)) {
-		slog_fatal("Invalid input %s", s);
+		slog_fatal_l("Invalid input %s", s);
 		perror("strtol");
 		*err = errno;
 		PEPA_TRY_ABORT();
@@ -52,14 +52,14 @@ long int pepa_string_to_int_strict(char *s, int *err)
 	}
 
 	if (endptr == s) {
-		slog_fatal("Invalid input %s", s);
+		slog_fatal_l("Invalid input %s", s);
 		*err = 1;
 		PEPA_TRY_ABORT();
 		return -PEPA_ERR_INVALID_INPUT;
 	}
 
 	if ((size_t)(endptr - s) != strlen(s)) {
-		slog_fatal("Only part of the string '%s' converted: strlen = %zd, converted %zd", s, strlen(s), (size_t)(endptr - s));
+		slog_fatal_l("Only part of the string '%s' converted: strlen = %zd, converted %zd", s, strlen(s), (size_t)(endptr - s));
 		*err = 1;
 		PEPA_TRY_ABORT();
 		return -PEPA_ERR_INVALID_INPUT;
@@ -89,7 +89,7 @@ int pepa_parse_ip_string_get_port(const char *argument)
 	colon_ptr = index(argument, ':');
 
 	if (NULL == colon_ptr) {
-		slog_fatal("Can not find : between IP and PORT: IP:PORT");
+		slog_fatal_l("Can not find : between IP and PORT: IP:PORT");
 		PEPA_TRY_ABORT();
 		return -PEPA_ERR_INVALID_INPUT;
 	}
@@ -97,7 +97,7 @@ int pepa_parse_ip_string_get_port(const char *argument)
 	int port = pepa_string_to_int_strict(colon_ptr + 1, &_err);
 
 	if (_err) {
-		slog_fatal("Can't convert port value from string to int: %s", colon_ptr);
+		slog_fatal_l("Can't convert port value from string to int: %s", colon_ptr);
 		PEPA_TRY_ABORT();
 		return -PEPA_ERR_INVALID_INPUT;
 	}
@@ -124,14 +124,14 @@ buf_t *pepa_parse_ip_string_get_ip(const char *_argument)
 
 	argument = strdup(_argument);
 	if (NULL == argument) {
-		slog_fatal("Can not duplicate argument");
+		slog_fatal_l("Can not duplicate argument");
 		PEPA_TRY_ABORT();
 		return NULL;
 	}
 
 	argument_len = strlen(argument);
 	if (argument_len < 1) {
-		slog_fatal("Wrong string, can not calculate len");
+		slog_fatal_l("Wrong string, can not calculate len");
 		PEPA_TRY_ABORT();
 		free(argument);
 		PEPA_TRY_ABORT();
@@ -141,7 +141,7 @@ buf_t *pepa_parse_ip_string_get_ip(const char *_argument)
 	colon_ptr = index(argument, ':');
 
 	if (NULL == colon_ptr) {
-		slog_fatal("Can not find ':' between IP and PORT: IP:PORT");
+		slog_fatal_l("Can not find ':' between IP and PORT: IP:PORT");
 		PEPA_TRY_ABORT();
 		free(argument);
 		return NULL;
@@ -197,48 +197,48 @@ int pepa_parse_arguments(int argi, char *argv[])
 		case 's': /* SHVA Server address to connect to */
 			core->shva_thread.ip_string = pepa_parse_ip_string_get_ip(optarg);
 			if (NULL == core->shva_thread.ip_string) {
-				slog_fatal("Could not parse SHVA ip address");
+				slog_fatal_l("Could not parse SHVA ip address");
 				abort();
 			}
 			core->shva_thread.port_int = pepa_parse_ip_string_get_port(optarg);
-			slog_info("SHVA Addr OK: |%s| : |%d|", core->shva_thread.ip_string->data, core->shva_thread.port_int);
+			slog_info_l("SHVA Addr OK: |%s| : |%d|", core->shva_thread.ip_string->data, core->shva_thread.port_int);
 			break;
 		case 'o': /* Output socket where packets from SHVA should be transfered */
 			core->out_thread.ip_string = pepa_parse_ip_string_get_ip(optarg);
 			if (NULL == core->out_thread.ip_string) {
-				slog_fatal("Could not parse OUT ip address");
+				slog_fatal_l("Could not parse OUT ip address");
 				abort();
 			}
 			core->out_thread.port_int = pepa_parse_ip_string_get_port(optarg);
-			slog_info("OUT Addr OK: |%s| : |%d|", core->out_thread.ip_string->data, core->out_thread.port_int);
+			slog_info_l("OUT Addr OK: |%s| : |%d|", core->out_thread.ip_string->data, core->out_thread.port_int);
 			break;
 		case 'i': /* Input socket - read and send to SHVA */
 			core->in_thread.ip_string = pepa_parse_ip_string_get_ip(optarg);
 			if (NULL == core->in_thread.ip_string) {
-				slog_fatal("Could not parse IN ip address");
+				slog_fatal_l("Could not parse IN ip address");
 				abort();
 			}
 			core->in_thread.port_int = pepa_parse_ip_string_get_port(optarg);
-			slog_info("IN Addr OK: |%s| : |%d|", core->in_thread.ip_string->data, core->in_thread.port_int);
+			slog_info_l("IN Addr OK: |%s| : |%d|", core->in_thread.ip_string->data, core->in_thread.port_int);
 			break;
 		case 'n':
 		{
 			core->in_thread.clients = pepa_string_to_int_strict(optarg, &err);
 			if (err < 0) {
-				slog_fatal("Could not parse number of client: %s", optarg);
+				slog_fatal_l("Could not parse number of client: %s", optarg);
 				abort();
 			}
-			slog_info("Number of client of IN socket: %d", core->in_thread.clients);
+			slog_info_l("Number of client of IN socket: %d", core->in_thread.clients);
 		}
 			break;
 		case 'b':
 		{
 			core->internal_buf_size = pepa_string_to_int_strict(optarg, &err);
 			if (err < 0) {
-				slog_fatal("Could not parse internal buffer size: %s", optarg);
+				slog_fatal_l("Could not parse internal buffer size: %s", optarg);
 				abort();
 			}
-			slog_info("Internal buffer size is set to: %d", core->internal_buf_size);
+			slog_info_l("Internal buffer size is set to: %d", core->internal_buf_size);
 		}
 			break;
 		case 'a':
@@ -248,17 +248,17 @@ int pepa_parse_arguments(int argi, char *argv[])
 		case 'f':
 			/* Set abort flag*/
 			core->slog_file = strndup(optarg, 1024);
-			slog_info("Log file name is set to: %s", core->slog_file);
+			slog_info_l("Log file name is set to: %s", core->slog_file);
 			break;
 		case 'd':
 			/* Set abort flag*/
 			core->slog_dir = strndup(optarg, 1024);
-			slog_info("Log file name is set to: %s", core->slog_dir);
+			slog_info_l("Log file name is set to: %s", core->slog_dir);
 			break;
 		case 'p':
 			/* Set abort flag*/
 			core->slog_print = 0;
-			slog_info("Log display is disabled");
+			slog_info_l("Log display is disabled");
 			break;
 		case 'l':
 			/* Set log level, 0-7*/
@@ -316,19 +316,19 @@ int pepa_parse_arguments(int argi, char *argv[])
 
 	/* Check that all arguments are parsed and all arguments are provided */
 	if (NULL == core->shva_thread.ip_string || core->shva_thread.port_int < 1) {
-		slog_fatal("SHVA config is missed or incomplete");
+		slog_fatal_l("SHVA config is missed or incomplete");
 		PEPA_TRY_ABORT();
 		return -PEPA_ERR_INVALID_INPUT;
 	}
 
 	if (NULL == core->out_thread.ip_string || core->out_thread.port_int < 1) {
-		slog_fatal("OUT config is missed or incomplete");
+		slog_fatal_l("OUT config is missed or incomplete");
 		PEPA_TRY_ABORT();
 		return -PEPA_ERR_INVALID_INPUT;
 	}
 
 	if (NULL == core->in_thread.ip_string || core->in_thread.port_int < 1) {
-		slog_fatal("IN config is missed or incomplete");
+		slog_fatal_l("IN config is missed or incomplete");
 		PEPA_TRY_ABORT();
 		return -PEPA_ERR_INVALID_INPUT;
 	}
@@ -351,7 +351,7 @@ int pepa_config_slogger(pepa_core_t *core)
 		cfg.nFlush = 1;
 		strcpy(cfg.sFileName, core->slog_file);
 	} else {
-		slog_note("No log file given");
+		slog_note_l("No log file given");
 	}
 
 	if (NULL != core->slog_dir) {

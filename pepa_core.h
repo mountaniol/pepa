@@ -87,6 +87,15 @@ typedef struct {
 	pthread_mutex_t sync_sem;
 } pepa_status_t;
 
+typedef struct {
+	uint64_t shva_rx;
+	uint64_t shva_tx;
+	uint64_t out_rx;
+	uint64_t out_tx;
+	uint64_t in_rx;
+	uint64_t in_tx;
+} pepa_stat_t;
+
 /**
  * @author Sebastian Mountaniol (7/20/23)
  * @brief This structure unites all variables and file
@@ -103,14 +112,16 @@ typedef struct {
 	int slog_print; /* Show slog output on terminal */
 
 	thread_vars_t shva_thread; /**< Configuration of SHVA thread */
-	thread_vars_t shva_transfet_thread; /**< Configuration of SHVA thread */
+	thread_vars_t shva_forwarder; /**< Configuration of SHVA thread */
 	thread_vars_t in_thread; /**< Configuration of IN thread */
 	thread_vars_t out_thread; /**< Configuration of OUT thread */
+	thread_vars_t monitor_thread; /**< Configuration of OUT thread */
 	int internal_buf_size; /**< Size of buffer used to pass packages, by defaiult COPY_BUF_SIZE bytes, see pepa_config.h */
 	int abort_flag; /**< Abort flag, if enabled, PEPA file abort on errors; for debug only */
 	pepa_sockets_t sockets;
 	int monitor_timeout; /**< How many microseconds to sleep between tests in microseconds */
 	pepa_status_t state;
+	pepa_stat_t monitor;
 } pepa_core_t;
 
 /**

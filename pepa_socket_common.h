@@ -44,44 +44,19 @@ x_conn_direction_t;
 #endif
 
 void set_sig_handler(void);
+
+__attribute__((warn_unused_result))
 int pepa_pthread_init_phase(const char *name);
 void pepa_parse_pthread_create_error(const int rc);
 
+__attribute__((warn_unused_result))
 int pepa_open_connection_to_server(const char *address, int port, const char *name);
 
-/**
- * @author Sebastian Mountaniol (12/13/23)
- * @brief Alloc structure and init it.
- *
- * @param int fd_read  Read file descriptor
- * @param int fd_write  Write file descriptor
- *
- * @param int fd_event  Event file descriptor, send notification
- *  		  to parent thread before exit;
- *  		 can be -1 which mean "not used"
- *
- * @param int fd_die  Event file descriptor, listen and when
- *  		  received event from the parent thread, terminate; 
- *  		  can be -1 which mean "not used"
- * @param sem_t* mutex Mutex to lock write descriptor,
- *  		   can be NULL, then not used
- * @return pepa_fds_t* Allocated and initted structure
- * @details 
- */
-pepa_fds_t *pepa_fds_t_alloc(int fd_read,
-							 int fd_write,
-							 int close_read_sock,
-							 sem_t *out_mutex,
-							 char *name_thread,
-							 char *name_read,
-							 char *name_write);
-
-void pepa_fds_t_release(pepa_fds_t *fdx);
-uint32_t pepa_thread_counter(void);
-//int pepa_one_direction_copy(pepa_fds_t *fdx, buf_t *buf);
+__attribute__((warn_unused_result))
 int pepa_one_direction_copy2(int fd_out, const char *name_out,
 							 int fd_in, const char *name_in,
-							 char *buf, size_t buf_size, int do_debug);
+							 char *buf, size_t buf_size, int do_debug, 
+							 uint64_t *ext_rx, uint64_t *ext_tx);
 
 /**
  * @author Sebastian Mountaniol (12/14/23)
@@ -93,6 +68,8 @@ int pepa_one_direction_copy2(int fd_out, const char *name_out,
  */
 int pepa_test_fd(int fd);
 
+
+__attribute__((warn_unused_result))
 int epoll_ctl_add(int epfd, int fd, uint32_t events);
 
 __attribute__((nonnull(1, 2)))
@@ -111,6 +88,8 @@ __attribute__((nonnull(1, 2)))
  */
 int pepa_open_listening_socket(struct sockaddr_in *s_addr, const buf_t *ip_address, const int port, const int num_of_clients, const char *caller_name);
 
+
+__attribute__((warn_unused_result))
 /**
  * @author Sebastian Mountaniol (12/12/23)
  * @brief Open socket to remote address:port
@@ -124,11 +103,22 @@ void *pepa_shva_thread_new(__attribute__((unused))void *arg);
 
 void pepa_parse_pthread_create_error(const int rc);
 
-void *pepa_in_thread_new(__attribute__((unused))void *arg);
+void *pepa_in_thread(__attribute__((unused))void *arg);
 
 void *pepa_out_thread(__attribute__((unused))void *arg);
 
+__attribute__((warn_unused_result))
 int pepa_socket_shutdown_and_close(int sock, const char *my_name);
+
+void pepa_socket_close(int fd, const char *socket_name);
+
+void pepa_socket_close_shva_rw(pepa_core_t *core);
+
+void pepa_socket_close_out_write(pepa_core_t *core);
+
+void pepa_socket_close_out_listen(pepa_core_t *core);
+
+void pepa_socket_close_in_listen(pepa_core_t *core);
 
 //void pepa_print_pthread_create_error(const int rc);
 #endif /* _PEPA_SOCKET_H__ */

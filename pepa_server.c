@@ -12,7 +12,6 @@
 
 #include "slog/src/slog.h"
 #include "pepa_core.h"
-#include "buf_t/se_debug.h"
 #if 0 /* SEB */
 
 static int running = 0;

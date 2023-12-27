@@ -12,33 +12,18 @@
 static void pepa_thread_cancel(pthread_t pid, const char *name)
 {
 	if (PTHREAD_DEAD == pid || pthread_kill(pid, 0) < 0) {
-		slog_error("Can not cancel %s thread, it is not alive", name);
+		slog_error_l("Can not cancel %s thread, it is not alive", name);
 		return;
 	}
 
 	int rc = pthread_cancel(pid);
 	if (0 != rc) {
-		slog_fatal("Can not cancel <%s> thread", name);
+		slog_fatal_l("Can not cancel <%s> thread", name);
 	} else {
-		slog_note("## Canceled <%s> thread", name);
+		slog_note_l("## Canceled <%s> thread", name);
 	}
 }
 
-static void pepa_socket_close(int fd, const char *socket_name)
-{
-	if (fd < 0) {
-		slog_error("Can not close socket %s, its value is %d", socket_name, fd);
-		return;
-	}
-
-	int rc = close(fd);
-	if (0 != rc) {
-		slog_error("Can not close socket %s, error %d:%s", socket_name, rc, strerror(errno));
-		return;
-	}
-
-	slog_note("## Closed socket socket %s");
-}
 
 int pepa_thread_is_shva_up(void)
 {
@@ -49,18 +34,36 @@ int pepa_thread_is_shva_up(void)
 	}
 	return PEPA_ERR_OK;
 }
+int pepa_thread_is_shva_fw_up(void)
+{
+	pepa_core_t          *core = pepa_get_core();
+	if (PTHREAD_DEAD == core->shva_forwarder.thread_id ||
+		pthread_kill(core->shva_forwarder.thread_id, 0) < 0) {
+		return -PEPA_ERR_THREAD_DEAD;
+	}
+	return PEPA_ERR_OK;
+}
+int pepa_thread_is_monitor_up(void)
+{
+	pepa_core_t          *core = pepa_get_core();
+	if (PTHREAD_DEAD == core->monitor_thread.thread_id ||
+		pthread_kill(core->monitor_thread.thread_id, 0) < 0) {
+		return -PEPA_ERR_THREAD_DEAD;
+	}
+	return PEPA_ERR_OK;
+}
 
 int pepa_thread_is_in_up(void)
 {
 	pepa_core_t          *core = pepa_get_core();
 
-	slog_note("core->in_thread.thread_id = %lX", core->in_thread.thread_id);
+	slog_note_l("core->in_thread.thread_id = %lX", core->in_thread.thread_id);
 	if (PTHREAD_DEAD == core->in_thread.thread_id) {
-		slog_error("THREAD IN IS DEAD: core->in_thread.thread_id = %lX", core->in_thread.thread_id);
+		slog_error_l("THREAD IN IS DEAD: core->in_thread.thread_id = %lX", core->in_thread.thread_id);
 		return -PEPA_ERR_THREAD_DEAD;
 	}
 	if (pthread_kill(core->in_thread.thread_id, 0) < 0) {
-		slog_error("THREAD IN IS DEAD: kill = %d", pthread_kill(core->in_thread.thread_id, 0));
+		slog_error_l("THREAD IN IS DEAD: kill = %d", pthread_kill(core->in_thread.thread_id, 0));
 		return -PEPA_ERR_THREAD_DEAD;
 	}
 	return PEPA_ERR_OK;
@@ -88,6 +91,15 @@ void pepa_thread_kill_shva(void)
 	slog_debug("#############################################");
 }
 
+void pepa_thread_kill_shva_forwarder(void)
+{
+	pepa_core_t          *core = pepa_get_core();
+	pepa_thread_cancel(core->shva_forwarder.thread_id, "SHVA-FORWARD");
+	core->shva_forwarder.thread_id = PTHREAD_DEAD;
+	slog_debug("#############################################");
+	slog_debug("##       THREAD <SHVA-FORWARD> IS KILLED   ##");
+	slog_debug("#############################################");
+}
 void pepa_thread_kill_out(void)
 {
 	pepa_core_t          *core = pepa_get_core();
@@ -109,13 +121,22 @@ void pepa_thread_kill_in(void)
 	slog_debug("##       THREAD <IN> IS KILLED             ##");
 	slog_debug("#############################################");
 }
+void pepa_thread_kill_monitor(void)
+{
+	pepa_core_t          *core = pepa_get_core();
+	pepa_thread_cancel(core->monitor_thread.thread_id, "IN");
+	core->monitor_thread.thread_id = PTHREAD_DEAD;
+	slog_debug("#############################################");
+	slog_debug("##       THREAD <MONITOR> IS KILLED        ##");
+	slog_debug("#############################################");
+}
 
 void pepa_thread_start_out(void)
 {
 	pepa_core_t          *core = pepa_get_core();
-	slog_note("Starting OUT thread");
+	slog_note_l("Starting OUT thread");
 	if (PEPA_ERR_OK == pepa_thread_is_out_up()) {
-		slog_note("Thread OUT is UP already, finishing");
+		slog_note_l("Thread OUT is UP already, finishing");
 		return;
 	}
 	int rc    = pthread_create(&core->out_thread.thread_id, NULL, pepa_out_thread, NULL);
@@ -133,9 +154,9 @@ void pepa_thread_start_out(void)
 void pepa_thread_start_shva(void)
 {
 	pepa_core_t          *core = pepa_get_core();
-	slog_note("Starting SHVA thread");
+	slog_note_l("Starting SHVA thread");
 	if (PEPA_ERR_OK == pepa_thread_is_shva_up()) {
-		slog_note("Thread SHVA is UP already, finishing");
+		slog_note_l("Thread SHVA is UP already, finishing");
 		return;
 	}
 
@@ -154,13 +175,13 @@ void pepa_thread_start_shva(void)
 void pepa_thread_start_in(void)
 {
 	pepa_core_t          *core = pepa_get_core();
-	slog_note("Starting IN thread");
+	slog_note_l("Starting IN thread");
 	if (PEPA_ERR_OK == pepa_thread_is_in_up()) {
-		slog_note("Thread IN is UP already, finishing");
+		slog_note_l("Thread IN is UP already, finishing");
 		return;
 	}
 
-	int rc = pthread_create(&core->in_thread.thread_id, NULL, pepa_in_thread_new, NULL);
+	int rc = pthread_create(&core->in_thread.thread_id, NULL, pepa_in_thread, NULL);
 	if (0 != rc) {
 		pepa_parse_pthread_create_error(rc);
 		abort();
@@ -168,6 +189,27 @@ void pepa_thread_start_in(void)
 
 	slog_debug("#############################################");
 	slog_debug("##       THREAD IN IS STARTED              ##");
+	slog_debug("#############################################");
+}
+
+
+void *pepa_monitor_thread(__attribute__((unused))void *arg);
+
+void pepa_thread_start_monitor(void)
+{
+	pepa_core_t          *core = pepa_get_core();
+	slog_note_l("Starting IN thread");
+	if (PEPA_ERR_OK == pepa_thread_is_monitor_up()) {
+		slog_warn_l("Thread IN is UP already, finishing");
+		return;
+	}
+	int rc = pthread_create(&core->monitor_thread.thread_id, NULL, pepa_monitor_thread, NULL);
+	if (0 != rc) {
+		pepa_parse_pthread_create_error(rc);
+		abort();
+	}
+	slog_debug("#############################################");
+	slog_debug("##       THREAD MONITOR IS STARTED         ##");
 	slog_debug("#############################################");
 }
 
@@ -191,23 +233,17 @@ void pepa_back_to_disconnected_state_new(void)
 	/*** Close the rest of the sockets ****/
 
 	/* Close the IN socket */
-	pepa_socket_close(core->sockets.in_listen, "core->sockets.in_listen");
-	core->sockets.in_listen = -1;
-
+	pepa_socket_close_in_listen(core);
 	slog_debug("##       BACK TO DISCONNECTED STATE        ##");
 
 	/* Close the SHVA write socket */
-	pepa_socket_close(core->sockets.shva_rw, "core->sockets.shva_rw");
-	core->sockets.shva_rw = -1;
+	pepa_socket_close_shva_rw(core);
 
 	/* Close the OUT listen socket */
-	pepa_socket_close(core->sockets.out_listen, "core->sockets.out_listen");
-	core->sockets.out_listen = -1;
+	pepa_socket_close_out_listen(core);
 
 	/* Close the OUT listen socket */
-	pepa_socket_close(core->sockets.out_write, "core->shva_thread.fd_write");
-	core->sockets.out_write = -1;
-
+	pepa_socket_close_out_write(core);
 	pepa_core_unlock();
 	counter++;
 
@@ -236,29 +272,23 @@ void pepa_kill_all_threads(void)
 	//pepa_thread_kill_ctl();
 	pepa_thread_kill_out();
 	pepa_thread_kill_in();
+	pepa_thread_kill_shva_forwarder();
 	pepa_thread_kill_shva();
+	pepa_thread_kill_monitor();
 
 	/*** Close the rest of the sockets ****/
 
 	/* Close the IN socket */
-	pepa_socket_shutdown_and_close(core->sockets.in_listen, "core->in_thread.fd_listen");
-	core->sockets.in_listen = -1;
+	pepa_socket_close_in_listen(core);
 
 	/* Close the SHVA write socket */
-	pepa_socket_close(core->sockets.shva_rw, "core->shva_thread.fd_write");
-	core->sockets.shva_rw = -1;
+	pepa_socket_close_shva_rw(core);
 
 	/* Close the OUT listen socket */
-	pepa_socket_shutdown_and_close(core->sockets.shva_rw, "core->shva_thread.fd_write");
-	core->sockets.out_listen = -1;
+	pepa_socket_close_out_listen(core);
 
 	/* Close the OUT write socket */
-	pepa_socket_close(core->sockets.out_write, "core->shva_thread.fd_write");
-	core->sockets.shva_rw = -1;
-
-	/* Close the OUT listen socket */
-	pepa_socket_shutdown_and_close(core->sockets.out_listen, "core->shva_thread.fd_write");
-	core->sockets.out_listen = -1;
+	pepa_socket_close_out_write(core);
 
 	pepa_core_unlock();
 	counter++;
@@ -327,7 +357,7 @@ void pepa_state_shva_set(pepa_core_t *core, pepa_sig_t sig)
 	core->state.signals[PEPA_PR_SHVA] = sig;
 	pthread_mutex_unlock(&core->state.signals_sem);
 	pepa_state_sig(core);
-	slog_note("Set SHVA state to %s", pepa_sig_str(sig));
+	slog_note_l("Set SHVA state to %s", pepa_sig_str(sig));
 }
 
 void pepa_state_in_set(pepa_core_t *core, pepa_sig_t sig)
@@ -336,7 +366,7 @@ void pepa_state_in_set(pepa_core_t *core, pepa_sig_t sig)
 	core->state.signals[PEPA_PR_IN] = sig;
 	pthread_mutex_unlock(&core->state.signals_sem);
 	pepa_state_sig(core);
-	slog_note("Set IN state to %s", pepa_sig_str(sig));
+	slog_note_l("Set IN state to %s", pepa_sig_str(sig));
 }
 
 void pepa_state_out_set(pepa_core_t *core, pepa_sig_t sig)
@@ -345,7 +375,7 @@ void pepa_state_out_set(pepa_core_t *core, pepa_sig_t sig)
 	core->state.signals[PEPA_PR_OUT] = sig;
 	pthread_mutex_unlock(&core->state.signals_sem);
 	pepa_state_sig(core);
-	slog_note("Set OUT state to %s", pepa_sig_str(sig));
+	slog_note_l("Set OUT state to %s", pepa_sig_str(sig));
 }
 
 
@@ -356,7 +386,7 @@ int pepa_state_shva_get(pepa_core_t *core)
 	pthread_mutex_lock(&core->state.signals_sem);
 	st = core->state.signals[PEPA_PR_SHVA];
 	pthread_mutex_unlock(&core->state.signals_sem);
-	slog_note("Return SHVA state is %s", pepa_sig_str(st));
+	slog_note_l("Return SHVA state is %s", pepa_sig_str(st));
 	return st;
 }
 
@@ -366,7 +396,7 @@ int pepa_state_in_get(pepa_core_t *core)
 	pthread_mutex_lock(&core->state.signals_sem);
 	st = core->state.signals[PEPA_PR_IN];
 	pthread_mutex_unlock(&core->state.signals_sem);
-	slog_note("Return IN state is %s", pepa_sig_str(st));
+	slog_note_l("Return IN state is %s", pepa_sig_str(st));
 	return st;
 }
 
@@ -376,7 +406,7 @@ int pepa_state_out_get(pepa_core_t *core)
 	pthread_mutex_lock(&core->state.signals_sem);
 	st = core->state.signals[PEPA_PR_OUT];
 	pthread_mutex_unlock(&core->state.signals_sem);
-	slog_note("Return OUT state is %s", pepa_sig_str(st));
+	slog_note_l("Return OUT state is %s", pepa_sig_str(st));
 	return st;
 }
 
@@ -397,5 +427,131 @@ int pepa_start_threads(void)
 	pepa_thread_start_out();
 	pepa_thread_start_shva();
 	pepa_thread_start_in();
+	pepa_thread_start_monitor();
 	return PEPA_ERR_OK;
 }
+
+#define KB(x) ((x)/1024)
+#define MB(x) ((x)/(1024 * 1024))
+#define MONITOR_SLEEP_TIME (5)
+void *pepa_monitor_thread(__attribute__((unused))void *arg)
+{
+	const char *my_name = "MONITOR";
+	int        rc       = pepa_pthread_init_phase(my_name);
+	if (rc < 0) {
+		slog_fatal_l("%s: Could not init the thread", my_name);
+		pthread_exit(NULL);
+	}
+
+	pepa_core_t *core        = pepa_get_core();
+	pepa_stat_t monitor_prev;
+	memcpy(&monitor_prev, &core->monitor, sizeof(monitor_prev));
+
+	do {
+		int shva_st    = pepa_thread_is_shva_up();
+		int shva_fw_st = pepa_thread_is_shva_fw_up();
+		int out_st     = pepa_thread_is_out_up();
+		int in_st      = pepa_thread_is_in_up();
+
+#if 0 /* SEB */
+		slog_debug("### STATUS: OUT %s, SHVA %s: SHVA FW: %s, IN: %s",
+				   (PEPA_ERR_OK == out_st) ? "UP"  : "DOWN",
+				   (PEPA_ERR_OK == shva_st) ? "UP"  : "DOWN",
+				   (PEPA_ERR_OK == shva_fw_st) ? "UP"  : "DOWN",
+				   (PEPA_ERR_OK == in_st) ? "UP"  : "DOWN");
+#endif
+
+#if 0 /* SEB */
+		slog_debug("### STATUS: (Kb) OUT: %s TX: %lu [df: %lu] || SHVA: %s RX: %lu [df: %lu] TX: %lu [df: %lu] || SHVA FWD: %s || IN: %s RX: %lu [df: %lu] ###",
+				   (PEPA_ERR_OK == out_st) ? "UP"  : "DOWN",
+				   KB(core->monitor.out_tx),
+				   KB(core->monitor.out_tx - monitor_prev.out_tx),
+
+				   (PEPA_ERR_OK == shva_st) ? "UP"  : "DOWN",
+				   KB(core->monitor.shva_rx),
+				   KB(core->monitor.shva_rx - monitor_prev.shva_rx),
+
+				   KB(core->monitor.shva_tx),
+				   KB(core->monitor.shva_tx - monitor_prev.shva_tx),
+
+				   (PEPA_ERR_OK == shva_fw_st) ? "UP"  : "DOWN",
+
+				   (PEPA_ERR_OK == in_st) ? "UP"  : "DOWN",
+
+				   KB(core->monitor.in_rx),
+				   KB(core->monitor.in_rx - monitor_prev.in_rx));
+#endif
+
+#if 0 /* SEB */
+		slog_debug("### STATUS: (Kb) SHVA FW [%s : %lu | +%lu] -> OUT [%s : %lu | +%lu] ### IN [%s : %lu | +%lu] -> SHVA [%s : %lu | +%lu]  ###",
+				   (PEPA_ERR_OK == shva_fw_st) ? "UP"  : "DOWN"),
+		KB(core->monitor.shva_rx),
+		KB(core->monitor.shva_rx - monitor_prev.shva_rx),
+
+		(PEPA_ERR_OK == out_st) ? "UP"  : "DOWN",
+		KB(core->monitor.out_tx),
+		KB(core->monitor.out_tx - monitor_prev.out_tx),
+
+		KB(core->monitor.shva_tx),
+		KB(core->monitor.shva_tx - monitor_prev.shva_tx),
+
+		(PEPA_ERR_OK == in_st) ? "UP"  : "DOWN",
+		KB(core->monitor.in_rx),
+		KB(core->monitor.in_rx - monitor_prev.in_rx),
+
+		(PEPA_ERR_OK == shva_st) ? "UP"  : "DOWN",
+		KB(core->monitor.shva_tx),
+		KB(core->monitor.shva_tx - monitor_prev.shva_tx),
+#endif
+
+		slog_debug("### STATUS: SHVA: %s | SHVA FW: %s | IN: %s | OUT: %s ###",
+				   (PEPA_ERR_OK == shva_st) ? "UP"  : "DOWN",
+				   (PEPA_ERR_OK == shva_fw_st) ? "UP"  : "DOWN",
+				   (PEPA_ERR_OK == in_st) ? "UP"  : "DOWN",
+				   (PEPA_ERR_OK == out_st) ? "UP"  : "DOWN");
+
+#if 0 /* SEB */
+		slog_debug("### STATUS: (Kb) SHVA FW [%lu | +%lu] ---> OUT [%lu | +%lu] ### IN [%lu | +%lu] ---> SHVA [%lu | +%lu]  ###",
+				   KB(core->monitor.shva_rx),
+				   KB(core->monitor.shva_rx - monitor_prev.shva_rx),
+
+				   KB(core->monitor.out_tx),
+				   KB(core->monitor.out_tx - monitor_prev.out_tx),
+
+				   KB(core->monitor.shva_tx),
+				   KB(core->monitor.shva_tx - monitor_prev.shva_tx),
+
+				   KB(core->monitor.in_rx),
+				   KB(core->monitor.in_rx - monitor_prev.in_rx),
+
+				   KB(core->monitor.shva_tx),
+				   KB(core->monitor.shva_tx - monitor_prev.shva_tx));
+#endif
+
+		slog_debug("### STATUS: (Kb) SHVA FW [+%lu | %lu / sec] ---> OUT [+%lu | %lu / sec] ### IN [+%lu | %lu / sec] ---> SHVA [+%lu | %lu / sec]  ###",
+				   KB(core->monitor.shva_rx - monitor_prev.shva_rx),
+				   KB((core->monitor.shva_rx - monitor_prev.shva_rx) / MONITOR_SLEEP_TIME),
+
+				   KB(core->monitor.out_tx - monitor_prev.out_tx),
+				   KB((core->monitor.out_tx - monitor_prev.out_tx)/ MONITOR_SLEEP_TIME ),
+
+				   KB(core->monitor.shva_tx - monitor_prev.shva_tx),
+				   KB((core->monitor.shva_tx - monitor_prev.shva_tx) / MONITOR_SLEEP_TIME),
+
+				   KB(core->monitor.in_rx - monitor_prev.in_rx),
+				   KB((core->monitor.in_rx - monitor_prev.in_rx ) / MONITOR_SLEEP_TIME),
+
+				   KB(core->monitor.shva_tx - monitor_prev.shva_tx),
+				   KB((core->monitor.shva_tx - monitor_prev.shva_tx) / MONITOR_SLEEP_TIME)
+				   );
+
+
+		slog_debug("### STATUS:  out_listen: %d | out_write: %d | shva_rw: %d | in_listen: %d ###",
+				   core->sockets.out_listen, core->sockets.out_write, core->sockets.shva_rw, core->sockets.in_listen);
+		slog_debug("### STATUS:  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
+
+		memcpy(&monitor_prev, &core->monitor, sizeof(monitor_prev));
+		sleep(MONITOR_SLEEP_TIME);
+	} while (1);
+}
+
