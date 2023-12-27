@@ -190,15 +190,133 @@ void *pepa_shva_thread_new(__attribute__((unused))void *arg)
 
 void pepa_shva_thread_new_forward_cleanup(__attribute__((unused))void *arg)
 {
+	int *eploll_fd = arg;
+	close(*eploll_fd);
+}
+
+#define BUF_SIZE (2048)
+
+void *pepa_shva_thread_new_forward(__attribute__((unused))void *arg)
+{
+	int                i;
+	int                rc;
+	pepa_core_t        *core            = pepa_get_core();
+	char               *my_name         = "SHVA-FORWARD";
+	char               buffer[BUF_SIZE];  //data buffer of 1K
+
+	struct epoll_event events[2];
+	int                epoll_fd         = epoll_create1(EPOLL_CLOEXEC);
+
+
+	rc = pepa_pthread_init_phase(my_name);
+	if (rc < 0) {
+		slog_fatal_l("%s: Could not init the thread", my_name);
+		//core->sockets.shva_rw = -1;
+		close(epoll_fd);
+		pthread_exit(NULL);
+	}
+
+	pthread_cleanup_push(pepa_shva_thread_new_forward_cleanup, epoll_fd);
+
+	if (0 != epoll_ctl_add(epoll_fd, core->sockets.shva_rw, EPOLLIN | EPOLLRDHUP | EPOLLHUP)) {
+		//slog_warn_l("%s: Tried to add core->sockets.shva_rw = %d and failed", my_name,  core->sockets.shva_rw);
+		close(epoll_fd);
+		pthread_exit(NULL);
+	}
+
+	if (epoll_ctl_add(epoll_fd, core->sockets.out_write, EPOLLRDHUP | EPOLLHUP)) {
+		//slog_warn_l("%s: Tried to add fdx->fd_write = %d and failed", my_name, core->sockets.out_write);
+		close(epoll_fd);
+		pepa_state_out_set(core, PEPA_ST_FAIL);
+		pthread_exit(NULL);
+	}
+
+	slog_note_l("%s: socket in (SHVA): %d, socket out (OUT): %d", my_name, core->sockets.shva_rw, core->sockets.out_write);
+
+	while (1)   {
+
+		int event_count = epoll_wait(epoll_fd, events, 1, 300000);
+
+		/* Interrupted by a signal */
+		if (event_count < 0 && EINTR == errno) {
+			continue;
+		}
+
+		if (event_count < 0) {
+			slog_fatal_l("%s: error on wait: %s", my_name, strerror(errno));
+			close(epoll_fd);
+			pepa_state_out_set(core, PEPA_ST_FAIL);
+			pthread_exit(NULL);
+		}
+
+		for (i = 0; i < event_count; i++) {
+			/* If one of the read/write sockets is diconnected, exit the thread */
+			if (events[i].events & (EPOLLRDHUP | EPOLLHUP)) {
+				close(epoll_fd);
+
+				if (core->sockets.shva_rw == events[i].data.fd) {
+					slog_warn_l("SHVA socket invalidated");
+					close(epoll_fd);
+					pepa_state_out_set(core, PEPA_ST_FAIL);
+				}
+
+				if (core->sockets.out_write == events[i].data.fd) {
+					slog_warn_l("SHVA socket invalidated");
+					close(epoll_fd);
+					pepa_state_out_set(core, PEPA_ST_FAIL);
+				}
+
+				usleep(5000);
+				pthread_exit(NULL);
+			} /* if (events[i].events & (EPOLLRDHUP | EPOLLHUP)) */
+
+			/* Read from socket */
+			if ((events[i].data.fd == core->sockets.shva_rw) && (events[i].events & EPOLLIN)) {
+				rc = pepa_one_direction_copy2(/* Send to : */core->sockets.out_write, "OUT",
+											  /* From: */core->sockets.shva_rw, "SHVA",
+											  buffer, BUF_SIZE, /* Debug off */ 0,
+											  /* RX stat */&core->monitor.shva_rx,
+											  /* TX stat */&core->monitor.out_tx);
+
+				if (PEPA_ERR_OK == rc) {
+					// slog_note_l("%s: Sent to OUT OK", my_name);
+					continue;
+				}
+
+				close(epoll_fd);
+
+				if (-PEPA_ERR_BAD_SOCKET_READ == rc) {
+					slog_warn_l("%s: Could not write to OUT, closing read IN socket", my_name);
+					close(epoll_fd);
+					pepa_state_shva_set(core, PEPA_ST_FAIL);
+				}
+
+				if (-PEPA_ERR_BAD_SOCKET_WRITE == rc) {
+					slog_warn_l("%s: Could not write to OUT, closing read IN socket", my_name);
+					close(epoll_fd);
+					pepa_state_out_set(core, PEPA_ST_FAIL);
+				}
+
+				usleep(5000);
+				pthread_exit(NULL);
+
+			} /* End of read descriptor processing */
+		}
+	}
+	pthread_cleanup_pop(0);
+	pthread_exit(NULL);
+}
+
+#if 0 /* SEB */
+void pepa_shva_thread_new_forward_cleanup(__attribute__((unused))void *arg){
 	char        *my_name         = "SHVA-FORWARD-CLEAN";
 	slog_warn("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$");
 	slog_warn_l("%s: Starting clean", my_name);
 	slog_warn("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$");
 
 }
-#define BUF_SIZE (2048)
-void *pepa_shva_thread_new_forward(__attribute__((unused))void *arg)
-{
+	#define BUF_SIZE (2048)
+void *pepa_shva_thread_new_forward(__attribute__((unused))void *arg){
 	int         rc;
 	pepa_core_t *core            = pepa_get_core();
 	char        *my_name         = "SHVA-FORWARD";
@@ -289,4 +407,5 @@ void *pepa_shva_thread_new_forward(__attribute__((unused))void *arg)
 	pthread_cleanup_pop(0);
 	pthread_exit(NULL);
 }
+#endif
 
