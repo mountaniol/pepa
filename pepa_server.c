@@ -13,15 +13,6 @@
 #include "slog/src/slog.h"
 #include "pepa_core.h"
 
-//static int running = 0;
-//static int delay = 1;
-//static int counter = 0;
-//static char *conf_file_name = NULL;
-//static char *pid_file_name = NULL;
-//static int pid_fd = -1;
-//static char *app_name = NULL;
-//static FILE *log_stream;
-
 void daemonize(pepa_core_t *core)
 {
 	pid_t pid = 0;

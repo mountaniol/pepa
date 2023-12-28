@@ -8,5 +8,6 @@
 #include "pepa_core.h"
 
 void *pepa_in_thread(__attribute__((unused))void *arg);
+void *pepa_in_thread_new_forward(__attribute__((unused))void *arg);
 
 #endif /* _PEPA_SOCKET_IN_H__ */

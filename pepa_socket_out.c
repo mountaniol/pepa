@@ -29,7 +29,7 @@ static int pepa_out_thread_start(char *name)
 	return pepa_pthread_init_phase(name);
 }
 
-static int pepa_out_thread_open_listening_socket(pepa_core_t *core, char *my_name)
+static int pepa_out_thread_open_listening_socket(pepa_core_t *core, __attribute__((unused)) char *my_name)
 {
 	struct sockaddr_in s_addr;
 	int                waiting_time = 0;
@@ -43,10 +43,11 @@ static int pepa_out_thread_open_listening_socket(pepa_core_t *core, char *my_nam
 															  __func__);
 		if (core->sockets.out_listen < 0) {
 			core->sockets.out_listen = -1;
-			slog_warn_l("%s: Can not open listening socket: %s", my_name, strerror(errno));
+			//slog_warn_l("%s: Can not open listening socket: %s", my_name, strerror(errno));
 			waiting_time += timeout;
 		}
 	} while (core->sockets.out_listen < 0);
+	usleep(1000);
 	return PEPA_ERR_OK;
 }
 
@@ -149,7 +150,6 @@ void *pepa_out_thread(__attribute__((unused))void *arg)
 		case PEPA_TH_OUT_WATCH_WRITE_SOCK:
 			slog_note_l("START STEP: %s", pepa_out_thread_state_str(this_step));
 			/* TODO */
-			//rc = pepa_out_thread_watch_write_socket(core, my_name);
 			rc = pepa_out_thread_wait_fail(core, my_name);
 			next_step = PEPA_TH_OUT_CLOSE_LISTEN_SOCKET;
 			slog_note_l("END STEP  : %s", pepa_out_thread_state_str(this_step));
@@ -157,7 +157,6 @@ void *pepa_out_thread(__attribute__((unused))void *arg)
 
 		case PEPA_TH_OUT_CLOSE_LISTEN_SOCKET:
 			slog_note_l("START STEP: %s", pepa_out_thread_state_str(this_step));
-			//rc = pepa_out_thread_close_write_socket(core, my_name);
 			rc = pepa_out_thread_close_listen(core, my_name);
 			next_step = PEPA_TH_OUT_CREATE_LISTEN;
 			slog_note_l("END STEP  : %s", pepa_out_thread_state_str(this_step));
@@ -183,6 +182,7 @@ void *pepa_out_thread(__attribute__((unused))void *arg)
 			break;
 		}
 	} while (1);
+
 	slog_fatal_l("Should never be here");
 	abort();
 	pthread_exit(NULL);

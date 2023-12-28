@@ -5,6 +5,7 @@
 #include "pepa_config.h"
 #include "pepa_errors.h"
 #include "pepa_debug.h"
+#include "pepa_socket_common.h"
 
 pepa_core_t *g_pepa_core = NULL;
 
@@ -96,6 +97,7 @@ static pepa_core_t *pepa_create_core_t(void)
 	core->shva_thread.thread_id = PTHREAD_DEAD;
 	core->shva_forwarder.thread_id = PTHREAD_DEAD;
 	core->in_thread.thread_id = PTHREAD_DEAD;
+	core->in_forwarder.thread_id = PTHREAD_DEAD;
 	core->out_thread.thread_id = PTHREAD_DEAD;
 	core->monitor_thread.thread_id = PTHREAD_DEAD;
 
@@ -290,7 +292,6 @@ int pepa_core_unlock(void)
 
 	return PEPA_ERR_OK;
 }
-
 
 int pepa_if_abort(void)
 {

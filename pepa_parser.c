@@ -158,18 +158,7 @@ buf_t *pepa_parse_ip_string_get_ip(const char *_argument)
 
 int pepa_parse_arguments(int argi, char *argv[])
 {
-	/* IP address to connect to a server */
-	//ip_port_t *ip_prev  = NULL;
 	pepa_core_t          *core          = pepa_get_core();
-
-				  #if 0 /* SEB */
-	/* We need at least 6 params : -- addr "address:port" -i "input_file" -o "output_file" */
-					  if (argi < 6) {
-		printf("ERROR: At least 3 arguments expected: SHVA, IN, OUT\n");
-		pepa_show_help();
-		exit(0);
-	}
-#endif
 
 	/* Long options. Address should be given in form addr:port*/
 	static struct option long_options[] = {
@@ -312,6 +301,7 @@ int pepa_parse_arguments(int argi, char *argv[])
 			pepa_print_version();
 			exit(0);
 		case 'm':
+			slog_debug_l("Asked to start MONITOR");
 			core->monitor.onoff = 1;
 			break;
 		case 'w':
@@ -345,7 +335,6 @@ int pepa_parse_arguments(int argi, char *argv[])
 
 	return PEPA_ERR_OK;
 }
-
 
 int pepa_config_slogger(pepa_core_t *core)
 {

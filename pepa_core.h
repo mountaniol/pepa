@@ -76,7 +76,6 @@ typedef enum {
 	PEPA_PR_OUT = 0,
 	PEPA_PR_SHVA, /* Only SHVA writes to this register */
 	PEPA_PR_IN, /* Only PEPA_PR_IN writes to this register */
-	PEPA_PR_CLT, /* Only CTL writes to this register */
 	PEPA_PR_MAX
 } pepa_proc_t;
 
@@ -115,6 +114,7 @@ typedef struct {
 	thread_vars_t shva_thread; /**< Configuration of SHVA thread */
 	thread_vars_t shva_forwarder; /**< Configuration of SHVA thread */
 	thread_vars_t in_thread; /**< Configuration of IN thread */
+	thread_vars_t in_forwarder; /**< Configuration of IN thread */
 	thread_vars_t out_thread; /**< Configuration of OUT thread */
 	thread_vars_t monitor_thread; /**< Configuration of OUT thread */
 	int internal_buf_size; /**< Size of buffer used to pass packages, by defaiult COPY_BUF_SIZE bytes, see pepa_config.h */

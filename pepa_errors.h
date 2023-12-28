@@ -11,6 +11,7 @@ typedef enum {
 	/* Situative statuses */
 	PEPA_ERR_THREAD_SHVA_DOWN,
 	PEPA_ERR_THREAD_IN_DOWN,
+	PEPA_ERR_THREAD_IN_FW_DOWN,
 	PEPA_ERR_THREAD_IN_SOCKET_RESET,
 	PEPA_ERR_THREAD_OUT_DOWN,
 
@@ -60,6 +61,9 @@ typedef enum {
 	PEPA_ERR_THREAD_DEAD,
 	PEPA_ERR_THREAD_DETOUCH,
 
+	/* Socket related */
+	PEPA_ERR_SOCKET_IN_LISTEN_DOWN,
+	
 	/* Unknown error number */
 	PEPA_ERR_ERROR_OUT_OF_RANGE,
 } pepa_error_t;

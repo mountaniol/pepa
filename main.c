@@ -7,18 +7,6 @@
 #include "pepa_parser.h"
 #include "pepa_server.h"
 #include "pepa_state_machine.h"
-
-void bye(void)
-{
-	pepa_core_t *core = pepa_get_core();
-	pthread_cancel(core->shva_thread.thread_id);
-	pthread_cancel(core->out_thread.thread_id);
-
-	/* This function closes all descriptors,
-	   frees all buffers and also frees core struct */
-	pepa_core_finish();
-}
-
 /* Catch Signal Handler functio */
 static void signal_callback_handler(int signum, __attribute__((unused))siginfo_t *info, __attribute__((unused))void *extra)
 {
@@ -33,6 +21,9 @@ static void signal_callback_handler(int signum, __attribute__((unused))siginfo_t
 void pepa_set_int_signal_handler(void)
 {
     struct sigaction action;
+
+	sigemptyset(&action.sa_mask);
+	action.sa_flags = 0;
 
     action.sa_flags = SA_SIGINFO;     
     action.sa_sigaction = signal_callback_handler;
@@ -63,7 +54,12 @@ int main(int argi, char *argv[])
 		exit(-11);
 	}
 
-	pepa_config_slogger(core);
+	rc = pepa_config_slogger(core);
+	if (PEPA_ERR_OK != rc) {
+		slog_error_l("Could not init slogger");
+		exit(1);
+	}
+
 	slog_note_l("Arguments parsed");
 
 	if (core->daemon) {
@@ -83,7 +79,7 @@ int main(int argi, char *argv[])
 
 
 	while (1) {
-		sleep(120);
+		sleep(60);
 	}
 	pepa_kill_all_threads();
 	sleep(1);

@@ -7,10 +7,12 @@ void pepa_thread_kill_shva_forwarder(void);
 void pepa_thread_kill_shva(void);
 void pepa_thread_kill_out(void);
 void pepa_thread_kill_in(void);
+void pepa_thread_kill_in_fw(void);
 void pepa_thread_kill_monitor(void);
 
 void pepa_thread_start_shva(void);
 void pepa_thread_start_in(void);
+void pepa_thread_start_in_fw(void);
 void pepa_thread_start_monitor(void);
 
 __attribute__((warn_unused_result))
@@ -32,6 +34,7 @@ void pepa_kill_all_threads(void);
 void pepa_state_shva_set(pepa_core_t *core, pepa_sig_t sig);
 void pepa_state_in_set(pepa_core_t *core, pepa_sig_t sig);
 void pepa_state_out_set(pepa_core_t *core, pepa_sig_t sig);
+//void pepa_state_in_fw_set(pepa_core_t *core, pepa_sig_t sig);
 
 __attribute__((warn_unused_result))
 int pepa_state_shva_get(pepa_core_t *core);
