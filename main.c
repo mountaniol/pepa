@@ -5,6 +5,7 @@
 #include "pepa_core.h"
 #include "pepa_errors.h"
 #include "pepa_parser.h"
+#include "pepa_server.h"
 #include "pepa_state_machine.h"
 
 void bye(void)
@@ -65,6 +66,12 @@ int main(int argi, char *argv[])
 	pepa_config_slogger(core);
 	slog_note_l("Arguments parsed");
 
+	if (core->daemon) {
+		daemonize(core);
+	}
+
+	pepa_set_int_signal_handler();
+
 	slog_note_l("Going to start threads");
 	rc = pepa_start_threads();
 	if (rc < 0) {
@@ -74,7 +81,6 @@ int main(int argi, char *argv[])
 
 	slog_note_l("Threads are started");
 
-	pepa_set_int_signal_handler();
 
 	while (1) {
 		sleep(120);

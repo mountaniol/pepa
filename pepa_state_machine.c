@@ -414,9 +414,9 @@ int pepa_start_threads(void)
 {
 
 	/* Slose STDIN */
-	int fd = open("/dev/null", O_WRONLY);
-	dup2(fd, 0);
-	close(fd);
+//	int fd = open("/dev/null", O_WRONLY);
+//	dup2(fd, 0);
+//	close(fd);
 
 	pepa_core_t *core = pepa_get_core();
 
@@ -534,8 +534,8 @@ void *pepa_monitor_thread(__attribute__((unused))void *arg)
 				   KB(core->monitor.out_tx - monitor_prev.out_tx),
 				   KB((core->monitor.out_tx - monitor_prev.out_tx)/ MONITOR_SLEEP_TIME ),
 
-				   KB(core->monitor.shva_tx - monitor_prev.shva_tx),
-				   KB((core->monitor.shva_tx - monitor_prev.shva_tx) / MONITOR_SLEEP_TIME),
+				   /* KB(core->monitor.shva_tx - monitor_prev.shva_tx),
+				   KB((core->monitor.shva_tx - monitor_prev.shva_tx) / MONITOR_SLEEP_TIME), */
 
 				   KB(core->monitor.in_rx - monitor_prev.in_rx),
 				   KB((core->monitor.in_rx - monitor_prev.in_rx ) / MONITOR_SLEEP_TIME),

@@ -32,7 +32,7 @@ CFLAGS+=$(PEPA_DEFINES)
 PEPA_O=pepa_state_machine.o pepa_parser.o main.o pepa_core.o \
 		pepa_server.o pepa_errors.o \
 		pepa_socket_common.o pepa_socket_in.o \
-		pepa_socket_out.o pepa_socket_shva.o 
+		pepa_socket_out.o pepa_socket_shva.o
 		
 PEPA_T=pepa-ng
 BUFT_AR=buf_t/buf_t.a

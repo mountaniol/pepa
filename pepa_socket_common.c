@@ -113,13 +113,11 @@ int pepa_one_direction_copy2(int fd_out, const char *name_out,
 				slog_error_l("Could not read on the first iteration: from read sock %s [%d] out socket %s [%d}: %s",
 							 name_in, fd_in, name_out, fd_out, strerror(errno));
 			}
-
 		}
 
 		if (PEPA_ERR_OK != ret) {
 			goto endit;
 		}
-
 
 		/* Write until transfer the whole received buffer */
 		do {

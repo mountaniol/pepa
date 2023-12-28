@@ -225,7 +225,7 @@ void *pepa_in_thread_new_forward(__attribute__((unused))void *arg)
 				continue;
 			}
 
-			// slog_note_l("%s: there is something on socket %d (slot %d)", my_name, sd, i);
+			//slog_note_l("%s: there is something on socket %d (slot %d)", my_name, sd, i);
 
 			rc = pepa_one_direction_copy2(/* Send to : */core->sockets.shva_rw, "SHVA",
 										  /* From: */ sd, "IN", buffer, BUF_SIZE, /*Debug is ON */ 1,

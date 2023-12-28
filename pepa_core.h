@@ -123,6 +123,9 @@ typedef struct {
 	int monitor_timeout; /**< How many microseconds to sleep between tests in microseconds */
 	pepa_status_t state;
 	pepa_stat_t monitor;
+	int daemon; /* If not 0, start as a daemon */
+	int pid_fd; /* File descriptor of PID file */
+	char *pid_file_name; /* File name of PID file  */
 } pepa_core_t;
 
 /**
