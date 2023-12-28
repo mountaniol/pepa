@@ -18,46 +18,71 @@ void daemonize(pepa_core_t *core)
 	pid_t pid = 0;
 	int   fd;
 
+	slog_debug_l("1");
+
 	/* Fork off the parent process */
 	pid = fork();
 
+	slog_debug_l("2");
+
 	/* An error occurred */
 	if (pid < 0) {
+		slog_debug_l("A fork error");
 		exit(EXIT_FAILURE);
 	}
+
+	slog_debug_l("3");
 
 	/* Success: Let the parent terminate */
 	if (pid > 0) {
 		exit(EXIT_SUCCESS);
 	}
 
+	slog_debug_l("4");
+
 	/* On success: The child process becomes session leader */
 	if (setsid() < 0) {
+		slog_debug_l("A setsid error");
 		exit(EXIT_FAILURE);
 	}
+
+	slog_debug_l("5");
 
 	/* Ignore signal sent from child to parent process */
 	signal(SIGCHLD, SIG_IGN);
 
+	slog_debug_l("6");
+
 	/* Fork off for the second time*/
 	pid = fork();
 
+	slog_debug_l("7");
+
 	/* An error occurred */
 	if (pid < 0) {
+		slog_debug_l("A fork error");
 		exit(EXIT_FAILURE);
 	}
+
+	slog_debug_l("8");
 
 	/* Success: Let the parent terminate */
 	if (pid > 0) {
 		exit(EXIT_SUCCESS);
 	}
 
+	slog_debug_l("9");
+
 	/* Set new file permissions */
 	umask(0);
 
+	slog_debug_l("10");
+
 	/* Change the working directory to the root directory */
 	/* or another appropriated directory */
-	chdir("/");
+	chdir("/tmp/");
+
+	slog_debug_l("11");
 
 	/* Close all open file descriptors */
 	for (fd = sysconf(_SC_OPEN_MAX); fd > 0; fd--) {

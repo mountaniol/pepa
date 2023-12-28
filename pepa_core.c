@@ -137,7 +137,7 @@ static pepa_core_t *pepa_create_core_t(void)
 		abort();
 	}
 
-	core->pid_file_name = strdup("/var/run/pepa.pid");
+	core->pid_file_name = strdup("/tmp/pepa.pid");
 
 	return core;
 }

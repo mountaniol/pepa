@@ -46,6 +46,7 @@ int pepa_parse_arguments(int argi, char *argv[]);
 
 __attribute__((warn_unused_result))
 int pepa_config_slogger(pepa_core_t *core);
+int pepa_config_slogger_daemon(pepa_core_t *core);
 
 void pepa_print_version(void);
 

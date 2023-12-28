@@ -64,6 +64,8 @@ int main(int argi, char *argv[])
 
 	if (core->daemon) {
 		daemonize(core);
+		slog_init("pepa", SLOG_FLAGS_ALL, 0);
+		rc = pepa_config_slogger_daemon(core);
 	}
 
 	pepa_set_int_signal_handler();

@@ -26,8 +26,8 @@ void pepa_show_help(void)
 		   "--inum    | -n N - max number of IN clients, by default 1024\n"
 		   "--abort   | -a - abort on errors, for debug\n"
 		   "--bsize   | -b N - size of internal buffer, in bytes; if not given, 1024 byte will be set\n"
-		   "--dir     | -d NAME - Name of directory to save the log into\n"
-		   "--file    | -f DIR - Name of log file to save the log into\n"
+		   "--dir     | -d DIR  - Name of directory to save the log into\n"
+		   "--file    | -f NAME - Name of log file to save the log into\n"
 		   "--noprint | -p - DO NOT print log onto terminal, by default it will be printed\n"
 		   "--log     | -l N - log level, accumulative: 0 = no log, 7 includes also {1-6}\n"
 		   "          ~        0: none, 1: falal, 2: trace, 3: error, 4: debug, 5: warn, 6: info, 7: note\n"
@@ -239,12 +239,12 @@ int pepa_parse_arguments(int argi, char *argv[])
 			core->abort_flag = 1;
 			break;
 		case 'f':
-			/* Set abort flag*/
+			/* Log file name */
 			core->slog_file = strndup(optarg, 1024);
 			slog_info_l("Log file name is set to: %s", core->slog_file);
 			break;
 		case 'd':
-			/* Set abort flag*/
+			/* Log file directory name */
 			core->slog_dir = strndup(optarg, 1024);
 			slog_info_l("Log file name is set to: %s", core->slog_dir);
 			break;
@@ -364,6 +364,35 @@ int pepa_config_slogger(pepa_core_t *core)
 	slog_config_set(&cfg);
 	slog_enable(SLOG_TRACE);
 	//slog_init("pepa", core->slog_level, 1);
+	slog_config_set(&cfg);
+	slog_disable(SLOG_FLAGS_ALL);
+	slog_enable(core->slog_flags);
+	return PEPA_ERR_OK;
+}
+
+int pepa_config_slogger_daemon(pepa_core_t *core)
+{
+	slog_config_t cfg;
+	slog_config_get(&cfg);
+
+	cfg.nTraceTid = 1;
+	cfg.eDateControl = SLOG_DATE_FULL;
+
+	if (NULL != core->slog_file) {
+		cfg.nToFile = 1;
+		cfg.nKeepOpen = 1;
+		cfg.nFlush = 1;
+		strcpy(cfg.sFileName, core->slog_file);
+	} else {
+		slog_note_l("No log file given");
+	}
+
+	if (NULL != core->slog_dir) {
+		strcpy(cfg.sFilePath, core->slog_dir);
+	}
+
+	cfg.nToScreen = 0;
+
 	slog_config_set(&cfg);
 	slog_disable(SLOG_FLAGS_ALL);
 	slog_enable(core->slog_flags);
