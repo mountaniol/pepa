@@ -312,13 +312,14 @@ int pepa_open_listening_socket(struct sockaddr_in *s_addr, const buf_t *ip_addre
 		return (-PEPA_ERR_SOCKET_CREATION);
 	}
 
-	do {
-		rc = bind(sock, (struct sockaddr *)s_addr, (socklen_t)sizeof(struct sockaddr_in));
-		if (rc < 0 && EADDRINUSE == errno) {
-			slog_warn_l("Address in use, can't bind, [from %s], waiting...", name);
-			sleep(10);
-		}
-	} while (rc < 0 && EADDRINUSE == errno);
+	//do {
+	rc = bind(sock, (struct sockaddr *)s_addr, (socklen_t)sizeof(struct sockaddr_in));
+	if (rc < 0 && EADDRINUSE == errno) {
+		slog_warn_l("Address in use, can't bind, [from %s], waiting...", name);
+		// sleep(10);
+		return -PEPA_ERR_SOCKET_BIND;
+	}
+	//} while (rc < 0 && EADDRINUSE == errno);
 
 	if (rc < 0) {
 		slog_error_l("Open Socket [from %s]: Can't bind: %s", name, strerror(errno));

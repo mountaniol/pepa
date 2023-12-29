@@ -6,10 +6,11 @@ GCC=gcc
 #GCC=gcc-10
 CFLAGS=-Wall -Wextra -O2 -Wswitch-enum -Wimplicit-fallthrough -Wno-error=unused-but-set-variable -Wswitch -Wreturn-type 
 #CFLAGS=-Wall -Wextra -O2
-DEBUG=-DDEBUG3
+#DEBUG=-DDEBUG3
+#DEBUG+=-ggdb
 # Static GCC-10 analyzer
 #CFLAGS+=-fanalyzer
-#CFLAGS+=-pg 
+CFLAGS+=-pg 
 # Clang static analyzer
 #CFLAGS += -Xfanalyzer
 
@@ -46,10 +47,15 @@ EMU_O=pepa_emulator.o pepa_state_machine.o pepa_parser.o \
 
 EMU_T=emu
 
+
 all: pepa emu
 
 pepa: slog buf_t $(PEPA_O)
-	$(GCC) $(CFLAGS) -ggdb $(DEBUG) $(PEPA_O) $(ARS) -o $(PEPA_T) -lpthread
+	$(GCC) $(CFLAGS) $(DEBUG) $(PEPA_O) $(ARS) -o $(PEPA_T) -lpthread
+
+static: slog buf_t $(PEPA_O)
+	$(GCC) $(CFLAGS) -static $(DEBUG) $(PEPA_O) $(ARS) -o $(PEPA_T) -lpthread
+	
 
 .PHONY:buf_t
 buf_t:
@@ -57,7 +63,7 @@ buf_t:
 
 .PHONY:emu
 emu: buf_t slog $(EMU_O)
-	$(GCC) $(CFLAGS) -ggdb $(DEBUG) $(EMU_O) $(ARS) -o $(EMU_T) -lpthread
+	$(GCC) $(CFLAGS) $(DEBUG) $(EMU_O) $(ARS) -o $(EMU_T) -lpthread
 
 .PHONY:slog
 slog:

@@ -382,7 +382,7 @@ void *pepa_in_thread(__attribute__((unused))void *arg)
 				//next_step = PEPA_TH_IN_WAIT_SHVA_UP;
 				next_step = PEPA_TH_IN_CLOSE_LISTEN;
 			}
-			pepa_thread_kill_in_fw();
+			pepa_thread_kill_in_fw(core);
 
 			slog_note_l("END STEP:   %s", pepa_in_thread_state_str(this_step));
 			break;
@@ -396,7 +396,7 @@ void *pepa_in_thread(__attribute__((unused))void *arg)
 				slog_fatal_l("Could not start subthread");
 			}
 #endif
-			pepa_thread_start_in_fw();
+			pepa_thread_start_in_fw(core);
 			pepa_state_in_set(core, PEPA_ST_RUN);
 			next_step = PEPA_TH_IN_WAIT_SHVA_DOWN;
 			slog_note_l("END STEP:   %s", pepa_in_thread_state_str(this_step));
@@ -410,7 +410,7 @@ void *pepa_in_thread(__attribute__((unused))void *arg)
 				slog_warn_l("%s: Could not terminate forwarding thread: %s", my_name, strerror(errno));
 			}
 #endif
-			pepa_thread_kill_in_fw();
+			pepa_thread_kill_in_fw(core);
 			pepa_state_in_set(core, PEPA_ST_FAIL);
 			sleep(10);
 			slog_note_l("END STEP:   %s", pepa_in_thread_state_str(this_step));

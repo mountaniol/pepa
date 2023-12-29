@@ -93,7 +93,7 @@ int pepa_parse_ip_string_get_port(const char *argument)
 	if (NULL == colon_ptr) {
 		slog_fatal_l("Can not find : between IP and PORT: IP:PORT");
 		PEPA_TRY_ABORT();
-		return -PEPA_ERR_INVALID_INPUT;
+		return -PEPA_ERR_ADDRESS_FORMAT;
 	}
 
 	int port = pepa_string_to_int_strict(colon_ptr + 1, &_err);
@@ -101,7 +101,7 @@ int pepa_parse_ip_string_get_port(const char *argument)
 	if (_err) {
 		slog_fatal_l("Can't convert port value from string to int: %s", colon_ptr);
 		PEPA_TRY_ABORT();
-		return -PEPA_ERR_INVALID_INPUT;
+		return -PEPA_ERR_ADDRESS_FORMAT;
 	}
 
 	return port;
@@ -180,11 +180,17 @@ int pepa_parse_arguments(int argi, char *argv[])
 		{0, 0, 0, 0}
 	};
 
-
 	int                  err;
 	int                  log;
 	int                  opt;
 	int                  option_index   = 0;
+	if (argi < 2) {
+		printf("No arguments provided\n");
+		pepa_show_help();
+		pepa_print_version();
+		return -1;
+
+	}
 	while ((opt = getopt_long(argi, argv, "s:o:i:n:l:f:d:phavmw", long_options, &option_index)) != -1) {
 		switch (opt) {
 		case 's': /* SHVA Server address to connect to */

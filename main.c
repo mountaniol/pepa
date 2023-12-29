@@ -10,10 +10,17 @@
 /* Catch Signal Handler functio */
 static void signal_callback_handler(int signum, __attribute__((unused))siginfo_t *info, __attribute__((unused))void *extra)
 {
+	pepa_core_t *core = pepa_get_core();
 	printf("Caught signal %d\n", signum);
 	if (signum == SIGINT) {
 		printf("Caught signal SIGINT: %d\n", signum);
-		pepa_back_to_disconnected_state_new();
+		pepa_back_to_disconnected_state_new(core);
+		exit(0);
+	}
+
+	if (signum == SIGUSR1) {
+		printf("Caught signal SIGINT: %d\n", signum);
+		pepa_back_to_disconnected_state_new(core);
 		exit(0);
 	}
 }
@@ -25,7 +32,7 @@ void pepa_set_int_signal_handler(void)
 	sigemptyset(&action.sa_mask);
 	action.sa_flags = 0;
 
-    action.sa_flags = SA_SIGINFO;     
+    action.sa_flags = SA_SIGINFO | SIGUSR1;     
     action.sa_sigaction = signal_callback_handler;
     sigaction(SIGINT, &action, NULL);
 }
@@ -71,7 +78,7 @@ int main(int argi, char *argv[])
 	pepa_set_int_signal_handler();
 
 	slog_note_l("Going to start threads");
-	rc = pepa_start_threads();
+	rc = pepa_start_threads(core);
 	if (rc < 0) {
 		slog_fatal_l("Could not start threads");
 		exit(-11);
@@ -83,7 +90,7 @@ int main(int argi, char *argv[])
 	while (1) {
 		sleep(60);
 	}
-	pepa_kill_all_threads();
+	pepa_kill_all_threads(core);
 	sleep(1);
 	slog_note_l("PEPA Exit");
 	return (0);

@@ -9,7 +9,7 @@ const char *pepa_error_code_to_str(int code)
 	case PEPA_ERR_EVENT: return "And event received on event fd desciptor";
 	case PEPA_ERR_STOP: return "Thread must stop and terminate";
 
-		/* Situative statuses */
+	/* Situative statuses */
 	case PEPA_ERR_THREAD_SHVA_DOWN: return "SHVA thread is in FAIL state";
 	case PEPA_ERR_THREAD_IN_DOWN: return "IN thread is in FAIL state";
 	case PEPA_ERR_THREAD_IN_SOCKET_RESET: return "IN thread should reset listening socket";
@@ -17,7 +17,6 @@ const char *pepa_error_code_to_str(int code)
 
 	/* Memory related errors */
 	case PEPA_ERR_NULL_POINTER: return "An argument is NULL pointer";
-	case PEPA_ERR_ALLOCATION: return "Can not allocate memory";
 	case PEPA_ERR_BUF_ALLOCATION: return "Can not allocate buf_t";
 
 	/* File related */

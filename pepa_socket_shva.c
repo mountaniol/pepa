@@ -14,9 +14,9 @@
  * @return int file descriptor of socket to shva, >= 0;
  *  	   a negative error code on an error
  */
-static int pepa_open_shava_connection(void)
+static int pepa_open_shava_connection(pepa_core_t *core)
 {
-	pepa_core_t *core                      = pepa_get_core();
+	//pepa_core_t *core                      = pepa_get_core();
 	return pepa_open_connection_to_server(core->shva_thread.ip_string->data, core->shva_thread.port_int, __func__);
 }
 
@@ -24,7 +24,7 @@ static int pepa_shva_thread_open_connection(pepa_core_t *core, const char *my_na
 {
 	/* Open connnection to the SHVA server */
 	do {
-		core->sockets.shva_rw = pepa_open_shava_connection();
+		core->sockets.shva_rw = pepa_open_shava_connection(core);
 
 		if (core->sockets.shva_rw < 0) {
 			core->sockets.shva_rw = -1;
@@ -150,7 +150,7 @@ void *pepa_shva_thread_new(__attribute__((unused))void *arg)
 				next_step = PEPA_TH_SHVA_WAIT_OUT;
 			}
 
-			pepa_thread_kill_shva_forwarder();
+			pepa_thread_kill_shva_forwarder(core);
 
 			slog_note_l("END STEP:   %s", pepa_shva_thread_state_str(next_step));
 			break;
