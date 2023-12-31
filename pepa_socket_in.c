@@ -199,7 +199,7 @@ int pepa_in_process_buffers(pepa_core_t *core, int epoll_fd, char *buffer, struc
 
 			rc = pepa_one_direction_copy2(/* Send to : */core->sockets.shva_rw, "SHVA",
 										  /* From: */ events[i].data.fd, "IN READ",
-										  buffer, core->internal_buf_size, /*Debug is ON */ 1,
+										  buffer, core->internal_buf_size * 1024, /*Debug is ON */ 1,
 										  /* RX stat */&core->monitor.in_rx,
 										  /* TX stat */&core->monitor.shva_tx);
 			if (PEPA_ERR_OK == rc) {
@@ -245,7 +245,7 @@ void *pepa_in_thread_new_forward(__attribute__((unused))void *arg)
 		pthread_exit(NULL);
 	}
 
-	buffer = calloc(core->internal_buf_size, 1);
+	buffer = calloc(core->internal_buf_size * 1024, 1);
 
 	if (NULL == buffer) {
 		slog_error_l("Can not allocate internal buffer, terminating thread");

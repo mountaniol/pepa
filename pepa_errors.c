@@ -61,7 +61,7 @@ const char *pepa_error_code_to_str(int code)
 
 	/* Unknown error number */
 	case PEPA_ERR_ERROR_OUT_OF_RANGE: return "Unknown PEPA error code was provided";
-
+	case PEPA_ERR_SOCKET_IN_LISTEN_DOWN: return "One of read or write sockets is hung up";
 
 	default: return "Unknown error code";
 	}

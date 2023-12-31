@@ -101,7 +101,7 @@ static pepa_core_t *pepa_create_core_t(void)
 	core->out_thread.thread_id = PTHREAD_DEAD;
 	core->monitor_thread.thread_id = PTHREAD_DEAD;
 
-	core->internal_buf_size = COPY_BUF_SIZE;
+	core->internal_buf_size = COPY_BUF_SIZE_KB;
 
 	/* Create event fd control descriptors */
 

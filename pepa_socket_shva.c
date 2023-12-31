@@ -242,7 +242,7 @@ int pepa_forwarder_process_buffers(pepa_core_t *core, char *buffer, struct epoll
 
 			rc = pepa_one_direction_copy2(/* Send to : */core->sockets.out_write, "OUT",
 										  /* From: */core->sockets.shva_rw, "SHVA",
-										  buffer, core->internal_buf_size, /* Debug off */ 0,
+										  buffer, core->internal_buf_size * 1024, /* Debug off */ 0,
 										  /* RX stat */&core->monitor.shva_rx,
 										  /* TX stat */&core->monitor.out_tx);
 
@@ -267,7 +267,7 @@ void *pepa_shva_thread_new_forward(__attribute__((unused))void *arg)
 
 	struct epoll_event events[EVENTS_NUM];
 
-	buffer = calloc(core->internal_buf_size, 1);
+	buffer = calloc(core->internal_buf_size * 1024, 1);
 	if (NULL == buffer) {
 		slog_error_l("Can not allocate a transfering buffer, stopped");
 		pthread_exit(NULL);

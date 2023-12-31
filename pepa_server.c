@@ -119,7 +119,7 @@ void daemonize(pepa_core_t *core)
 		sprintf(str, "%d\n", getpid());
 		/* Write PID to lockfile */
 		rc = write(core->pid_fd, str, strlen(str));
-		if (rc != strlen(str)) {
+		if (rc != (int) strlen(str)) {
 			slog_fatal_l("Can not write PID into PID file: %s", strerror(errno));
 			exit(EXIT_FAILURE);
 		}

@@ -25,7 +25,7 @@ void pepa_show_help(void)
 		   "--in      | -i IP:PORT - address of IN  listening socket, waiting for OUT stram connnection, in form '1.2.3.4:3748'\n"
 		   "--inum    | -n N - max number of IN clients, by default 1024\n"
 		   "--abort   | -a - abort on errors, for debug\n"
-		   "--bsize   | -b N - size of internal buffer, in bytes; if not given, 1024 byte will be set\n"
+		   "--bsize   | -b N - size of SEND / REVC buffer and internal buffer size, in Kb; if not given, 64 Kb will be set\n"
 		   "--dir     | -d DIR  - Name of directory to save the log into\n"
 		   "--file    | -f NAME - Name of log file to save the log into\n"
 		   "--noprint | -p - DO NOT print log onto terminal, by default it will be printed\n"
@@ -191,7 +191,7 @@ int pepa_parse_arguments(int argi, char *argv[])
 		return -1;
 
 	}
-	while ((opt = getopt_long(argi, argv, "s:o:i:n:l:f:d:phavmw", long_options, &option_index)) != -1) {
+	while ((opt = getopt_long(argi, argv, "s:o:i:n:l:f:d:b:phavmw", long_options, &option_index)) != -1) {
 		switch (opt) {
 		case 's': /* SHVA Server address to connect to */
 			core->shva_thread.ip_string = pepa_parse_ip_string_get_ip(optarg);
