@@ -65,6 +65,69 @@ void pepa_parse_pthread_create_error(const int rc)
 	}
 }
 
+void pepa_set_tcp_timeout(pepa_core_t *core, int sock)
+{
+//	return;
+	struct timeval time_out;
+	time_out.tv_sec = 3;
+	time_out.tv_usec = 0;
+
+	if (0 != setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char *)&time_out, sizeof(time_out))) {
+		slog_debug_l("[from %s] SO_RCVTIMEO has a problem", "EMU SHVA", strerror(errno));
+	}
+	if (0 != setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, (char *)&time_out, sizeof(time_out))) {
+		slog_debug_l("[from %s] SO_SNDTIMEO has a problem", "EMU SHVA", strerror(errno));
+	}
+}
+
+void pepa_set_tcp_recv_size(pepa_core_t *core, int sock)
+{
+//	return;
+	int buf_size = core->internal_buf_size;
+
+	/* Set TCP receive window size */
+	if (0 != setsockopt(sock, SOL_SOCKET, SO_RCVBUF, (char *)&buf_size, sizeof(buf_size))) {
+		slog_debug_l("[from %s] SO_RCVBUF has a problem", "EMU SHVA", strerror(errno));
+	}
+}
+
+void pepa_set_tcp_send_size(pepa_core_t *core, int sock)
+{
+//	return;
+	int buf_size = core->internal_buf_size;
+	/* Set TCP sent window size */
+	if (0 != setsockopt(sock, SOL_SOCKET, SO_SNDBUF, (char *)&buf_size, sizeof(buf_size))) {
+		slog_debug_l("[from %s] SO_SNDBUF has a problem", "EMU SHVA", strerror(errno));
+	}
+}
+
+void pepa_set_tcp_connection_props(pepa_core_t *core, int sock)
+{
+	struct timeval time_out;
+	time_out.tv_sec = 10;
+	time_out.tv_usec = 0;
+
+	int buf_size = core->internal_buf_size;
+
+	if (0 != setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char *)&time_out, sizeof(time_out))) {
+		slog_debug_l("[from %s] tsetsockopt function has a problem", "EMU SHVA", strerror(errno));
+	}
+	if (0 != setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, (char *)&time_out, sizeof(time_out))) {
+		slog_debug_l("[from %s] tsetsockopt function has a problem", "EMU SHVA", strerror(errno));
+	}
+
+	/* Set TCP receive window size */
+	if (0 != setsockopt(sock, SOL_SOCKET, SO_RCVBUF, (char *)&buf_size, sizeof(buf_size))) {
+		slog_debug_l("[from %s] tsetsockopt function has a problem", "EMU SHVA", strerror(errno));
+	}
+
+	/* Set TCP sent window size */
+	if (0 != setsockopt(sock, SOL_SOCKET, SO_SNDBUF, (char *)&buf_size, sizeof(buf_size))) {
+		slog_debug_l("[from %s] tsetsockopt function has a problem", "EMU SHVA", strerror(errno));
+	}
+}
+
+
 int pepa_one_direction_copy2(int fd_out, const char *name_out,
 							 int fd_in, const char *name_in,
 							 char *buf, size_t buf_size, int do_debug,
@@ -267,7 +330,12 @@ void pepa_socket_close_in_listen(pepa_core_t *core)
 }
 
 __attribute__((nonnull(1, 2)))
-int pepa_open_listening_socket(struct sockaddr_in *s_addr, const buf_t *ip_address, const int port, const int num_of_clients, const char *name)
+int pepa_open_listening_socket(pepa_core_t *core,
+							   struct sockaddr_in *s_addr,
+							   const buf_t *ip_address,
+							   const int port,
+							   const int num_of_clients,
+							   const char *name)
 {
 	int rc   = PEPA_ERR_OK;
 	int sock;
@@ -295,9 +363,12 @@ int pepa_open_listening_socket(struct sockaddr_in *s_addr, const buf_t *ip_addre
 		slog_error_l("Open Socket [from %s]: Could not create listen socket: %s", name, strerror(errno));
 		return (-PEPA_ERR_SOCKET_CREATION);
 	}
+
+#if 0 /* SEB */
 	struct timeval time_out;
 	time_out.tv_sec = 1;
 	time_out.tv_usec = 0;
+
 	if (0 != setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char *)&time_out, sizeof(time_out))) {
 		slog_debug_l("[from %s] tsetsockopt function has a problem", name, strerror(errno));
 	}
@@ -311,6 +382,9 @@ int pepa_open_listening_socket(struct sockaddr_in *s_addr, const buf_t *ip_addre
 		slog_error_l("Open Socket [from %s]: Could not set SO_REUSEADDR on socket, error: %s", name, strerror(errno));
 		return (-PEPA_ERR_SOCKET_CREATION);
 	}
+#endif
+
+	// pepa_set_tcp_connection_props(core, sock);
 
 	//do {
 	rc = bind(sock, (struct sockaddr *)s_addr, (socklen_t)sizeof(struct sockaddr_in));
@@ -338,7 +412,7 @@ int pepa_open_listening_socket(struct sockaddr_in *s_addr, const buf_t *ip_addre
 	return (sock);
 }
 
-int pepa_open_connection_to_server(const char *address, int port, const char *name)
+int pepa_open_connection_to_server(pepa_core_t *core, const char *address, int port, const char *name)
 {
 	struct sockaddr_in s_addr;
 	int                sock;
@@ -369,6 +443,7 @@ int pepa_open_connection_to_server(const char *address, int port, const char *na
 		return (-PEPA_ERR_SOCKET_CREATION);
 	}
 
+#if 0 /* SEB */
 	struct timeval time_out;
 	time_out.tv_sec = 1;
 	time_out.tv_usec = 0;
@@ -379,6 +454,7 @@ int pepa_open_connection_to_server(const char *address, int port, const char *na
 		slog_debug_l("[from %s] tsetsockopt function has a problem", name, strerror(errno));
 	}
 
+#endif
 	slog_note_l("[from %s]: Starting connect(): |%s|", name, address);
 	if (connect(sock, (struct sockaddr *)&s_addr, (socklen_t)sizeof(s_addr)) < 0) {
 		slog_debug_l("[from %s]: Could not connect to server: %s", name, strerror(errno));
@@ -386,6 +462,7 @@ int pepa_open_connection_to_server(const char *address, int port, const char *na
 		//PEPA_TRY_ABORT();
 		return (-PEPA_ERR_SOCK_CONNECT);
 	}
+	//pepa_set_tcp_connection_props(core, sock);
 
 	slog_note_l("[from %s]: Opened connection to server: %d", name, sock);
 

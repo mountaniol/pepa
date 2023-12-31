@@ -7,41 +7,11 @@
 #include "buf_t/buf_t.h"
 #include "pepa_core.h"
 
+/* Arguments for thread clean hook  */
 typedef struct {
-	char my_name[32];
-	int fd_read; /**< Read from this fd */
-	int fd_write; /**< Write to this fd */
-	int fd_die; /**< If given, listen and exit when received event from parent thread */
-	int close_read_sock; /**< If not 0, the thread will close reading socket before when termonated */
-	int fd_eventpoll; /**< Eventpoll file descriptor, to be closed when the thread is finished */
-	char *name;
-	char *name_read;
-	char *name_write;
-	sem_t *fd_write_mutex;
-	void *buf;
-	uint64_t rx;
-	uint64_t tx;
-	uint64_t reads;
-	uint64_t writes;
-
-} pepa_fds_t;
-
-#if 0 /* SEB */
-typedef struct {
-	int fd_src;
-	int fd_dst;
-	buf_t *buf;
-}
-x_connect_t;
-#endif
-
-#if 0 /* SEB */
-typedef enum {
-	X_CONN_COPY_LEFT = 1,
-	X_CONN_COPY_RIGHT
-}
-x_conn_direction_t;
-#endif
+	int epoll_fd;
+	char *buf;
+} thread_clean_args_t;
 
 void set_sig_handler(void);
 
@@ -49,8 +19,12 @@ __attribute__((warn_unused_result))
 int pepa_pthread_init_phase(const char *name);
 void pepa_parse_pthread_create_error(const int rc);
 
-__attribute__((warn_unused_result))
-int pepa_open_connection_to_server(const char *address, int port, const char *name);
+void pepa_set_tcp_timeout(pepa_core_t *core, int sock);
+void pepa_set_tcp_recv_size(pepa_core_t *core, int sock);
+void pepa_set_tcp_send_size(pepa_core_t *core, int sock);
+void pepa_set_tcp_connection_props(pepa_core_t *core, int sock);
+
+//int pepa_open_connection_to_server(pepa_core_t *core, const char *address, int port, const char *name);
 
 __attribute__((warn_unused_result))
 int pepa_one_direction_copy2(int fd_out, const char *name_out,
@@ -86,7 +60,12 @@ __attribute__((nonnull(1, 2)))
  * @return int Socket file descriptor, >= 0, or a negative error
  *  	   code
  */
-int pepa_open_listening_socket(struct sockaddr_in *s_addr, const buf_t *ip_address, const int port, const int num_of_clients, const char *caller_name);
+int pepa_open_listening_socket(pepa_core_t *core, 
+							   struct sockaddr_in *s_addr,
+							   const buf_t *ip_address,
+							   const int port,
+							   const int num_of_clients,
+							   const char *caller_name);
 
 
 __attribute__((warn_unused_result))
@@ -97,7 +76,7 @@ __attribute__((warn_unused_result))
  * @param int port   Port
  * @return int Opened socket >= 0, negative core on an error
  */
-int pepa_open_connection_to_server(const char *address, int port, const char *name);
+int pepa_open_connection_to_server(pepa_core_t *core, const char *address, int port, const char *name);
 
 void *pepa_shva_thread_new(__attribute__((unused))void *arg);
 

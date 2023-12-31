@@ -17,7 +17,7 @@
 static int pepa_open_shava_connection(pepa_core_t *core)
 {
 	//pepa_core_t *core                      = pepa_get_core();
-	return pepa_open_connection_to_server(core->shva_thread.ip_string->data, core->shva_thread.port_int, __func__);
+	return pepa_open_connection_to_server(core, core->shva_thread.ip_string->data, core->shva_thread.port_int, __func__);
 }
 
 static int pepa_shva_thread_open_connection(pepa_core_t *core, const char *my_name)
@@ -181,10 +181,14 @@ void *pepa_shva_thread_new(__attribute__((unused))void *arg)
 	pthread_exit(NULL);
 }
 
+// #define BUF_SIZE (2048)
+
+
 void pepa_shva_thread_new_forward_cleanup(__attribute__((unused))void *arg)
 {
-	int *eploll_fd = arg;
-	close(*eploll_fd);
+	thread_clean_args_t *clean_args = arg;
+	free(clean_args->buf);
+	close(clean_args->epoll_fd);
 }
 
 int pepa_shva_epoll_test_hang_up(pepa_core_t *core, struct epoll_event events[], int num_events)
@@ -228,8 +232,6 @@ int pepa_shva_epoll_test_hang_up(pepa_core_t *core, struct epoll_event events[],
 	return PEPA_ERR_OK;
 }
 
-#define BUF_SIZE (2048)
-
 int pepa_forwarder_process_buffers(pepa_core_t *core, char *buffer, struct epoll_event events[], int num_events)
 {
 	int rc = PEPA_ERR_OK;
@@ -240,7 +242,7 @@ int pepa_forwarder_process_buffers(pepa_core_t *core, char *buffer, struct epoll
 
 			rc = pepa_one_direction_copy2(/* Send to : */core->sockets.out_write, "OUT",
 										  /* From: */core->sockets.shva_rw, "SHVA",
-										  buffer, BUF_SIZE, /* Debug off */ 0,
+										  buffer, core->internal_buf_size, /* Debug off */ 0,
 										  /* RX stat */&core->monitor.shva_rx,
 										  /* TX stat */&core->monitor.out_tx);
 
@@ -260,11 +262,29 @@ void *pepa_shva_thread_new_forward(__attribute__((unused))void *arg)
 	int                rc;
 	pepa_core_t        *core              = pepa_get_core();
 	char               *my_name           = "SHVA-FORWARD";
-	char               buffer[BUF_SIZE];  //data buffer of 1K
+	// char               buffer[BUF_SIZE];  //data buffer of 1K
+	char               *buffer;  //data buffer of 1K
 
 	struct epoll_event events[EVENTS_NUM];
+
+	buffer = calloc(core->internal_buf_size, 1);
+	if (NULL == buffer) {
+		slog_error_l("Can not allocate a transfering buffer, stopped");
+		pthread_exit(NULL);
+	}
+
 	int                epoll_fd           = epoll_create1(EPOLL_CLOEXEC);
 
+	if (epoll_fd < 0) {
+		slog_error_l("Can not create eventfd file descriptor, stopped");
+		free(buffer);
+		pthread_exit(NULL);
+	}
+
+	thread_clean_args_t clean_args;
+
+	clean_args.buf = buffer;
+	clean_args.epoll_fd = epoll_fd;
 
 	rc = pepa_pthread_init_phase(my_name);
 	if (rc < 0) {
@@ -274,7 +294,7 @@ void *pepa_shva_thread_new_forward(__attribute__((unused))void *arg)
 		pthread_exit(NULL);
 	}
 
-	pthread_cleanup_push(pepa_shva_thread_new_forward_cleanup, &epoll_fd);
+	pthread_cleanup_push(pepa_shva_thread_new_forward_cleanup, &clean_args);
 
 	/* Init epoll set */
 

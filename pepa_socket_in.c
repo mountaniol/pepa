@@ -26,7 +26,7 @@ static void pepa_in_thread_listen_socket(pepa_core_t *core, __attribute__((unuse
 		/* Just try to close it */
 		pepa_in_thread_close_listen(core, __func__);
 
-		core->sockets.in_listen = pepa_open_listening_socket(&s_addr,
+		core->sockets.in_listen = pepa_open_listening_socket(core, &s_addr,
 															 core->in_thread.ip_string,
 															 core->in_thread.port_int,
 															 core->in_thread.clients,
@@ -88,18 +88,21 @@ static int pepa_in_thread_wait_fail_event(pepa_core_t *core, __attribute__((unus
 }
 
 #define MAX_CLIENTS (512)
-#define BUF_SIZE (2048)
-#define EMPTY_SLOT (-1)
 
 void pepa_in_thread_new_forward_clean(void *arg)
 {
+
 	pepa_core_t *core     = pepa_get_core();
-	int         *epoll_fd = arg;
+	// int         *epoll_fd = arg;
 	char        *my_name  = "IN-FORWARD-CLEAN";
+
+	thread_clean_args_t *clean_args = arg;
+
 	slog_warn("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$");
 	slog_warn_l("%s: Starting clean", my_name);
 
-	close(*epoll_fd);
+	close(clean_args->epoll_fd);
+	free(clean_args->buf);
 	/* Set state: we failed */
 	pepa_state_in_set(core, PEPA_ST_SOCKET_RESET);
 
@@ -153,6 +156,10 @@ int pepa_in_accept_new_connection(pepa_core_t *core, int epoll_fd)
 		return -1;
 	}
 
+	// pepa_set_tcp_connection_props(core, new_socket);
+	pepa_set_tcp_timeout(core, new_socket);
+	pepa_set_tcp_recv_size(core, new_socket);
+
 	if (0 != epoll_ctl_add(epoll_fd, new_socket, EPOLLIN | EPOLLRDHUP | EPOLLHUP)) {
 		slog_error_l("%s: Can not add new socke to epoll set: %s", "IN-FORWARD", strerror(errno));
 		return -1;
@@ -191,7 +198,8 @@ int pepa_in_process_buffers(pepa_core_t *core, int epoll_fd, char *buffer, struc
 			}
 
 			rc = pepa_one_direction_copy2(/* Send to : */core->sockets.shva_rw, "SHVA",
-										  /* From: */ events[i].data.fd, "IN READ", buffer, BUF_SIZE, /*Debug is ON */ 1,
+										  /* From: */ events[i].data.fd, "IN READ",
+										  buffer, core->internal_buf_size, /*Debug is ON */ 1,
 										  /* RX stat */&core->monitor.in_rx,
 										  /* TX stat */&core->monitor.shva_tx);
 			if (PEPA_ERR_OK == rc) {
@@ -224,11 +232,31 @@ void *pepa_in_thread_new_forward(__attribute__((unused))void *arg)
 	int                rc;
 	pepa_core_t        *core              = pepa_get_core();
 	char               *my_name           = "IN-FORWARD";
-	char               buffer[BUF_SIZE];  //data buffer of 1K
+	//char               buffer[BUF_SIZE];  //data buffer of 1K
+	char               *buffer;  //data buffer of 1K
 	struct epoll_event events[EVENTS_NUM];
+
+	thread_clean_args_t clean_args;
+
 	int                epoll_fd           = epoll_create1(EPOLL_CLOEXEC);
 
-	pthread_cleanup_push(pepa_in_thread_new_forward_clean, &epoll_fd);
+	if (epoll_fd < 0) {
+		slog_error_l("Can not open epoll fd");
+		pthread_exit(NULL);
+	}
+
+	buffer = calloc(core->internal_buf_size, 1);
+
+	if (NULL == buffer) {
+		slog_error_l("Can not allocate internal buffer, terminating thread");
+		close(epoll_fd);
+		pthread_exit(NULL);
+	}
+
+	clean_args.buf = buffer;
+	clean_args.epoll_fd = epoll_fd;
+
+	pthread_cleanup_push(pepa_in_thread_new_forward_clean, &clean_args);
 
 	rc = pepa_pthread_init_phase(my_name);
 	if (rc < 0) {

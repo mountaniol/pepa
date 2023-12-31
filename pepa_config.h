@@ -1,8 +1,11 @@
 #ifndef _PEPA_CONFIG_H_
 #define _PEPA_CONFIG_H_
 
+
 /* Size of buffer used to copy from fd to fd*/
-#define COPY_BUF_SIZE (128)
+//#define COPY_BUF_SIZE (128)
+/* The copying buffer is set to 2 Mega */
+#define COPY_BUF_SIZE (1024 * 1024 * 2)
 
 /* Predefined number of IN clients */
 #define PEPA_IN_SOCKETS (1024)

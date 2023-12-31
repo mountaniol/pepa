@@ -158,12 +158,16 @@ static int out_start_connection(void)
 	pepa_core_t *core = pepa_get_core();
 
 	do {
-		sock = pepa_open_connection_to_server(core->out_thread.ip_string->data, core->out_thread.port_int, __func__);
+		sock = pepa_open_connection_to_server(core, core->out_thread.ip_string->data, core->out_thread.port_int, __func__);
 		if (sock < 0) {
 			slog_error_l("Emu OUT: Could not connect to OUT (returned %d); |%s| ; waiting...", sock, strerror(errno));
 			sleep(5);
 		}
 	} while (sock < 0);
+
+	/* Set socket properties */
+	pepa_set_tcp_timeout(core, sock);
+	pepa_set_tcp_recv_size(core, sock);
 
 	slog_debug_l("Established connection to OUT: %d", sock);
 	return sock;
@@ -230,8 +234,14 @@ void *pepa_emulator_out_thread(__attribute__((unused))void *arg)
 			}
 
 			for (i = 0; i < event_count; i++) {
-				if (events[i].events & (EPOLLRDHUP | EPOLLHUP)) {
-					slog_info_l("    OUT: The remote disconnected: %s", strerror(err));
+
+				if (events[i].events & EPOLLRDHUP) {
+					slog_warn_l("    OUT: The remote disconnected: %s", strerror(err));
+					goto closeit;
+				}
+
+				if (events[i].events & EPOLLHUP) {
+					slog_warn_l("    OUT: Hung up happened: %s", strerror(err));
 					goto closeit;
 				}
 
@@ -258,7 +268,7 @@ void *pepa_emulator_out_thread(__attribute__((unused))void *arg)
 
 			/* Sometimes emulate broken connection: break the loop, then the socket will be closed */
 			if (SHOULD_EMULATE_DISCONNECT()) {
-				//slog_debug_l("OUT      : EMULATING DISCONNECT");
+				slog_note_l("OUT      : EMULATING DISCONNECT");
 				pepa_emulator_disconnect_mes("OUT");
 				goto closeit;
 			}
@@ -288,8 +298,8 @@ void *pepa_emulator_shva_reader_thread(__attribute__((unused))void *arg)
 
 	emu_set_int_signal_handler();
 
-	uint64_t    reads       = 0;
-	uint64_t    tx          = 0;
+	uint64_t reads = 0;
+	uint64_t tx    = 0;
 
 	slog_debug("#############################################");
 	slog_debug("##       THREAD <SHVA READER> IS STARTED   ##");
@@ -427,10 +437,10 @@ void *pepa_emulator_shva_thread(__attribute__((unused))void *arg)
 {
 	pthread_t          shva_reader;
 	pthread_t          shva_writer;
-	int                rc                 = -1;
-	pepa_core_t        *core              = pepa_get_core();
+	int                rc          = -1;
+	pepa_core_t        *core       = pepa_get_core();
 	struct sockaddr_in s_addr;
-	int                sock_listen        = -1;
+	int                sock_listen = -1;
 	// int                sock_rw     = -1;
 
 	emu_set_int_signal_handler();
@@ -444,7 +454,7 @@ void *pepa_emulator_shva_thread(__attribute__((unused))void *arg)
 	do {
 		do {
 			slog_note_l("Emu SHVA: OPEN LISTENING SOCKET");
-			sock_listen = pepa_open_listening_socket(&s_addr, core->shva_thread.ip_string, core->shva_thread.port_int, 1, __func__);
+			sock_listen = pepa_open_listening_socket(core, &s_addr, core->shva_thread.ip_string, core->shva_thread.port_int, 1, __func__);
 			if (sock_listen < 0) {
 				slog_note_l("Emu SHVA: Could not open listening socket, waiting...");
 				usleep(1000);
@@ -507,6 +517,7 @@ void *pepa_emulator_shva_thread(__attribute__((unused))void *arg)
 						continue;
 					}
 
+#if 0 /* SEB */
 					struct timeval time_out;
 					time_out.tv_sec = 3;
 					time_out.tv_usec = 0;
@@ -518,6 +529,21 @@ void *pepa_emulator_shva_thread(__attribute__((unused))void *arg)
 						slog_debug_l("[from %s] tsetsockopt function has a problem", "EMU SHVA", strerror(errno));
 					}
 
+					/* Set TCP receive window size */
+					int buf_size = core->internal_buf_size;
+					if (0 != setsockopt(core->sockets.shva_rw, SOL_SOCKET, SO_RCVBUF, (char *)&buf_size, sizeof(buf_size))) {
+						slog_debug_l("[from %s] tsetsockopt function has a problem", "EMU SHVA", strerror(errno));
+					}
+
+					/* Set TCP sent window size */
+					if (0 != setsockopt(core->sockets.shva_rw, SOL_SOCKET, SO_SNDBUF, (char *)&buf_size, sizeof(buf_size))) {
+						slog_debug_l("[from %s] tsetsockopt function has a problem", "EMU SHVA", strerror(errno));
+					}
+#endif	
+					//pepa_set_tcp_connection_props(core, core->sockets.shva_rw);
+					pepa_set_tcp_timeout(core, core->sockets.shva_rw);
+					pepa_set_tcp_send_size(core, core->sockets.shva_rw);
+					pepa_set_tcp_recv_size(core, core->sockets.shva_rw);
 
 					/* Start read/write threads */
 					rc = pthread_create(&shva_writer, NULL, pepa_emulator_shva_writer_thread, NULL);
@@ -561,12 +587,16 @@ int         in_start_connection(void)
 	pepa_core_t *core = pepa_get_core();
 	int         sock;
 	do {
-		sock = pepa_open_connection_to_server(core->in_thread.ip_string->data, core->in_thread.port_int, __func__);
+		sock = pepa_open_connection_to_server(core, core->in_thread.ip_string->data, core->in_thread.port_int, __func__);
 		if (sock < 0) {
 			slog_note_l("Emu IN: Could not connect to IN; waiting...");
 			sleep(5);
 		}
 	} while (sock < 0);
+
+	pepa_set_tcp_timeout(core, sock);
+	pepa_set_tcp_send_size(core, sock);
+
 	return sock;
 }
 
