@@ -17,7 +17,7 @@
 static int pepa_open_shava_connection(pepa_core_t *core)
 {
 	//pepa_core_t *core                      = pepa_get_core();
-	return pepa_open_connection_to_server(core, core->shva_thread.ip_string->data, core->shva_thread.port_int, __func__);
+	return pepa_open_connection_to_server(core->shva_thread.ip_string->data, core->shva_thread.port_int, __func__);
 }
 
 static int pepa_shva_thread_open_connection(pepa_core_t *core, const char *my_name)

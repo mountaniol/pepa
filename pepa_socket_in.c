@@ -26,7 +26,7 @@ static void pepa_in_thread_listen_socket(pepa_core_t *core, __attribute__((unuse
 		/* Just try to close it */
 		pepa_in_thread_close_listen(core, __func__);
 
-		core->sockets.in_listen = pepa_open_listening_socket(core, &s_addr,
+		core->sockets.in_listen = pepa_open_listening_socket(&s_addr,
 															 core->in_thread.ip_string,
 															 core->in_thread.port_int,
 															 core->in_thread.clients,
@@ -157,7 +157,7 @@ int pepa_in_accept_new_connection(pepa_core_t *core, int epoll_fd)
 	}
 
 	// pepa_set_tcp_connection_props(core, new_socket);
-	pepa_set_tcp_timeout(core, new_socket);
+	pepa_set_tcp_timeout(new_socket);
 	pepa_set_tcp_recv_size(core, new_socket);
 
 	if (0 != epoll_ctl_add(epoll_fd, new_socket, EPOLLIN | EPOLLRDHUP | EPOLLHUP)) {

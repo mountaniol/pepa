@@ -158,7 +158,7 @@ static int out_start_connection(void)
 	pepa_core_t *core = pepa_get_core();
 
 	do {
-		sock = pepa_open_connection_to_server(core, core->out_thread.ip_string->data, core->out_thread.port_int, __func__);
+		sock = pepa_open_connection_to_server(core->out_thread.ip_string->data, core->out_thread.port_int, __func__);
 		if (sock < 0) {
 			slog_error_l("Emu OUT: Could not connect to OUT (returned %d); |%s| ; waiting...", sock, strerror(errno));
 			sleep(5);
@@ -166,7 +166,7 @@ static int out_start_connection(void)
 	} while (sock < 0);
 
 	/* Set socket properties */
-	pepa_set_tcp_timeout(core, sock);
+	pepa_set_tcp_timeout(sock);
 	pepa_set_tcp_recv_size(core, sock);
 
 	slog_debug_l("Established connection to OUT: %d", sock);
@@ -454,7 +454,7 @@ void *pepa_emulator_shva_thread(__attribute__((unused))void *arg)
 	do {
 		do {
 			slog_note_l("Emu SHVA: OPEN LISTENING SOCKET");
-			sock_listen = pepa_open_listening_socket(core, &s_addr, core->shva_thread.ip_string, core->shva_thread.port_int, 1, __func__);
+			sock_listen = pepa_open_listening_socket(&s_addr, core->shva_thread.ip_string, core->shva_thread.port_int, 1, __func__);
 			if (sock_listen < 0) {
 				slog_note_l("Emu SHVA: Could not open listening socket, waiting...");
 				usleep(1000);
@@ -541,7 +541,7 @@ void *pepa_emulator_shva_thread(__attribute__((unused))void *arg)
 					}
 #endif	
 					//pepa_set_tcp_connection_props(core, core->sockets.shva_rw);
-					pepa_set_tcp_timeout(core, core->sockets.shva_rw);
+					pepa_set_tcp_timeout(core->sockets.shva_rw);
 					pepa_set_tcp_send_size(core, core->sockets.shva_rw);
 					pepa_set_tcp_recv_size(core, core->sockets.shva_rw);
 
@@ -587,14 +587,14 @@ int         in_start_connection(void)
 	pepa_core_t *core = pepa_get_core();
 	int         sock;
 	do {
-		sock = pepa_open_connection_to_server(core, core->in_thread.ip_string->data, core->in_thread.port_int, __func__);
+		sock = pepa_open_connection_to_server(core->in_thread.ip_string->data, core->in_thread.port_int, __func__);
 		if (sock < 0) {
 			slog_note_l("Emu IN: Could not connect to IN; waiting...");
 			sleep(5);
 		}
 	} while (sock < 0);
 
-	pepa_set_tcp_timeout(core, sock);
+	pepa_set_tcp_timeout(sock);
 	pepa_set_tcp_send_size(core, sock);
 
 	return sock;

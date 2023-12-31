@@ -19,7 +19,7 @@ __attribute__((warn_unused_result))
 int pepa_pthread_init_phase(const char *name);
 void pepa_parse_pthread_create_error(const int rc);
 
-void pepa_set_tcp_timeout(pepa_core_t *core, int sock);
+void pepa_set_tcp_timeout(int sock);
 void pepa_set_tcp_recv_size(pepa_core_t *core, int sock);
 void pepa_set_tcp_send_size(pepa_core_t *core, int sock);
 void pepa_set_tcp_connection_props(pepa_core_t *core, int sock);
@@ -60,8 +60,7 @@ __attribute__((nonnull(1, 2)))
  * @return int Socket file descriptor, >= 0, or a negative error
  *  	   code
  */
-int pepa_open_listening_socket(pepa_core_t *core, 
-							   struct sockaddr_in *s_addr,
+int pepa_open_listening_socket(struct sockaddr_in *s_addr,
 							   const buf_t *ip_address,
 							   const int port,
 							   const int num_of_clients,
@@ -76,7 +75,7 @@ __attribute__((warn_unused_result))
  * @param int port   Port
  * @return int Opened socket >= 0, negative core on an error
  */
-int pepa_open_connection_to_server(pepa_core_t *core, const char *address, int port, const char *name);
+int pepa_open_connection_to_server(const char *address, int port, const char *name);
 
 void *pepa_shva_thread_new(__attribute__((unused))void *arg);
 

@@ -22,7 +22,7 @@ static int pepa_out_wait_connection(pepa_core_t *core, int fd_listen)
 
 	slog_info_l("%s: ACCEPTED CONNECTION: fd = %d", my_name, fd_read);
 	//pepa_set_tcp_connection_props(core, fd_read);
-	pepa_set_tcp_timeout(core, fd_read);
+	pepa_set_tcp_timeout(fd_read);
 	pepa_set_tcp_send_size(core, fd_read);
 	return fd_read;
 }
@@ -43,7 +43,7 @@ static int pepa_out_thread_open_listening_socket(pepa_core_t *core, __attribute_
 	}
 	do {
 		/* Just try to close it */
-		core->sockets.out_listen = pepa_open_listening_socket(core, &s_addr,
+		core->sockets.out_listen = pepa_open_listening_socket(&s_addr,
 															  core->out_thread.ip_string,
 															  core->out_thread.port_int,
 															  core->out_thread.clients,

@@ -65,7 +65,7 @@ void pepa_parse_pthread_create_error(const int rc)
 	}
 }
 
-void pepa_set_tcp_timeout(pepa_core_t *core, int sock)
+void pepa_set_tcp_timeout(int sock)
 {
 //	return;
 	struct timeval time_out;
@@ -330,8 +330,7 @@ void pepa_socket_close_in_listen(pepa_core_t *core)
 }
 
 __attribute__((nonnull(1, 2)))
-int pepa_open_listening_socket(pepa_core_t *core,
-							   struct sockaddr_in *s_addr,
+int pepa_open_listening_socket(struct sockaddr_in *s_addr,
 							   const buf_t *ip_address,
 							   const int port,
 							   const int num_of_clients,
@@ -412,7 +411,7 @@ int pepa_open_listening_socket(pepa_core_t *core,
 	return (sock);
 }
 
-int pepa_open_connection_to_server(pepa_core_t *core, const char *address, int port, const char *name)
+int pepa_open_connection_to_server(const char *address, int port, const char *name)
 {
 	struct sockaddr_in s_addr;
 	int                sock;

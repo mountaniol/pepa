@@ -71,7 +71,9 @@ int main(int argi, char *argv[])
 
 	if (core->daemon) {
 		daemonize(core);
+		/* Set hight limit of opened files */
 		pepa_set_rlimit();
+		/* After demonization we must reinit the logger */
 		slog_init("pepa", SLOG_FLAGS_ALL, 0);
 		rc = pepa_config_slogger_daemon(core);
 	}
@@ -86,7 +88,6 @@ int main(int argi, char *argv[])
 	}
 
 	slog_note_l("Threads are started");
-
 
 	while (1) {
 		sleep(60);
