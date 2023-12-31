@@ -10,8 +10,31 @@
 #include <sys/types.h>
 #include <errno.h>
 
+#include <sys/time.h>
+#include <sys/resource.h>
+
+
 #include "slog/src/slog.h"
 #include "pepa_core.h"
+
+void pepa_set_rlimit(void)
+{
+	struct rlimit limit;
+
+	limit.rlim_cur = 65535;
+	limit.rlim_max = 65535;
+	if (setrlimit(RLIMIT_NOFILE, &limit) != 0) {
+		slog_debug_l("setrlimit() failed with errno=%d\n", errno);
+	}
+
+	/* Get max number of files. */
+	if (getrlimit(RLIMIT_NOFILE, &limit) != 0) {
+		slog_debug_l("getrlimit() failed with errno=%d\n", errno);
+	}
+
+	slog_debug_l("The soft limit is %lu\n", limit.rlim_cur);
+	slog_debug_l("The hard limit is %lu\n", limit.rlim_max);
+}
 
 void daemonize(pepa_core_t *core)
 {

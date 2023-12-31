@@ -69,7 +69,7 @@ void pepa_set_tcp_timeout(pepa_core_t *core, int sock)
 {
 //	return;
 	struct timeval time_out;
-	time_out.tv_sec = 3;
+	time_out.tv_sec = 1;
 	time_out.tv_usec = 0;
 
 	if (0 != setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char *)&time_out, sizeof(time_out))) {
@@ -314,7 +314,7 @@ void pepa_socket_close_out_listen(pepa_core_t *core)
 {
 	pepa_socket_close_out_write(core);
 	if (PEPA_ERR_OK != pepa_socket_shutdown_and_close(core->sockets.out_listen, "OUT LISTEN")) {
-		slog_debug_l("Close and shutdown od OUT LISTEN is failed");
+		slog_debug_l("Close and shutdown of the OUT LISTEN is failed");
 	}
 	core->sockets.out_listen = -1;
 	slog_note_l("Closed core->sockets.out_listen");
@@ -376,13 +376,13 @@ int pepa_open_listening_socket(pepa_core_t *core,
 	if (0 != setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, (char *)&time_out, sizeof(time_out))) {
 		slog_debug_l("[from %s] tsetsockopt function has a problem", name, strerror(errno));
 	}
+#endif
 	const int enable = 1;
 	rc = setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable));
 	if (rc < 0) {
 		slog_error_l("Open Socket [from %s]: Could not set SO_REUSEADDR on socket, error: %s", name, strerror(errno));
 		return (-PEPA_ERR_SOCKET_CREATION);
 	}
-#endif
 
 	// pepa_set_tcp_connection_props(core, sock);
 

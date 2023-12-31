@@ -37,6 +37,10 @@ static int pepa_out_thread_open_listening_socket(pepa_core_t *core, __attribute_
 	struct sockaddr_in s_addr;
 	int                waiting_time = 0;
 	int                timeout      = 5;
+
+	if (core->sockets.out_listen >= 0) {
+		slog_debug_l("Trying to open a listening socket while it is already opened");
+	}
 	do {
 		/* Just try to close it */
 		core->sockets.out_listen = pepa_open_listening_socket(core, &s_addr,
@@ -48,6 +52,7 @@ static int pepa_out_thread_open_listening_socket(pepa_core_t *core, __attribute_
 			core->sockets.out_listen = -1;
 			//slog_warn_l("%s: Can not open listening socket: %s", my_name, strerror(errno));
 			waiting_time += timeout;
+			usleep(1000000);
 		}
 	} while (core->sockets.out_listen < 0);
 	usleep(1000);
@@ -122,6 +127,7 @@ void *pepa_out_thread(__attribute__((unused))void *arg)
 			rc = pepa_out_thread_open_listening_socket(core, my_name);
 			if (rc) {
 				slog_warn_l("%s: Can not open listening socket", my_name);
+				sleep(1);
 				next_step = PEPA_TH_OUT_CLOSE_WRITE_SOCKET;
 			}
 			slog_note_l("END STEP  : %s", pepa_out_thread_state_str(this_step));
