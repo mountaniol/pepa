@@ -78,9 +78,9 @@ void *pepa_shva_thread_new_forward(__attribute__((unused))void *arg);
 void *pepa_shva_thread_new(__attribute__((unused))void *arg)
 {
 	int                      rc;
-	const char               *my_name       = "SHVA";
-	pepa_core_t              *core          = pepa_get_core();
-	pepa_shva_thread_state_t next_step      = PEPA_TH_SHVA_START;
+	const char               *my_name  = "SHVA";
+	pepa_core_t              *core     = pepa_get_core();
+	pepa_shva_thread_state_t next_step = PEPA_TH_SHVA_START;
 
 	set_sig_handler();
 
@@ -240,12 +240,19 @@ int pepa_forwarder_process_buffers(pepa_core_t *core, char *buffer, struct epoll
 		/* Read /write from/to socket */
 		if ((events[i].data.fd == core->sockets.shva_rw) && (events[i].events & EPOLLIN)) {
 
+#if 0 /* SEB */
 			rc = pepa_one_direction_copy2(/* Send to : */core->sockets.out_write, "OUT",
 										  /* From: */core->sockets.shva_rw, "SHVA",
 										  buffer, core->internal_buf_size * 1024, /* Debug off */ 0,
 										  /* RX stat */&core->monitor.shva_rx,
 										  /* TX stat */&core->monitor.out_tx);
-
+#endif
+			rc = pepa_one_direction_copy3(/* Send to : */core->sockets.out_write, "OUT",
+										  /* From: */core->sockets.shva_rw, "SHVA",
+										  buffer, core->internal_buf_size * 1024, /* Debug off */ 0,
+										  /* RX stat */&core->monitor.shva_rx,
+										  /* TX stat */&core->monitor.out_tx,
+										  /* Max iterations */ 64);
 			if (PEPA_ERR_OK == rc) {
 				continue;
 			}

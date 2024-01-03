@@ -2,6 +2,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
+#include <stdio.h>
 
 #include "slog/src/slog.h"
 #include "pepa_config.h"
@@ -455,6 +456,23 @@ int pepa_start_threads(pepa_core_t *core)
 	return PEPA_ERR_OK;
 }
 
+/* Catch Signal Handler function */
+static void signal_callback_handler(int signum, __attribute__((unused))siginfo_t *info, __attribute__((unused))void *extra)
+{
+}
+
+static void pepa_set_int_signal_handler(void)
+{
+    struct sigaction action;
+
+	sigemptyset(&action.sa_mask);
+	action.sa_flags = 0;
+
+    //action.sa_flags = SA_SIGINFO | SIGUSR1;     
+    action.sa_sigaction = signal_callback_handler;
+    sigaction(SIGINT, &action, NULL);
+}
+
 #define KB(x) ((x)/1024)
 #define MB(x) ((x)/(1024 * 1024))
 #define MONITOR_SLEEP_TIME (5)
@@ -462,6 +480,8 @@ int pepa_start_threads(pepa_core_t *core)
 void *pepa_monitor_thread(__attribute__((unused))void *arg)
 {
 	const char *my_name = "MONITOR";
+	pepa_set_int_signal_handler();
+
 	int        rc       = pepa_pthread_init_phase(my_name);
 	if (rc < 0) {
 		slog_fatal_l("%s: Could not init the thread", my_name);
@@ -508,6 +528,8 @@ void *pepa_monitor_thread(__attribute__((unused))void *arg)
 		slog_debug("### STATUS:  out_listen: %d | out_write: %d | shva_rw: %d | in_listen: %d ###",
 				   core->sockets.out_listen, core->sockets.out_write, core->sockets.shva_rw, core->sockets.in_listen);
 		slog_debug("### STATUS:  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
+
+		fflush(stdout); 
 
 		memcpy(&monitor_prev, &core->monitor, sizeof(monitor_prev));
 		sleep(MONITOR_SLEEP_TIME);

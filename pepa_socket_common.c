@@ -127,6 +127,107 @@ void pepa_set_tcp_connection_props(pepa_core_t *core, int sock)
 	}
 }
 
+int pepa_one_direction_copy3(int fd_out, const char *name_out,
+							 int fd_in, const char *name_in,
+							 char *buf, size_t buf_size, int do_debug,
+							 uint64_t *ext_rx, uint64_t *ext_tx, int max_iterations)
+{
+	int ret       = PEPA_ERR_OK;
+	int rx        = 0;
+	int tx_total  = 0;
+	int rx_total  = 0;
+	int iteration = 0;
+
+	if (do_debug) {
+		// slog_note_l("Starrting transfering from %s to %s", name_in, name_out);
+	}
+
+	do {
+		int tx         = 0;
+		int tx_current = 0;
+
+		iteration++;
+		if (do_debug) {
+			// slog_note_l("Iteration: %d", iteration);
+		}
+
+		/* Read one time, then we will transfer it possibly in pieces */
+		rx = read(fd_in, buf, buf_size);
+
+		if (do_debug) {
+			// slog_note_l("Iteration: %d, finised read(), there is %d bytes", iteration, rx);
+		}
+
+		if (rx < 0) {
+			if (do_debug) {
+				slog_error_l("Could not read: from read sock %s [%d]: %s", name_in, fd_in, strerror(errno));
+			}
+			ret = -PEPA_ERR_BAD_SOCKET_READ;
+			goto endit;
+		}
+
+		/* nothing to read*/
+		if ((0 == rx) && (1 == iteration)) {
+			/* If we can not read on the first iteration, it probably means the fd was closed */
+			ret = -PEPA_ERR_BAD_SOCKET_READ;
+
+			if (do_debug) {
+				slog_error_l("Could not read on the first iteration: from read sock %s [%d] out socket %s [%d}: %s",
+							 name_in, fd_in, name_out, fd_out, strerror(errno));
+			}
+		}
+
+		if (PEPA_ERR_OK != ret) {
+			goto endit;
+		}
+
+		/* Write until transfer the whole received buffer */
+		do {
+			tx_current  = write(fd_out, buf, (rx - tx));
+
+			if (tx_current < 0) {
+				ret = -PEPA_ERR_BAD_SOCKET_WRITE;
+				if (do_debug) {
+					slog_warn_l("Could not write to write to sock %s [%d]: returned -1: %s", name_out, fd_out, strerror(errno));
+				}
+				goto endit;
+			}
+
+			tx += tx_current;
+
+			/* If we still not transfered everything, give the TX socket some time to rest and finish the transfer */
+			if (tx < rx) {
+				usleep(10);
+			}
+
+		} while (tx < rx);
+
+		rx_total += rx;
+		tx_total += tx;
+		if (do_debug) {
+			// slog_note_l("Iteration %d done: rx = %d, tx = %d", iteration, rx, tx);
+		}
+
+	} while ((int)buf_size == rx && (iteration < max_iterations)); /* Tun this loop as long as we have data on read socket */
+
+	ret = PEPA_ERR_OK;
+endit:
+	if (do_debug) {
+		// slog_note_l("Finished transfering from %s to %s, returning %d, rx = %d, tx = %d, ", name_in, name_out, ret, rx_total, tx_total);
+	}
+
+	if (rx_total > 0) {
+		*ext_rx += rx_total;
+
+	}
+
+	if (tx_total > 0) {
+		*ext_tx += tx_total;
+
+	}
+
+	return ret;
+}
 
 int pepa_one_direction_copy2(int fd_out, const char *name_out,
 							 int fd_in, const char *name_in,

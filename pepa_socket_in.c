@@ -17,7 +17,7 @@ static void pepa_in_thread_close_listen(pepa_core_t *core, __attribute__((unused
 	pepa_socket_close_in_listen(core);
 }
 
-static void pepa_in_thread_listen_socket(pepa_core_t *core, __attribute__((unused))const char *my_name)
+static void pepa_in_thread_listen_socket(pepa_core_t *core, __attribute__((unused)) const char *my_name)
 {
 	struct sockaddr_in s_addr;
 
@@ -92,9 +92,9 @@ static int pepa_in_thread_wait_fail_event(pepa_core_t *core, __attribute__((unus
 void pepa_in_thread_new_forward_clean(void *arg)
 {
 
-	pepa_core_t *core     = pepa_get_core();
+	pepa_core_t         *core       = pepa_get_core();
 	// int         *epoll_fd = arg;
-	char        *my_name  = "IN-FORWARD-CLEAN";
+	char                *my_name    = "IN-FORWARD-CLEAN";
 
 	thread_clean_args_t *clean_args = arg;
 
@@ -115,7 +115,8 @@ int pepa_in_epoll_test_hang_up(pepa_core_t *core, int epoll_fd, struct epoll_eve
 	int i;
 	for (i = 0; i < num_events; i++) {
 		/* If no hung ups - continue */
-		if (!(events[i].events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR))) {
+		//if (!(events[i].events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR))) {
+		if (!(events[i].events & (EPOLLRDHUP | EPOLLHUP))) {
 			continue;
 		}
 
@@ -131,12 +132,17 @@ int pepa_in_epoll_test_hang_up(pepa_core_t *core, int epoll_fd, struct epoll_eve
 
 		int rc  = epoll_ctl(epoll_fd, EPOLL_CTL_DEL, events[i].data.fd, NULL);
 		int err = errno;
-
-		/* Close the file descriptor */
-		close(events[i].data.fd);
+		slog_warn_l("IN reading socket: disconnected external writer, fd: %d", events[i].data.fd);
 
 		if (0 != rc) {
 			slog_debug_l("Can not remove file descriptor from the epoll set: %s", strerror(err));
+		}
+
+		/* Close the file descriptor */
+		rc = close(events[i].data.fd);
+
+		if (0 != rc) {
+			slog_debug_l("Can not close file descriptor from the epoll set: %s", strerror(err));
 		}
 	}
 
@@ -197,11 +203,24 @@ int pepa_in_process_buffers(pepa_core_t *core, int epoll_fd, char *buffer, struc
 				continue;
 			}
 
+#if 0 /* SEB */
 			rc = pepa_one_direction_copy2(/* Send to : */core->sockets.shva_rw, "SHVA",
 										  /* From: */ events[i].data.fd, "IN READ",
 										  buffer, core->internal_buf_size * 1024, /*Debug is ON */ 1,
 										  /* RX stat */&core->monitor.in_rx,
 										  /* TX stat */&core->monitor.shva_tx);
+#endif	
+
+			/* We must lock SHVA socket since IN can run several instances of this thread */
+			pepa_shva_socket_lock(core);
+			rc = pepa_one_direction_copy3(/* Send to : */core->sockets.shva_rw, "SHVA",
+										  /* From: */ events[i].data.fd, "IN READ",
+										  buffer, core->internal_buf_size * 1024, /*Debug is ON */ 1,
+										  /* RX stat */&core->monitor.in_rx,
+										  /* TX stat */&core->monitor.shva_tx,
+										  /* Max iterations */ 4);
+			pepa_shva_socket_unlock(core);
+
 			if (PEPA_ERR_OK == rc) {
 				//slog_warn_l("%s: Sent from socket %d", "IN-FORWARD", events[i].data.fd);
 				continue;
@@ -229,16 +248,16 @@ int pepa_in_process_buffers(pepa_core_t *core, int epoll_fd, char *buffer, struc
 
 void *pepa_in_thread_new_forward(__attribute__((unused))void *arg)
 {
-	int                rc;
-	pepa_core_t        *core              = pepa_get_core();
-	char               *my_name           = "IN-FORWARD";
+	int                 rc;
+	pepa_core_t         *core              = pepa_get_core();
+	char                *my_name           = "IN-FORWARD";
 	//char               buffer[BUF_SIZE];  //data buffer of 1K
-	char               *buffer;  //data buffer of 1K
-	struct epoll_event events[EVENTS_NUM];
+	char                *buffer;  //data buffer of 1K
+	struct epoll_event  events[EVENTS_NUM];
 
 	thread_clean_args_t clean_args;
 
-	int                epoll_fd           = epoll_create1(EPOLL_CLOEXEC);
+	int                 epoll_fd           = epoll_create1(EPOLL_CLOEXEC);
 
 	if (epoll_fd < 0) {
 		slog_error_l("Can not open epoll fd");
@@ -304,7 +323,8 @@ void *pepa_in_thread_new_forward(__attribute__((unused))void *arg)
 
 		/* We get error if the listening socket is diconnected  */
 		if (PEPA_ERR_OK != rc) {
-			pthread_exit(NULL);
+			//slog_warn_l("An error in socket; continue");
+			//pthread_exit(NULL);
 		}
 	}
 

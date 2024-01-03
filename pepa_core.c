@@ -36,6 +36,21 @@ static int pepa_core_sem_init(pepa_core_t *core)
 	return PEPA_ERR_OK;
 }
 
+static int pepa_shva_mutex_init(pepa_core_t *core)
+{
+	TESTP(core, -1);
+	int sem_rc = sem_init(&core->sockets.shva_rw_mutex, 0, 1);
+
+	if (0 != sem_rc) {
+		slog_fatal_l("Could not init SHVA mutexes");
+		perror("sem init failure: ");
+		PEPA_TRY_ABORT();
+		return (-PEPA_ERR_INIT_MITEX);
+	}
+
+	return PEPA_ERR_OK;
+}
+
 /**
  * @author Sebastian Mountaniol (7/20/23)
  * @brief Destroy the pepa_core_t internal semaphore
@@ -88,6 +103,14 @@ static pepa_core_t *pepa_create_core_t(void)
 	rc = pepa_core_sem_init(core);
 	if (rc) {
 		slog_fatal_l("Could not init mutex - returning NULL");
+		free(core);
+		PEPA_TRY_ABORT();
+		return NULL;
+	}
+
+	rc = pepa_shva_mutex_init(core);
+	if (rc) {
+		slog_fatal_l("Could not init SHAV mutex - returning NULL");
 		free(core);
 		PEPA_TRY_ABORT();
 		return NULL;
@@ -291,6 +314,30 @@ int pepa_core_unlock(void)
 	}
 
 	return PEPA_ERR_OK;
+}
+
+void pepa_shva_socket_lock(pepa_core_t *core)
+{
+	int rc;
+	TESTP_ASSERT(g_pepa_core, "Core is NULL!");
+
+	rc = sem_wait(&core->sockets.shva_rw_mutex);
+	if (0 != rc) {
+		slog_fatal_l("Can't wait on semaphore; abort");
+		perror("Can't wait on semaphore; abort");
+		abort();
+	}
+}
+
+void pepa_shva_socket_unlock(pepa_core_t *core)
+{
+	int rc;
+	rc = sem_post(&core->sockets.shva_rw_mutex);
+	if (0 != rc) {
+		slog_fatal_l("Can't unlock semaphore: abort");
+		perror("Can't unlock semaphore: abort");
+		abort();
+	}
 }
 
 int pepa_if_abort(void)

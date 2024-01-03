@@ -14,6 +14,10 @@
 #include "pepa_socket_common.h"
 #include "pepa_state_machine.h"
 
+/* Keep here PIDs of IN threads */
+pthread_t *in_thread_idx;
+int number_of_in_threads = 4;
+
 #define SHUTDOWN_DIVIDER (100003573)
 #define SHOULD_EMULATE_DISCONNECT() (0 == (rand() % SHUTDOWN_DIVIDER))
 #define RX_TX_PRINT_DIVIDER (1000000)
@@ -27,11 +31,14 @@ uint64_t   lorem_ipsum_len = 0;
 
 static void close_emulatior(void)
 {
+	int i;
 	pepa_core_t *core = pepa_get_core();
 	/* Stop threads */
 	slog_debug_l("Starting EMU clean");
 	pthread_cancel(core->out_thread.thread_id);
-	pthread_cancel(core->in_thread.thread_id);
+	for (i = 0; i < number_of_in_threads ; i++) {
+		pthread_cancel(in_thread_idx[i]);
+	}
 	pthread_cancel(core->shva_thread.thread_id);
 	slog_debug_l("Finish EMU clean");
 }
@@ -88,9 +95,9 @@ void pepa_emulator_buf_validate_size(buf_t *buf)
 
 void pepa_emulator_disconnect_mes(const char *name)
 {
-	slog_note("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$");
-	slog_note_l("EMU: Emulating %s disconnect", name);
-	slog_note("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$");
+	slog_warn("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$");
+	slog_warn("EMU: Emulating %s disconnect", name);
+	slog_warn("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$");
 }
 
 int pepa_emulator_generate_buffer_buf(buf_t *buf, int64_t buffer_size)
@@ -612,15 +619,20 @@ void pepa_emulator_in_thread_cleanup(__attribute__((unused))void *arg)
 /* Create 1 read/write listening socket to emulate SHVA server */
 void *pepa_emulator_in_thread(__attribute__((unused))void *arg)
 {
+	pthread_cleanup_push(pepa_emulator_in_thread_cleanup, NULL);
+
+	int *my_num = arg;
+	char my_name[32] = {0};
 	int         rc     = -1;
-	pepa_core_t *core  = pepa_get_core();
+	//pepa_core_t *core  = pepa_get_core();
 
 	uint64_t    writes = 0;
 	uint64_t    rx     = 0;
+	int in_socket = -1;
 
 	emu_set_int_signal_handler();
+	sprintf(my_name, "   IN[%.2d]", *my_num);
 
-	pthread_cleanup_push(pepa_emulator_in_thread_cleanup, NULL);
 
 	/* In this thread we read from socket as fast as we can */
 
@@ -628,26 +640,26 @@ void *pepa_emulator_in_thread(__attribute__((unused))void *arg)
 
 	do {
 		/* Note: the in_start_connection() function can not fail; it blocking until connection opened */
-		core->sockets.in_listen = in_start_connection();
-		slog_warn_l("     IN: Opened connectuin to IN: fd = %d", core->sockets.in_listen);
+		in_socket = in_start_connection();
+		slog_warn_l("%s: Opened connectuin to IN: fd = %d", my_name, in_socket);
 
 		do {
 			if (0 != pepa_emulator_generate_buffer_buf(buf, (rand() % 750) + 16)) {
-				slog_fatal_l("     IN: Can't generate buf");
+				slog_fatal_l("%s: Can't generate buf", my_name);
 				break;
 			}
 
-			// slog_note_l("     IN: Trying to write");
-			rc = write(core->sockets.in_listen, buf->data, buf->used);
+			// slog_note_l("%s: Trying to write", , my_name);
+			rc = write(in_socket, buf->data, buf->used);
 			writes++;
 
 			if (rc < 0) {
-				slog_warn_l("     IN: Could not send buffer to SHVA, error: %s", strerror(errno));
+				slog_warn_l("%s: Could not send buffer to SHVA, error: %s",my_name, strerror(errno));
 				break;
 			}
 
 			if (0 == rc) {
-				slog_warn_l("     IN: Send 0 bytes to SHVA, error: %s", strerror(errno));
+				slog_warn_l("%s: Send 0 bytes to SHVA, error: %s",my_name, strerror(errno));
 				usleep(10000);
 				break;
 			}
@@ -656,20 +668,20 @@ void *pepa_emulator_in_thread(__attribute__((unused))void *arg)
 			rx += rc;
 
 			if (0 == (writes % RX_TX_PRINT_DIVIDER)) {
-				slog_debug_l("     IN: %-7lu writes, bytes: %-7lu, Kb: %-7lu", writes, rx, (rx / 1024));
+				slog_debug_l("%s: %-7lu writes, bytes: %-7lu, Kb: %-7lu",my_name, writes, rx, (rx / 1024));
 			}
 
 			/* Emulate socket closing */
 			if (SHOULD_EMULATE_DISCONNECT()) {
-				pepa_emulator_disconnect_mes("IN");
+				pepa_emulator_disconnect_mes(my_name);
 				break;
 			}
 
 		} while (1); /* Generating and sending data */
 
-		slog_warn_l("     IN: Closing connection");
-		close(core->sockets.in_listen);
-		core->sockets.in_listen = -1;
+		slog_warn_l("%s: Closing connection",my_name);
+		close(in_socket);
+		in_socket = -1;
 		sleep(5);
 	} while (1);
 
@@ -738,14 +750,23 @@ int main(int argi, char *argv[])
 
 	usleep(500000);
 
+	/* How many connection to IN to run */
+	//number_of_in_threads = 2;
+	int i = 0;
+
+	in_thread_idx = calloc(sizeof(pthread_t) * number_of_in_threads, number_of_in_threads);
+
 	if (NULL != core->in_thread.ip_string) {
-		slog_info_l("Starting IN thread");
-		rc = pthread_create(&core->in_thread.thread_id, NULL, pepa_emulator_in_thread, NULL);
-		if (0 == rc) {
-			slog_note_l("SHVA thread is started");
-		} else {
-			pepa_parse_pthread_create_error(rc);
-			return -PEPA_ERR_THREAD_CANNOT_CREATE;
+		for (i = 0; i < number_of_in_threads; i++) {
+			slog_info_l("Starting IN[%d] thread", i);
+			//rc = pthread_create(&core->in_thread.thread_id, NULL, pepa_emulator_in_thread, NULL);
+			rc = pthread_create(&in_thread_idx[i], NULL, pepa_emulator_in_thread, &i);
+			if (0 == rc) {
+				slog_note_l("IN[%d] thread is started", i);
+			} else {
+				pepa_parse_pthread_create_error(rc);
+				return -PEPA_ERR_THREAD_CANNOT_CREATE;
+			}
 		}
 	}
 

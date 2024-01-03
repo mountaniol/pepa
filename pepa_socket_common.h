@@ -32,6 +32,11 @@ int pepa_one_direction_copy2(int fd_out, const char *name_out,
 							 char *buf, size_t buf_size, int do_debug, 
 							 uint64_t *ext_rx, uint64_t *ext_tx);
 
+int pepa_one_direction_copy3(int fd_out, const char *name_out,
+							 int fd_in, const char *name_in,
+							 char *buf, size_t buf_size, int do_debug,
+							 uint64_t *ext_rx, uint64_t *ext_tx, int max_iterations);
+
 /**
  * @author Sebastian Mountaniol (12/14/23)
  * @brief Test file descriptor. If it opened, return PEPA_ERR_OK,

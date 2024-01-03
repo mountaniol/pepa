@@ -389,6 +389,7 @@ int pepa_config_slogger_daemon(pepa_core_t *core)
 		cfg.nKeepOpen = 1;
 		cfg.nFlush = 1;
 		strcpy(cfg.sFileName, core->slog_file);
+		cfg.eColorFormat = SLOG_COLORING_DISABLE;
 	} else {
 		slog_note_l("No log file given");
 	}

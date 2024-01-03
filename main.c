@@ -7,7 +7,8 @@
 #include "pepa_parser.h"
 #include "pepa_server.h"
 #include "pepa_state_machine.h"
-/* Catch Signal Handler functio */
+
+/* Catch Signal Handler function */
 static void signal_callback_handler(int signum, __attribute__((unused))siginfo_t *info, __attribute__((unused))void *extra)
 {
 	pepa_core_t *core = pepa_get_core();
@@ -25,7 +26,7 @@ static void signal_callback_handler(int signum, __attribute__((unused))siginfo_t
 	}
 }
 
-void pepa_set_int_signal_handler(void)
+static void pepa_set_int_signal_handler(void)
 {
     struct sigaction action;
 

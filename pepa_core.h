@@ -28,6 +28,7 @@ typedef struct {
  */
 typedef struct {
 	int shva_rw;
+	sem_t shva_rw_mutex;
 	int out_listen;
 	int out_write;
 	int in_listen;
@@ -194,4 +195,7 @@ int pepa_if_abort(void);
 const char *pepa_out_thread_state_str(pepa_out_thread_state_t s);
 const char *pepa_shva_thread_state_str(pepa_shva_thread_state_t s);
 const char *pepa_in_thread_state_str(pepa_in_thread_state_t s);
+
+void pepa_shva_socket_lock(pepa_core_t *core);
+void pepa_shva_socket_unlock(pepa_core_t *core);
 #endif /* _PEPA_CORE_H_ */
