@@ -39,7 +39,7 @@ static int32_t pepa_out_thread_open_listening_socket(pepa_core_t *core, __attrib
 	int32_t                timeout      = 5;
 
 	if (core->sockets.out_listen >= 0) {
-		slog_debug_l("Trying to open a listening socket while it is already opened");
+		slog_note_l("Trying to open a listening socket while it is already opened");
 	}
 	do {
 		/* Just try to close it */

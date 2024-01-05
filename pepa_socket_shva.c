@@ -29,7 +29,7 @@ static int pepa_shva_thread_open_connection(pepa_core_t *core, const char *my_na
 		if (core->sockets.shva_rw < 0) {
 			core->sockets.shva_rw = -1;
 			//slog_note_l("%s: Can not open connection to SHVA server; wait 1 seconds and try over", my_name);
-			usleep(1);
+			usleep(100000);
 			continue;
 		}
 	} while (core->sockets.shva_rw < 0);

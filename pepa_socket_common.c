@@ -556,7 +556,7 @@ int pepa_open_connection_to_server(const char *address, int port, const char *na
 #endif
 	slog_note_l("[from %s]: Starting connect(): |%s|", name, address);
 	if (connect(sock, (struct sockaddr *)&s_addr, (socklen_t)sizeof(s_addr)) < 0) {
-		slog_debug_l("[from %s]: Could not connect to server: %s", name, strerror(errno));
+		slog_note_l("[from %s]: Could not connect to server: %s", name, strerror(errno));
 		close(sock);
 		//PEPA_TRY_ABORT();
 		return (-PEPA_ERR_SOCK_CONNECT);
