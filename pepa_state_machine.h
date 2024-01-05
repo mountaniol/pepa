@@ -16,11 +16,11 @@ void pepa_thread_start_in_fw(pepa_core_t *core);
 void pepa_thread_start_monitor(pepa_core_t *core);
 
 __attribute__((warn_unused_result))
-int pepa_thread_is_shva_up(pepa_core_t *core);
+int32_t pepa_thread_is_shva_up(pepa_core_t *core);
 __attribute__((warn_unused_result))
-int pepa_thread_is_in_up(pepa_core_t *core);
+int32_t pepa_thread_is_in_up(pepa_core_t *core);
 __attribute__((warn_unused_result))
-int pepa_thread_is_out_up(pepa_core_t *core);
+int32_t pepa_thread_is_out_up(pepa_core_t *core);
 
 void pepa_thread_start_out(pepa_core_t *core);
 
@@ -37,19 +37,19 @@ void pepa_state_out_set(pepa_core_t *core, pepa_sig_t sig);
 //void pepa_state_in_fw_set(pepa_core_t *core, pepa_sig_t sig);
 
 __attribute__((warn_unused_result))
-int pepa_state_shva_get(pepa_core_t *core);
+int32_t pepa_state_shva_get(pepa_core_t *core);
 __attribute__((warn_unused_result))
-int pepa_state_in_get(pepa_core_t *core);
+int32_t pepa_state_in_get(pepa_core_t *core);
 __attribute__((warn_unused_result))
-int pepa_state_out_get(pepa_core_t *core);
+int32_t pepa_state_out_get(pepa_core_t *core);
 
 __attribute__((warn_unused_result))
 /**
  * @author Sebastian Mountaniol (12/10/23)
  * @brief Start threads / state machine 
- * @return int PEPA_ERR_OK on success, a negative value on an
+ * @return int32_t PEPA_ERR_OK on success, a negative value on an
  *  	   error
  */
-int pepa_start_threads(pepa_core_t *core);
+int32_t pepa_start_threads(pepa_core_t *core);
 
 #endif /* _PEPA_STATE_MACHINE_H_ */

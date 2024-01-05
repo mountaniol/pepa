@@ -27,7 +27,7 @@ void set_sig_handler(void)
 	}
 }
 
-int pepa_pthread_init_phase(const char *name)
+int32_t pepa_pthread_init_phase(const char *name)
 {
 	slog_note("####################################################");
 	slog_note_l("Thread %s: Detaching", name);
@@ -40,7 +40,7 @@ int pepa_pthread_init_phase(const char *name)
 	slog_note_l("Thread %s: Detached", name);
 	slog_note("####################################################");
 
-	int rc = pthread_setname_np(pthread_self(), name);
+	int32_t rc = pthread_setname_np(pthread_self(), name);
 	if (0 != rc) {
 		slog_fatal_l("Thread %s: can't set name", name);
 	}
@@ -48,7 +48,7 @@ int pepa_pthread_init_phase(const char *name)
 	return PEPA_ERR_OK;
 }
 
-void pepa_parse_pthread_create_error(const int rc)
+void pepa_parse_pthread_create_error(const int32_t rc)
 {
 	switch (rc) {
 	case EAGAIN:
@@ -82,8 +82,7 @@ void pepa_set_tcp_timeout(int sock)
 
 void pepa_set_tcp_recv_size(pepa_core_t *core, int sock)
 {
-//	return;
-	int buf_size = core->internal_buf_size * 1024;
+	int32_t buf_size = core->internal_buf_size * 1024;
 
 	/* Set TCP receive window size */
 	if (0 != setsockopt(sock, SOL_SOCKET, SO_RCVBUF, (char *)&buf_size, sizeof(buf_size))) {
@@ -93,8 +92,7 @@ void pepa_set_tcp_recv_size(pepa_core_t *core, int sock)
 
 void pepa_set_tcp_send_size(pepa_core_t *core, int sock)
 {
-//	return;
-	int buf_size = core->internal_buf_size * 1024;
+	int32_t buf_size = core->internal_buf_size * 1024;
 	/* Set TCP sent window size */
 	if (0 != setsockopt(sock, SOL_SOCKET, SO_SNDBUF, (char *)&buf_size, sizeof(buf_size))) {
 		slog_debug_l("[from %s] SO_SNDBUF has a problem", "EMU SHVA", strerror(errno));
@@ -107,7 +105,7 @@ void pepa_set_tcp_connection_props(pepa_core_t *core, int sock)
 	time_out.tv_sec = 10;
 	time_out.tv_usec = 0;
 
-	int buf_size = core->internal_buf_size * 1024;
+	int32_t buf_size = core->internal_buf_size * 1024;
 
 	if (0 != setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char *)&time_out, sizeof(time_out))) {
 		slog_debug_l("[from %s] tsetsockopt function has a problem", "EMU SHVA", strerror(errno));
@@ -208,7 +206,8 @@ int pepa_one_direction_copy3(int fd_out, const char *name_out,
 			// slog_note_l("Iteration %d done: rx = %d, tx = %d", iteration, rx, tx);
 		}
 
-	} while ((int)buf_size == rx && (iteration < max_iterations)); /* Tun this loop as long as we have data on read socket */
+		/* Run this loop as long as we have data on read socket, nut no more that max_iterations */
+	} while ( ((int32_t)buf_size == rx) && (iteration <= max_iterations)); 
 
 	ret = PEPA_ERR_OK;
 endit:
@@ -330,7 +329,7 @@ endit:
 	return ret;
 }
 
-int pepa_test_fd(int fd)
+int32_t pepa_test_fd(int32_t fd)
 {
 	if ((fcntl(fd, F_GETFL) < 0) && (EBADF == errno)) {
 		return -PEPA_ERR_FILE_DESCRIPTOR;
@@ -338,7 +337,7 @@ int pepa_test_fd(int fd)
 	return PEPA_ERR_OK;
 }
 
-int epoll_ctl_add(int epfd, int fd, uint32_t events)
+int32_t epoll_ctl_add(int epfd, int fd, uint32_t events)
 {
 	struct epoll_event ev;
 
@@ -357,7 +356,7 @@ int epoll_ctl_add(int epfd, int fd, uint32_t events)
 	return PEPA_ERR_OK;
 }
 
-int pepa_socket_shutdown_and_close(int sock, const char *my_name)
+int32_t pepa_socket_shutdown_and_close(int sock, const char *my_name)
 {
 	if (sock < 0) {
 		slog_warn_l("%s: Looks like the socket is closed: == %d", my_name);

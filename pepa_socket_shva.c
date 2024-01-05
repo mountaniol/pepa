@@ -28,8 +28,8 @@ static int pepa_shva_thread_open_connection(pepa_core_t *core, const char *my_na
 
 		if (core->sockets.shva_rw < 0) {
 			core->sockets.shva_rw = -1;
-			slog_note_l("%s: Can not open connection to SHVA server; wait 1 seconds and try over", my_name);
-			usleep(1 * 1000000);
+			//slog_note_l("%s: Can not open connection to SHVA server; wait 1 seconds and try over", my_name);
+			usleep(1);
 			continue;
 		}
 	} while (core->sockets.shva_rw < 0);
@@ -38,7 +38,7 @@ static int pepa_shva_thread_open_connection(pepa_core_t *core, const char *my_na
 	return PEPA_ERR_OK;
 }
 
-static int pepa_shva_thread_wait_out(pepa_core_t *core, __attribute__((unused)) const char *my_name)
+static int32_t pepa_shva_thread_wait_out(pepa_core_t *core, __attribute__((unused)) const char *my_name)
 {
 	while (1) {
 		if (PEPA_ST_RUN == pepa_state_out_get(core)) {
@@ -54,7 +54,7 @@ static int pepa_shva_thread_wait_out(pepa_core_t *core, __attribute__((unused)) 
 }
 
 /* Wait for signal; when SHVA is DOWN, return */
-static int pepa_shva_thread_wait_fail(pepa_core_t *core, __attribute__((unused)) const char *my_name)
+static int32_t pepa_shva_thread_wait_fail(pepa_core_t *core, __attribute__((unused)) const char *my_name)
 {
 	while (1) {
 		if (PEPA_ST_FAIL == pepa_state_out_get(core)) {
@@ -77,7 +77,7 @@ static int pepa_shva_thread_wait_fail(pepa_core_t *core, __attribute__((unused))
 void *pepa_shva_thread_new_forward(__attribute__((unused))void *arg);
 void *pepa_shva_thread_new(__attribute__((unused))void *arg)
 {
-	int                      rc;
+	int32_t                      rc;
 	const char               *my_name  = "SHVA";
 	pepa_core_t              *core     = pepa_get_core();
 	pepa_shva_thread_state_t next_step = PEPA_TH_SHVA_START;
@@ -232,10 +232,10 @@ int pepa_shva_epoll_test_hang_up(pepa_core_t *core, struct epoll_event events[],
 	return PEPA_ERR_OK;
 }
 
-int pepa_forwarder_process_buffers(pepa_core_t *core, char *buffer, struct epoll_event events[], int num_events)
+int32_t pepa_forwarder_process_buffers(pepa_core_t *core, char *buffer, struct epoll_event events[], uint32_t num_events)
 {
-	int rc = PEPA_ERR_OK;
-	int i;
+	int32_t rc = PEPA_ERR_OK;
+	uint32_t i;
 	for (i = 0; i < num_events; i++) {
 		/* Read /write from/to socket */
 		if ((events[i].data.fd == core->sockets.shva_rw) && (events[i].events & EPOLLIN)) {
@@ -252,7 +252,7 @@ int pepa_forwarder_process_buffers(pepa_core_t *core, char *buffer, struct epoll
 										  buffer, core->internal_buf_size * 1024, /* Debug off */ 0,
 										  /* RX stat */&core->monitor.shva_rx,
 										  /* TX stat */&core->monitor.out_tx,
-										  /* Max iterations */ 64);
+										  /* Max iterations */ 1);
 			if (PEPA_ERR_OK == rc) {
 				continue;
 			}
@@ -266,7 +266,7 @@ int pepa_forwarder_process_buffers(pepa_core_t *core, char *buffer, struct epoll
 void *pepa_shva_thread_new_forward(__attribute__((unused))void *arg)
 {
 	//int                i;
-	int                rc;
+	int32_t                rc;
 	pepa_core_t        *core              = pepa_get_core();
 	char               *my_name           = "SHVA-FORWARD";
 	// char               buffer[BUF_SIZE];  //data buffer of 1K
@@ -320,7 +320,7 @@ void *pepa_shva_thread_new_forward(__attribute__((unused))void *arg)
 
 	while (1)   {
 		/* Wait until something happened */
-		int event_count = epoll_wait(epoll_fd, events, EVENTS_NUM, -1);
+		int32_t event_count = epoll_wait(epoll_fd, events, EVENTS_NUM, -1);
 
 		/* Interrupted by a signal */
 		if (event_count < 0 && EINTR == errno) {

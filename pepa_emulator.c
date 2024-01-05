@@ -15,28 +15,28 @@
 #include "pepa_state_machine.h"
 
 /* Keep here PIDs of IN threads */
-pthread_t *in_thread_idx;
-int number_of_in_threads = 4;
+pthread_t  *in_thread_idx;
+uint32_t        number_of_in_threads = 4;
 
-#define SHUTDOWN_DIVIDER (100003573)
-#define SHOULD_EMULATE_DISCONNECT() (0 == (rand() % SHUTDOWN_DIVIDER))
-#define RX_TX_PRINT_DIVIDER (1000000)
+	   #define SHUTDOWN_DIVIDER (100003573)
+	   #define SHOULD_EMULATE_DISCONNECT() (0 == (rand() % SHUTDOWN_DIVIDER))
+	   #define RX_TX_PRINT_DIVIDER (1000000)
 
-int        shva_to_out     = 0;
-int        in_to_shva      = 0;
+int        shva_to_out          = 0;
+int        in_to_shva           = 0;
 
-			#define PEPA_MIN(a,b) ((a<b) ? a : b )
-const char *lorem_ipsum    = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.\0";
-uint64_t   lorem_ipsum_len = 0;
+				 #define PEPA_MIN(a,b) ((a<b) ? a : b )
+const char *lorem_ipsum         = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.\0";
+uint64_t   lorem_ipsum_len      = 0;
 
 static void close_emulatior(void)
 {
-	int i;
+	uint32_t         i;
 	pepa_core_t *core = pepa_get_core();
 	/* Stop threads */
 	slog_debug_l("Starting EMU clean");
 	pthread_cancel(core->out_thread.thread_id);
-	for (i = 0; i < number_of_in_threads ; i++) {
+	for (i = 0; i < number_of_in_threads; i++) {
 		pthread_cancel(in_thread_idx[i]);
 	}
 	pthread_cancel(core->shva_thread.thread_id);
@@ -79,7 +79,7 @@ typedef struct {
 } __attribute__((packed)) buf_head_t;
 
 
-int pepa_emulator_buf_count(buf_t *buf)
+int32_t pepa_emulator_buf_count(buf_t *buf)
 {
 	buf_head_t *head = (buf_head_t *)buf->data;
 	return head->counter;
@@ -100,9 +100,9 @@ void pepa_emulator_disconnect_mes(const char *name)
 	slog_warn("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$");
 }
 
-int pepa_emulator_generate_buffer_buf(buf_t *buf, int64_t buffer_size)
+int32_t pepa_emulator_generate_buffer_buf(buf_t *buf, int64_t buffer_size)
 {
-	int        rc   = 0;
+	int32_t        rc   = 0;
 	buf_head_t head;
 	TESTP(buf, -1);
 	buf->used = 0;
@@ -130,7 +130,7 @@ int pepa_emulator_generate_buffer_buf(buf_t *buf, int64_t buffer_size)
 
 	while (rest > 0) {
 		uint64_t to_copy_size = PEPA_MIN(lorem_ipsum_len, rest);
-		int      rc           = buf_add(buf, lorem_ipsum, to_copy_size);
+		int32_t      rc           = buf_add(buf, lorem_ipsum, to_copy_size);
 
 		if (rc != BUFT_OK) {
 			slog_fatal_l("Could not create text buffer: %s", buf_error_code_to_string(rc));
@@ -145,7 +145,7 @@ int pepa_emulator_generate_buffer_buf(buf_t *buf, int64_t buffer_size)
 
 buf_t *pepa_emulator_generate_buffer(uint64_t buffer_size)
 {
-	int   rc;
+	int32_t   rc;
 	buf_t *buf = buf_new(buffer_size);
 	if (PEPA_ERR_OK == pepa_emulator_generate_buffer_buf(buf, buffer_size)) {
 		return buf;
@@ -159,7 +159,7 @@ buf_t *pepa_emulator_generate_buffer(uint64_t buffer_size)
 	return NULL;
 }
 
-static int out_start_connection(void)
+static int32_t out_start_connection(void)
 {
 	int         sock;
 	pepa_core_t *core = pepa_get_core();
@@ -193,10 +193,10 @@ void pepa_emulator_out_thread_cleanup(__attribute__((unused))void *arg)
 /* Create 1 read socket to emulate OUT connection */
 void *pepa_emulator_out_thread(__attribute__((unused))void *arg)
 {
-	int         rc          = -1;
+	int32_t         rc          = -1;
 	pepa_core_t *core       = pepa_get_core();
-	int         event_count;
-	int         i;
+	int32_t         event_count;
+	int32_t         i;
 
 	uint64_t    reads       = 0;
 	uint64_t    rx          = 0;
@@ -298,7 +298,7 @@ typedef struct {
 /* Create 1 read/write listening socket to emulate SHVA server */
 void *pepa_emulator_shva_reader_thread(__attribute__((unused))void *arg)
 {
-	int         rc          = -1;
+	int32_t         rc          = -1;
 	pepa_core_t *core       = pepa_get_core();
 	int         event_count;
 	int         i;
@@ -360,6 +360,13 @@ void *pepa_emulator_shva_reader_thread(__attribute__((unused))void *arg)
 						close(epoll_fd);
 						pthread_exit(NULL);
 					}
+
+					if (0 == rc) {
+						slog_warn_l("SHVA READ: Read op returned 0 bytes, an error: %s", strerror(errno));
+						close(epoll_fd);
+						pthread_exit(NULL);
+					}
+
 					tx += rc;
 					if (0 == (reads % RX_TX_PRINT_DIVIDER)) {
 						slog_debug_l("SHVA READ: %-7lu reads, bytes: %-7lu, Kb: %-7lu", reads, tx, (tx / 1024));
@@ -379,7 +386,7 @@ void *pepa_emulator_shva_reader_thread(__attribute__((unused))void *arg)
 /* Create 1 read/write listening socket to emulate SHVA server */
 void *pepa_emulator_shva_writer_thread(__attribute__((unused))void *arg)
 {
-	int         rc     = -1;
+	int32_t         rc     = -1;
 	pepa_core_t *core  = pepa_get_core();
 	uint64_t    writes = 0;
 	uint64_t    rx     = 0;
@@ -411,7 +418,8 @@ void *pepa_emulator_shva_writer_thread(__attribute__((unused))void *arg)
 
 		if (0 == rc) {
 			slog_warn_l("SHVA WRITE: Send 0 bytes to SHVA, error: %s", strerror(errno));
-			usleep(100000);
+			pthread_exit(NULL);
+			//usleep(100000);
 			continue;
 		}
 
@@ -430,7 +438,7 @@ void pepa_emulator_shva_thread_cleanup(__attribute__((unused))void *arg)
 {
 	int         *sock_listen = (int *)arg;
 	pepa_core_t *core        = pepa_get_core();
-	int         rc           = pepa_socket_shutdown_and_close(*sock_listen, "EMU SHVA");
+	int32_t         rc           = pepa_socket_shutdown_and_close(*sock_listen, "EMU SHVA");
 	if (PEPA_ERR_OK != rc) {
 		slog_error_l("Could not close listening socket");
 	}
@@ -444,7 +452,7 @@ void *pepa_emulator_shva_thread(__attribute__((unused))void *arg)
 {
 	pthread_t          shva_reader;
 	pthread_t          shva_writer;
-	int                rc          = -1;
+	int32_t                rc          = -1;
 	pepa_core_t        *core       = pepa_get_core();
 	struct sockaddr_in s_addr;
 	int                sock_listen = -1;
@@ -546,7 +554,7 @@ void *pepa_emulator_shva_thread(__attribute__((unused))void *arg)
 					if (0 != setsockopt(core->sockets.shva_rw, SOL_SOCKET, SO_SNDBUF, (char *)&buf_size, sizeof(buf_size))) {
 						slog_debug_l("[from %s] tsetsockopt function has a problem", "EMU SHVA", strerror(errno));
 					}
-#endif	
+#endif
 					//pepa_set_tcp_connection_props(core, core->sockets.shva_rw);
 					pepa_set_tcp_timeout(core->sockets.shva_rw);
 					pepa_set_tcp_send_size(core, core->sockets.shva_rw);
@@ -589,7 +597,7 @@ void *pepa_emulator_shva_thread(__attribute__((unused))void *arg)
 	pthread_exit(NULL);
 }
 
-int         in_start_connection(void)
+int32_t         in_start_connection(void)
 {
 	pepa_core_t *core = pepa_get_core();
 	int         sock;
@@ -616,18 +624,21 @@ void pepa_emulator_in_thread_cleanup(__attribute__((unused))void *arg)
 	slog_note("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$");
 }
 
+/* If this flag is ON, all IN threads should emulate sicconnection and sleep for 5 seconds */
+int32_t in_thread_disconnect_all = 0;
+
 /* Create 1 read/write listening socket to emulate SHVA server */
 void *pepa_emulator_in_thread(__attribute__((unused))void *arg)
 {
 	pthread_cleanup_push(pepa_emulator_in_thread_cleanup, NULL);
 
-	int *my_num = arg;
-	char my_name[32] = {0};
-	int         rc     = -1;
+	int32_t      *my_num     = arg;
+	char     my_name[32] = {0};
+	int32_t      rc          = -1;
 	//pepa_core_t *core  = pepa_get_core();
 
-	uint64_t    writes = 0;
-	uint64_t    rx     = 0;
+	uint64_t writes      = 0;
+	uint64_t rx          = 0;
 	int in_socket = -1;
 
 	emu_set_int_signal_handler();
@@ -644,6 +655,12 @@ void *pepa_emulator_in_thread(__attribute__((unused))void *arg)
 		slog_warn_l("%s: Opened connectuin to IN: fd = %d", my_name, in_socket);
 
 		do {
+
+			/* Disconnection of all IN thread is required */
+			if (in_thread_disconnect_all > 0) {
+				break;
+			}
+
 			if (0 != pepa_emulator_generate_buffer_buf(buf, (rand() % 750) + 16)) {
 				slog_fatal_l("%s: Can't generate buf", my_name);
 				break;
@@ -654,12 +671,12 @@ void *pepa_emulator_in_thread(__attribute__((unused))void *arg)
 			writes++;
 
 			if (rc < 0) {
-				slog_warn_l("%s: Could not send buffer to SHVA, error: %s",my_name, strerror(errno));
+				slog_warn_l("%s: Could not send buffer to SHVA, error: %s", my_name, strerror(errno));
 				break;
 			}
 
 			if (0 == rc) {
-				slog_warn_l("%s: Send 0 bytes to SHVA, error: %s",my_name, strerror(errno));
+				slog_warn_l("%s: Send 0 bytes to SHVA, error: %s", my_name, strerror(errno));
 				usleep(10000);
 				break;
 			}
@@ -668,7 +685,7 @@ void *pepa_emulator_in_thread(__attribute__((unused))void *arg)
 			rx += rc;
 
 			if (0 == (writes % RX_TX_PRINT_DIVIDER)) {
-				slog_debug_l("%s: %-7lu writes, bytes: %-7lu, Kb: %-7lu",my_name, writes, rx, (rx / 1024));
+				slog_debug_l("%s: %-7lu writes, bytes: %-7lu, Kb: %-7lu", my_name, writes, rx, (rx / 1024));
 			}
 
 			/* Emulate socket closing */
@@ -677,11 +694,23 @@ void *pepa_emulator_in_thread(__attribute__((unused))void *arg)
 				break;
 			}
 
+			/* Eulate ALL IN sockets disconnect */
+			if (SHOULD_EMULATE_DISCONNECT()) {
+				pepa_emulator_disconnect_mes("ALL IN");
+				in_thread_disconnect_all = number_of_in_threads;
+				break;
+			}
+
 		} while (1); /* Generating and sending data */
 
-		slog_warn_l("%s: Closing connection",my_name);
+		slog_warn_l("%s: Closing connection", my_name);
 		close(in_socket);
 		in_socket = -1;
+
+		/* If 'disconnect all IN threads' counter is UP, decrease it */
+		if (in_thread_disconnect_all > 0) {
+			in_thread_disconnect_all--;
+		}
 		sleep(5);
 	} while (1);
 
@@ -695,7 +724,7 @@ int main(int argi, char *argv[])
 	pepa_core_init();
 	pepa_core_t *core = pepa_get_core();
 
-	int         rc    = pepa_parse_arguments(argi, argv);
+	int32_t         rc    = pepa_parse_arguments(argi, argv);
 	if (rc < 0) {
 		slog_fatal_l("Could not parse");
 		return rc;
@@ -752,7 +781,7 @@ int main(int argi, char *argv[])
 
 	/* How many connection to IN to run */
 	//number_of_in_threads = 2;
-	int i = 0;
+	uint32_t i = 0;
 
 	in_thread_idx = calloc(sizeof(pthread_t) * number_of_in_threads, number_of_in_threads);
 

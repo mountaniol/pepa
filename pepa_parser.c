@@ -83,7 +83,7 @@ long int pepa_string_to_int_strict(char *s, int *err)
 
 int pepa_parse_ip_string_get_port(const char *argument)
 {
-	int  _err       = 0;
+	int32_t  _err       = 0;
 	char *colon_ptr = NULL;
 
 	TESTP_ASSERT(argument, "NULL argument");

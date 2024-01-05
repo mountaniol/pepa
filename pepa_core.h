@@ -16,8 +16,8 @@
 typedef struct {
 	pthread_t thread_id; /**< UD of thread */
 	buf_t *ip_string; /**< IP of socket  */
-	int port_int; /**< Port of socket  */
-	int clients; /**< Number of clients on this socket */
+	int32_t port_int; /**< Port of socket  */
+	uint32_t clients; /**< Number of clients on this socket */
 } thread_vars_t;
 
 /**
@@ -118,13 +118,13 @@ typedef struct {
 	thread_vars_t in_forwarder; /**< Configuration of IN thread */
 	thread_vars_t out_thread; /**< Configuration of OUT thread */
 	thread_vars_t monitor_thread; /**< Configuration of OUT thread */
-	int internal_buf_size; /**< Size of buffer used to pass packages, by defaiult COPY_BUF_SIZE bytes, see pepa_config.h */
-	int abort_flag; /**< Abort flag, if enabled, PEPA file abort on errors; for debug only */
+	uint32_t internal_buf_size; /**< Size of buffer used to pass packages, by defaiult COPY_BUF_SIZE bytes, see pepa_config.h */
+	int32_t abort_flag; /**< Abort flag, if enabled, PEPA file abort on errors; for debug only */
 	pepa_sockets_t sockets;
-	int monitor_timeout; /**< How many microseconds to sleep between tests in microseconds */
+	int32_t monitor_timeout; /**< How many microseconds to sleep between tests in microseconds */
 	pepa_status_t state;
 	pepa_stat_t monitor;
-	int daemon; /* If not 0, start as a daemon */
+	int32_t daemon; /* If not 0, start as a daemon */
 	int pid_fd; /* File descriptor of PID file */
 	char *pid_file_name; /* File name of PID file  */
 } pepa_core_t;
@@ -132,22 +132,23 @@ typedef struct {
 /**
  * @author Sebastian Mountaniol (12/6/23)
  * @brief Init pepas core structure
- * @return int 0 on success, a negative error code on failure.
+ * @return int32_t 0 on success, a negative error code on
+ *  	   failure.
  * @details This function should never fail. THe only reason it
  *  		can fail is lack of memory which means the OS in a
  *  		very stressed condition. The app must abort int this
  *  		case.
  */
-int pepa_core_init(void);
+int32_t pepa_core_init(void);
 
 /**
  * @author Sebastian Mountaniol (12/10/23)
  * @brief Destroy core structure
  * @param  void  
- * @return int 0 on success
+ * @return int32_t 0 on success
  * @details 
  */
-int pepa_core_finish(void);
+int32_t pepa_core_finish(void);
 
 /* Get pointer to codre */
 /**
@@ -165,31 +166,31 @@ pepa_core_t *pepa_get_core(void);
  * @author Sebastian Mountaniol (12/6/23)
  * @brief Lock core; anyone else can manipulate locked values
  *  	  until it unlocked
- * @return int 0 on success.
+ * @return int32_t 0 on success.
  * @details This function should never show failure.
  *  		It will wait on semaphore until the sem taken.
  * @todo Should it be void?
  */
-int pepa_core_lock(void);
+int32_t pepa_core_lock(void);
 
 /**
  * @author Sebastian Mountaniol (12/6/23)
  * @brief Unlock core
- * @return int 0 on success
+ * @return int32_t 0 on success
  * @details This function should never fail.
  * @todo Should it be void?
  */
-int pepa_core_unlock(void);
+int32_t pepa_core_unlock(void);
 
 /**
  * @author Sebastian Mountaniol (12/10/23)
  * @brief Return abort flag; if core is not inited yet,
  *  	  always return NO (0)
  * @param  void  
- * @return int Abort flag
+ * @return int32_t Abort flag
  * @details 
  */
-int pepa_if_abort(void);
+int32_t pepa_if_abort(void);
 
 
 const char *pepa_out_thread_state_str(pepa_out_thread_state_t s);

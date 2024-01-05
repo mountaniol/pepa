@@ -39,8 +39,8 @@ void pepa_set_rlimit(void)
 void daemonize(pepa_core_t *core)
 {
 	pid_t pid = 0;
-	int   fd;
-	int   rc;
+	int32_t   fd;
+	int32_t   rc;
 
 	/* Fork off the parent process */
 	pid = fork();
@@ -119,7 +119,7 @@ void daemonize(pepa_core_t *core)
 		sprintf(str, "%d\n", getpid());
 		/* Write PID to lockfile */
 		rc = write(core->pid_fd, str, strlen(str));
-		if (rc != (int) strlen(str)) {
+		if (rc != (int32_t) strlen(str)) {
 			slog_fatal_l("Can not write PID into PID file: %s", strerror(errno));
 			exit(EXIT_FAILURE);
 		}

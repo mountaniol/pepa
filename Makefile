@@ -48,7 +48,9 @@ EMU_O=pepa_emulator.o pepa_state_machine.o pepa_parser.o \
 EMU_T=emu
 
 
-all: pepa emu
+#all: pepa emu
+all: clean static
+ca: clean pepa emu
 
 pepa: slog buf_t $(PEPA_O)
 	$(GCC) $(CFLAGS) $(DEBUG) $(PEPA_O) $(ARS) -o $(PEPA_T) -lpthread

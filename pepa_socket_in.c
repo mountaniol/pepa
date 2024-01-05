@@ -39,12 +39,12 @@ static void pepa_in_thread_listen_socket(pepa_core_t *core, __attribute__((unuse
 }
 
 /* Wait for signal; when SHVA is UP, return */
-static int pepa_in_thread_wait_shva_ready(pepa_core_t *core, __attribute__((unused)) const char *my_name)
+static int32_t pepa_in_thread_wait_shva_ready(pepa_core_t *core, __attribute__((unused)) const char *my_name)
 {
 	slog_note_l("Start waiting SHVA UP");
 
 	while (1) {
-		int st = pepa_state_shva_get(core);
+		int32_t st = pepa_state_shva_get(core);
 		if (PEPA_ST_RUN == st) {
 			slog_note_l("%s: SHVA became UP: %d", my_name, st);
 			return PEPA_ERR_OK;
@@ -60,7 +60,7 @@ static int pepa_in_thread_wait_shva_ready(pepa_core_t *core, __attribute__((unus
 }
 
 /* Wait for signal; when SHVA is DOWN, return */
-static int pepa_in_thread_wait_fail_event(pepa_core_t *core, __attribute__((unused)) const char *my_name)
+static int32_t pepa_in_thread_wait_fail_event(pepa_core_t *core, __attribute__((unused)) const char *my_name)
 {
 	while (1) {
 		if (PEPA_ST_RUN != pepa_state_shva_get(core)) {
@@ -68,7 +68,7 @@ static int pepa_in_thread_wait_fail_event(pepa_core_t *core, __attribute__((unus
 			return -PEPA_ERR_THREAD_SHVA_DOWN;
 		}
 
-		int st = pepa_state_in_get(core);
+		int32_t st = pepa_state_in_get(core);
 
 		if (PEPA_ST_FAIL == st) {
 			slog_note_l("%s: IN became DOWN", my_name);
@@ -93,7 +93,7 @@ void pepa_in_thread_new_forward_clean(void *arg)
 {
 
 	pepa_core_t         *core       = pepa_get_core();
-	// int         *epoll_fd = arg;
+	// int32_t         *epoll_fd = arg;
 	char                *my_name    = "IN-FORWARD-CLEAN";
 
 	thread_clean_args_t *clean_args = arg;
@@ -110,9 +110,9 @@ void pepa_in_thread_new_forward_clean(void *arg)
 	slog_warn("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$");
 }
 
-int pepa_in_epoll_test_hang_up(pepa_core_t *core, int epoll_fd, struct epoll_event events[], int num_events)
+int32_t pepa_in_epoll_test_hang_up(pepa_core_t *core, int32_t epoll_fd, struct epoll_event events[], int32_t num_events)
 {
-	int i;
+	int32_t i;
 	for (i = 0; i < num_events; i++) {
 		/* If no hung ups - continue */
 		//if (!(events[i].events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR))) {
@@ -130,8 +130,8 @@ int pepa_in_epoll_test_hang_up(pepa_core_t *core, int epoll_fd, struct epoll_eve
 
 		/* Other case, just remove the failen socket from the set */
 
-		int rc  = epoll_ctl(epoll_fd, EPOLL_CTL_DEL, events[i].data.fd, NULL);
-		int err = errno;
+		int32_t rc  = epoll_ctl(epoll_fd, EPOLL_CTL_DEL, events[i].data.fd, NULL);
+		int32_t err = errno;
 		slog_warn_l("IN reading socket: disconnected external writer, fd: %d", events[i].data.fd);
 
 		if (0 != rc) {
@@ -149,11 +149,11 @@ int pepa_in_epoll_test_hang_up(pepa_core_t *core, int epoll_fd, struct epoll_eve
 	return PEPA_ERR_OK;
 }
 
-int pepa_in_accept_new_connection(pepa_core_t *core, int epoll_fd)
+int32_t pepa_in_accept_new_connection(pepa_core_t *core, int32_t epoll_fd)
 {
 	struct sockaddr_in address;
-	int                new_socket = -1;
-	static int         addrlen    = sizeof(address);
+	int32_t                new_socket = -1;
+	static int32_t         addrlen    = sizeof(address);
 
 	if ((new_socket = accept(core->sockets.in_listen,
 							 (struct sockaddr *)&address,
@@ -176,13 +176,13 @@ int pepa_in_accept_new_connection(pepa_core_t *core, int epoll_fd)
 	return PEPA_ERR_OK;
 }
 
-int pepa_in_process_buffers(pepa_core_t *core, int epoll_fd, char *buffer, struct epoll_event events[], int num_events)
+int32_t pepa_in_process_buffers(pepa_core_t *core, int32_t epoll_fd, char *buffer, struct epoll_event events[], int32_t num_events)
 {
 
-	int rc        = PEPA_ERR_OK;
-	int ret       = PEPA_ERR_OK;
-	int rc_remove;
-	int i;
+	int32_t rc        = PEPA_ERR_OK;
+	int32_t ret       = PEPA_ERR_OK;
+	int32_t rc_remove;
+	int32_t i;
 
 	for (i = 0; i < num_events; i++) {
 		if (events[i].events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR)) {
@@ -218,14 +218,13 @@ int pepa_in_process_buffers(pepa_core_t *core, int epoll_fd, char *buffer, struc
 										  buffer, core->internal_buf_size * 1024, /*Debug is ON */ 1,
 										  /* RX stat */&core->monitor.in_rx,
 										  /* TX stat */&core->monitor.shva_tx,
-										  /* Max iterations */ 4);
+										  /* Max iterations */ 1);
 			pepa_shva_socket_unlock(core);
 
 			if (PEPA_ERR_OK == rc) {
 				//slog_warn_l("%s: Sent from socket %d", "IN-FORWARD", events[i].data.fd);
 				continue;
 			}
-
 
 			ret = -1;
 
@@ -248,7 +247,7 @@ int pepa_in_process_buffers(pepa_core_t *core, int epoll_fd, char *buffer, struc
 
 void *pepa_in_thread_new_forward(__attribute__((unused))void *arg)
 {
-	int                 rc;
+	int32_t                 rc;
 	pepa_core_t         *core              = pepa_get_core();
 	char                *my_name           = "IN-FORWARD";
 	//char               buffer[BUF_SIZE];  //data buffer of 1K
@@ -257,7 +256,7 @@ void *pepa_in_thread_new_forward(__attribute__((unused))void *arg)
 
 	thread_clean_args_t clean_args;
 
-	int                 epoll_fd           = epoll_create1(EPOLL_CLOEXEC);
+	int32_t                 epoll_fd           = epoll_create1(EPOLL_CLOEXEC);
 
 	if (epoll_fd < 0) {
 		slog_error_l("Can not open epoll fd");
@@ -295,7 +294,7 @@ void *pepa_in_thread_new_forward(__attribute__((unused))void *arg)
 
 	while (1)   {
 
-		int event_count = epoll_wait(epoll_fd, events, EVENTS_NUM, 100);
+		int32_t event_count = epoll_wait(epoll_fd, events, EVENTS_NUM, 100);
 
 		/* Interrupted by a signal */
 		if (event_count < 0 && EINTR == errno) {
@@ -336,7 +335,7 @@ void *pepa_in_thread(__attribute__((unused))void *arg)
 {
 	pepa_in_thread_state_t next_step = PEPA_TH_IN_START;
 	const char             *my_name  = "IN";
-	int                    rc;
+	int32_t                    rc;
 	pepa_core_t            *core     = pepa_get_core();
 
 	set_sig_handler();

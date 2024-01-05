@@ -15,16 +15,16 @@ pepa_core_t *g_pepa_core = NULL;
  *  	  structure
  * @param pepa_core_t* core  An instance of pepa_core_t
  *  				 structure to init semaphore
- * @return int 0 on success, -1 on an error
+ * @return int32_t 0 on success, -1 on an error
  * @details You need to use this function if you clean an
  *  		existing core structure, and want to reuse it. After
  *  		cleaning the structure, the semaphore is destroyes
  *  		and not reinited
  */
-static int pepa_core_sem_init(pepa_core_t *core)
+static int32_t pepa_core_sem_init(pepa_core_t *core)
 {
 	TESTP(core, -1);
-	int sem_rc = sem_init(&core->mutex, 0, 1);
+	int32_t sem_rc = sem_init(&core->mutex, 0, 1);
 
 	if (0 != sem_rc) {
 		slog_fatal_l("Could not init mutexes");
@@ -36,10 +36,10 @@ static int pepa_core_sem_init(pepa_core_t *core)
 	return PEPA_ERR_OK;
 }
 
-static int pepa_shva_mutex_init(pepa_core_t *core)
+static int32_t pepa_shva_mutex_init(pepa_core_t *core)
 {
 	TESTP(core, -1);
-	int sem_rc = sem_init(&core->sockets.shva_rw_mutex, 0, 1);
+	int32_t sem_rc = sem_init(&core->sockets.shva_rw_mutex, 0, 1);
 
 	if (0 != sem_rc) {
 		slog_fatal_l("Could not init SHVA mutexes");
@@ -56,15 +56,15 @@ static int pepa_shva_mutex_init(pepa_core_t *core)
  * @brief Destroy the pepa_core_t internal semaphore
  * @param pepa_core_t* core  Instance of pepa_core_t structure
  *  				 to destroy semaphore
- * @return int 0 on success, -1 on an error
+ * @return int32_t 0 on success, -1 on an error
  * @details YOu should never use this function; however, in the
  *  		future might be some change in the code and this
  *  		function should be used.
  */
-static int pepa_core_sem_destroy(pepa_core_t *core)
+static int32_t pepa_core_sem_destroy(pepa_core_t *core)
 {
 	TESTP(core, -1);
-	const int sem_rc = sem_destroy(&core->mutex);
+	const int32_t sem_rc = sem_destroy(&core->mutex);
 	if (0 != sem_rc) {
 		slog_fatal_l("Could not destroy mutex");
 		perror("sem destroy failure: ");
@@ -95,7 +95,7 @@ static void pepa_core_set_default_values(pepa_core_t *core)
  */
 static pepa_core_t *pepa_create_core_t(void)
 {
-	int         rc;
+	int32_t         rc;
 
 	pepa_core_t *core = calloc(sizeof(pepa_core_t), 1);
 	TESTP_ASSERT(core, "Can not create core");
@@ -171,10 +171,10 @@ static pepa_core_t *pepa_create_core_t(void)
  *  	  to default state; WARNING: semaphor (->mutex) is
  *  	  destroyes and NOT inited again
  * @param pepa_core_t* core  
- * @return int 0 on success, -1 on an error
+ * @return int32_t 0 on success, -1 on an error
  * @details 
  */
-static int pepa_clean_core_t(pepa_core_t *core)
+static int32_t pepa_clean_core_t(pepa_core_t *core)
 {
 	TESTP(core, -PEPA_ERR_NULL_POINTER);
 
@@ -196,15 +196,15 @@ static int pepa_clean_core_t(pepa_core_t *core)
  *  	  the semaphor is destroyed.
  * @param pepa_core_t* core  The instance of the structure to be
  *  				 destroyed
- * @return int 0 on success, -1 on en error
+ * @return int32_t 0 on success, -1 on en error
  * @details WARNING: The semaphore (->mutex) must be posted when
  *  		this function is called; else the behavoir is
  *  		undefined. For more, see 'man sem_destry'
  */
-static int pepa_destroy_core_t(pepa_core_t *core)
+static int32_t pepa_destroy_core_t(pepa_core_t *core)
 {
-	int       rc;
-	const int clean_rc = pepa_clean_core_t(core);
+	int32_t       rc;
+	const int32_t clean_rc = pepa_clean_core_t(core);
 	if (0 != clean_rc) {
 		slog_fatal_l("Could not clean core - return error");
 		return clean_rc;
@@ -243,7 +243,7 @@ static int pepa_destroy_core_t(pepa_core_t *core)
 
 /****** API FUNCTIONS *******/
 
-int pepa_core_init(void)
+int32_t pepa_core_init(void)
 {
 	g_pepa_core = pepa_create_core_t();
 	if (NULL == g_pepa_core) {
@@ -254,7 +254,7 @@ int pepa_core_init(void)
 	return PEPA_ERR_OK;
 }
 
-int pepa_core_finish(void)
+int32_t pepa_core_finish(void)
 {
 	if (NULL == g_pepa_core) {
 		slog_fatal_l("Can not destroy core, it is NULL already!");
@@ -272,9 +272,9 @@ pepa_core_t *pepa_get_core(void)
 	return g_pepa_core;
 }
 
-int pepa_core_lock(void)
+int32_t pepa_core_lock(void)
 {
-	int rc;
+	int32_t rc;
 	TESTP_ASSERT(g_pepa_core, "Core is NULL!");
 	sem_getvalue(&g_pepa_core->mutex, &rc);
 	if (rc > 1) {
@@ -294,9 +294,9 @@ int pepa_core_lock(void)
 	return PEPA_ERR_OK;
 }
 
-int pepa_core_unlock(void)
+int32_t pepa_core_unlock(void)
 {
-	int rc;
+	int32_t rc;
 	TESTP_ASSERT(g_pepa_core, "Core is NULL!");
 	sem_getvalue(&g_pepa_core->mutex, &rc);
 	if (rc > 0) {
@@ -318,7 +318,7 @@ int pepa_core_unlock(void)
 
 void pepa_shva_socket_lock(pepa_core_t *core)
 {
-	int rc;
+	int32_t rc;
 	TESTP_ASSERT(g_pepa_core, "Core is NULL!");
 
 	rc = sem_wait(&core->sockets.shva_rw_mutex);
@@ -331,7 +331,7 @@ void pepa_shva_socket_lock(pepa_core_t *core)
 
 void pepa_shva_socket_unlock(pepa_core_t *core)
 {
-	int rc;
+	int32_t rc;
 	rc = sem_post(&core->sockets.shva_rw_mutex);
 	if (0 != rc) {
 		slog_fatal_l("Can't unlock semaphore: abort");
@@ -340,7 +340,7 @@ void pepa_shva_socket_unlock(pepa_core_t *core)
 	}
 }
 
-int pepa_if_abort(void)
+int32_t pepa_if_abort(void)
 {
 	if (NULL == g_pepa_core) {
 		return PEPA_ERR_OK;

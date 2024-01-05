@@ -7,12 +7,12 @@
 #include "pepa_errors.h"
 #include "pepa_state_machine.h"
 
-static int pepa_out_wait_connection(pepa_core_t *core, int fd_listen)
+static int32_t pepa_out_wait_connection(pepa_core_t *core, int32_t fd_listen)
 {
 	struct sockaddr_in s_addr;
 	socklen_t          addrlen  = sizeof(struct sockaddr);
 	const char         *my_name = "OUT-ACCEPT";
-	int                fd_read  = -1;
+	int32_t                fd_read  = -1;
 	do {
 		slog_info_l("%s: Starting accept() waiting", my_name);
 
@@ -27,16 +27,16 @@ static int pepa_out_wait_connection(pepa_core_t *core, int fd_listen)
 	return fd_read;
 }
 
-static int pepa_out_thread_start(char *name)
+static int32_t pepa_out_thread_start(char *name)
 {
 	return pepa_pthread_init_phase(name);
 }
 
-static int pepa_out_thread_open_listening_socket(pepa_core_t *core, __attribute__((unused)) char *my_name)
+static int32_t pepa_out_thread_open_listening_socket(pepa_core_t *core, __attribute__((unused)) char *my_name)
 {
 	struct sockaddr_in s_addr;
-	int                waiting_time = 0;
-	int                timeout      = 5;
+	int32_t                waiting_time = 0;
+	int32_t                timeout      = 5;
 
 	if (core->sockets.out_listen >= 0) {
 		slog_debug_l("Trying to open a listening socket while it is already opened");
@@ -52,21 +52,21 @@ static int pepa_out_thread_open_listening_socket(pepa_core_t *core, __attribute_
 			core->sockets.out_listen = -1;
 			//slog_warn_l("%s: Can not open listening socket: %s", my_name, strerror(errno));
 			waiting_time += timeout;
-			usleep(1000000);
+			//usleep(1000000);
 		}
 	} while (core->sockets.out_listen < 0);
 	usleep(1000);
 	return PEPA_ERR_OK;
 }
 
-static int pepa_out_thread_accept(pepa_core_t *core, __attribute__((unused))char *my_name)
+static int32_t pepa_out_thread_accept(pepa_core_t *core, __attribute__((unused))char *my_name)
 {
-	int fd_read = pepa_out_wait_connection(core, core->sockets.out_listen);
+	int32_t fd_read = pepa_out_wait_connection(core, core->sockets.out_listen);
 	core->sockets.out_write = fd_read;
 	return PEPA_ERR_OK;
 }
 
-static int pepa_out_thread_close_listen(pepa_core_t *core, __attribute__((unused))char *my_name)
+static int32_t pepa_out_thread_close_listen(pepa_core_t *core, __attribute__((unused))char *my_name)
 {
 	pepa_socket_close_out_write(core);
 	pepa_socket_close_out_listen(core);
@@ -77,7 +77,7 @@ static int pepa_out_thread_close_listen(pepa_core_t *core, __attribute__((unused
 }
 
 /* Wait for signal; when SHVA is DOWN, return */
-static int pepa_out_thread_wait_fail(pepa_core_t *core, __attribute__((unused)) const char *my_name)
+static int32_t pepa_out_thread_wait_fail(pepa_core_t *core, __attribute__((unused)) const char *my_name)
 {
 	while (1) {
 		if (PEPA_ST_FAIL == pepa_state_out_get(core)) {
@@ -101,7 +101,7 @@ void *pepa_out_thread(__attribute__((unused))void *arg)
 {
 	pepa_out_thread_state_t next_step = PEPA_TH_OUT_START;
 	char                    *my_name  = "OUT";
-	int                     rc;
+	int32_t                     rc;
 	pepa_core_t             *core     = pepa_get_core();
 
 	set_sig_handler();

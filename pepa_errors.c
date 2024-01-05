@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include "pepa_errors.h"
 
-const char *pepa_error_code_to_str(int code)
+const char *pepa_error_code_to_str(int32_t code)
 {
 	pepa_error_t enum_code = abs(code);
 	switch (enum_code) {
