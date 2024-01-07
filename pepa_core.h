@@ -66,7 +66,7 @@ typedef enum {
 } pepa_in_thread_state_t;
 
 typedef enum {
-	PEPA_ST_NONE = 0,
+	PEPA_ST_DOWN = 0,
 	PEPA_ST_RUN,
 	PEPA_ST_FAIL,
 	PEPA_ST_SOCKET_RESET,
@@ -81,7 +81,8 @@ typedef enum {
 } pepa_proc_t;
 
 typedef struct {
-	pepa_sig_t signals[PEPA_PR_MAX];
+	pepa_proc_t emiter; /* Who produced the last signal? */
+	pepa_sig_t signals[PEPA_PR_MAX]; /* Signals from all processes */
 	pthread_mutex_t signals_sem;
 	pthread_cond_t sync;
 	pthread_mutex_t sync_sem;
@@ -97,6 +98,11 @@ typedef struct {
 	uint64_t in_tx;
 } pepa_stat_t;
 
+typedef struct {
+	int *sockets;
+	int number;
+} pepa_in_read_sockets_t;
+
 /**
  * @author Sebastian Mountaniol (7/20/23)
  * @brief This structure unites all variables and file
@@ -111,6 +117,7 @@ typedef struct {
 	char *slog_file; /* Keep slog output file name; if given, log will be saved there */
 	char *slog_dir; /* Keep slog output file in this directory */
 	int slog_print; /* Show slog output on terminal */
+	int slog_color; /* Output on terminal should use color or not (by defailt: no) */
 
 	thread_vars_t shva_thread; /**< Configuration of SHVA thread */
 	thread_vars_t shva_forwarder; /**< Configuration of SHVA thread */
@@ -118,6 +125,7 @@ typedef struct {
 	thread_vars_t in_forwarder; /**< Configuration of IN thread */
 	thread_vars_t out_thread; /**< Configuration of OUT thread */
 	thread_vars_t monitor_thread; /**< Configuration of OUT thread */
+	pepa_in_read_sockets_t in_reading_sockets; /**< Reading sockets opened when accept new connections */
 	uint32_t internal_buf_size; /**< Size of buffer used to pass packages, by defaiult COPY_BUF_SIZE bytes, see pepa_config.h */
 	int32_t abort_flag; /**< Abort flag, if enabled, PEPA file abort on errors; for debug only */
 	pepa_sockets_t sockets;
@@ -127,6 +135,9 @@ typedef struct {
 	int32_t daemon; /* If not 0, start as a daemon */
 	int pid_fd; /* File descriptor of PID file */
 	char *pid_file_name; /* File name of PID file  */
+	void *buffer;
+	uint32_t buffer_size;
+	int epoll_fd;
 } pepa_core_t;
 
 /**

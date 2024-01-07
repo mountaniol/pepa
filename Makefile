@@ -4,13 +4,13 @@
 #GCC=clang-10
 GCC=gcc
 #GCC=gcc-10
-CFLAGS=-Wall -Wextra -O2 -Wswitch-enum -Wimplicit-fallthrough -Wno-error=unused-but-set-variable -Wswitch -Wreturn-type 
+CFLAGS=-Wall -Wextra -O2 -Wswitch-enum -Wimplicit-fallthrough -Wno-error=unused-but-set-variable -Wswitch -Wreturn-type -Wpedantic
 #CFLAGS=-Wall -Wextra -O2
 #DEBUG=-DDEBUG3
 #DEBUG+=-ggdb
 # Static GCC-10 analyzer
 #CFLAGS+=-fanalyzer
-CFLAGS+=-pg 
+#CFLAGS+=-pg 
 # Clang static analyzer
 #CFLAGS += -Xfanalyzer
 
@@ -30,23 +30,29 @@ PEPA_DEFINES+=-DPEPA_HOST=\"$(PEPA_HOST_VAL)\"
 #CFLAGS+= -DPEPA_VERSION_GIT=\"$(PEPA_VERSION_GIT_VAL)\"
 CFLAGS+=$(PEPA_DEFINES)
 
-PEPA_O=pepa_state_machine.o pepa_parser.o main.o pepa_core.o \
+#PEPA_O= pepa3.o pepa_state_machine.o pepa_parser.o main.o pepa_core.o \
 		pepa_server.o pepa_errors.o \
 		pepa_socket_common.o pepa_socket_in.o \
 		pepa_socket_out.o pepa_socket_shva.o
+
+PEPA_O= pepa3.o pepa_state_machine.o pepa_parser.o main.o pepa_core.o \
+		pepa_server.o pepa_errors.o \
+		pepa_socket_common.o 
 		
 PEPA_T=pepa-ng
 BUFT_AR=buf_t/buf_t.a
 SLOG_AR=slog/libslog.a
 ARS=$(BUFT_AR) $(SLOG_AR)
 
-EMU_O=pepa_emulator.o pepa_state_machine.o pepa_parser.o \
+#EMU_O=pepa_emulator.o pepa_state_machine.o pepa_parser.o \
 	pepa_core.o pepa_server.o pepa_errors.o \
 	pepa_socket_common.o pepa_socket_in.o \
 	pepa_socket_out.o pepa_socket_shva.o 
+EMU_O=pepa_emulator.o pepa_state_machine.o pepa_parser.o \
+	pepa_core.o pepa_server.o pepa_errors.o \
+	pepa_socket_common.o 
 
 EMU_T=emu
-
 
 #all: pepa emu
 all: clean static

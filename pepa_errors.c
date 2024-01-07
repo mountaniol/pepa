@@ -10,10 +10,13 @@ const char *pepa_error_code_to_str(int32_t code)
 	case PEPA_ERR_STOP: return "Thread must stop and terminate";
 
 	/* Situative statuses */
-	case PEPA_ERR_THREAD_SHVA_DOWN: return "SHVA thread is in FAIL state";
-	case PEPA_ERR_THREAD_IN_DOWN: return "IN thread is in FAIL state";
+	case PEPA_ERR_THREAD_SHVA_DOWN: return "SHVA thread is in DOWN state";
+	case PEPA_ERR_THREAD_SHVA_FAIL: return "SHVA thread is in FAIL state";
+	case PEPA_ERR_THREAD_IN_FAIL: return "IN thread is in FAIL state";
+	case PEPA_ERR_THREAD_IN_DOWN: return "IN thread is in DOWN state";
 	case PEPA_ERR_THREAD_IN_SOCKET_RESET: return "IN thread should reset listening socket";
-	case PEPA_ERR_THREAD_OUT_DOWN: return "OUT thread is in FAIL state";
+	case PEPA_ERR_THREAD_OUT_DOWN: return "OUT thread is in DOWN state";
+	case PEPA_ERR_THREAD_OUT_FAIL: return "OUT thread is in FAIL state";
 
 	/* Memory related errors */
 	case PEPA_ERR_NULL_POINTER: return "An argument is NULL pointer";

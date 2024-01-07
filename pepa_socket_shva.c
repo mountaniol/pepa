@@ -1,12 +1,13 @@
-#include <unistd.h>
-#include <errno.h>
-#include <sys/epoll.h>
+#if 0 /* SEB */
+	#include <unistd.h>
+	#include <errno.h>
+	#include <sys/epoll.h>
 
-#include "slog/src/slog.h"
-#include "pepa_socket_common.h"
-#include "pepa_errors.h"
-#include "pepa_core.h"
-#include "pepa_state_machine.h"
+	#include "slog/src/slog.h"
+	#include "pepa_socket_common.h"
+	#include "pepa_errors.h"
+	#include "pepa_core.h"
+	#include "pepa_state_machine.h"
 
 /**
  * @author Sebastian Mountaniol (12/8/23)
@@ -14,14 +15,12 @@
  * @return int file descriptor of socket to shva, >= 0;
  *  	   a negative error code on an error
  */
-static int pepa_open_shava_connection(pepa_core_t *core)
-{
+static int pepa_open_shava_connection(pepa_core_t *core){
 	//pepa_core_t *core                      = pepa_get_core();
 	return pepa_open_connection_to_server(core->shva_thread.ip_string->data, core->shva_thread.port_int, __func__);
 }
 
-static int pepa_shva_thread_open_connection(pepa_core_t *core, const char *my_name)
-{
+static int pepa_shva_thread_open_connection(pepa_core_t *core, const char *my_name){
 	/* Open connnection to the SHVA server */
 	do {
 		core->sockets.shva_rw = pepa_open_shava_connection(core);
@@ -38,8 +37,7 @@ static int pepa_shva_thread_open_connection(pepa_core_t *core, const char *my_na
 	return PEPA_ERR_OK;
 }
 
-static int32_t pepa_shva_thread_wait_out(pepa_core_t *core, __attribute__((unused)) const char *my_name)
-{
+static int32_t pepa_shva_thread_wait_out(pepa_core_t *core, __attribute__((unused)) const char *my_name){
 	while (1) {
 		if (PEPA_ST_RUN == pepa_state_out_get(core)) {
 			slog_note_l("%s: OUT is UP", my_name);
@@ -54,17 +52,16 @@ static int32_t pepa_shva_thread_wait_out(pepa_core_t *core, __attribute__((unuse
 }
 
 /* Wait for signal; when SHVA is DOWN, return */
-static int32_t pepa_shva_thread_wait_fail(pepa_core_t *core, __attribute__((unused)) const char *my_name)
-{
+static int32_t pepa_shva_thread_wait_fail(pepa_core_t *core, __attribute__((unused)) const char *my_name){
 	while (1) {
 		if (PEPA_ST_FAIL == pepa_state_out_get(core)) {
-			slog_note_l("%s: OUT became DOWN", my_name);
-			return -PEPA_ERR_THREAD_OUT_DOWN;
+			slog_note_l("%s: OUT became FAIL", my_name);
+			return -PEPA_ERR_THREAD_OUT_FAIL;
 		}
 
 		if (PEPA_ST_FAIL == pepa_state_shva_get(core)) {
-			slog_note_l("%s: SHVA became DOWN", my_name);
-			return -PEPA_ERR_THREAD_SHVA_DOWN;
+			slog_note_l("%s: SHVA became FAIL", my_name);
+			return -PEPA_ERR_THREAD_SHVA_FAIL;
 		}
 
 		/* We exit this wait only when SHVA is ready */
@@ -75,9 +72,9 @@ static int32_t pepa_shva_thread_wait_fail(pepa_core_t *core, __attribute__((unus
 }
 
 void *pepa_shva_thread_new_forward(__attribute__((unused))void *arg);
-void *pepa_shva_thread_new(__attribute__((unused))void *arg)
-{
-	int32_t                      rc;
+
+void *pepa_shva_thread_new(__attribute__((unused))void *arg){
+	int32_t                  rc;
 	const char               *my_name  = "SHVA";
 	pepa_core_t              *core     = pepa_get_core();
 	pepa_shva_thread_state_t next_step = PEPA_TH_SHVA_START;
@@ -87,21 +84,31 @@ void *pepa_shva_thread_new(__attribute__((unused))void *arg)
 	do {
 		pepa_shva_thread_state_t this_step = next_step;
 		switch (next_step) {
-		case 	PEPA_TH_SHVA_START:
+			case 	PEPA_TH_SHVA_START:
 			slog_note_l("START STEP: %s", pepa_shva_thread_state_str(this_step));
-			next_step = PEPA_TH_SHVA_OPEN_CONNECTION;
+			next_step = PEPA_TH_SHVA_WAIT_OUT;
 			rc = pepa_pthread_init_phase(my_name);
 			if (rc < 0) {
 				slog_fatal_l("%s: Could not init the thread", my_name);
-				pepa_state_shva_set(core, PEPA_ST_FAIL);
+				pepa_state_shva_set(core, PEPA_ST_DOWN);
 				next_step = PEPA_TH_SHVA_TERMINATE;
 			}
 			slog_note_l("END STEP:   %s", pepa_shva_thread_state_str(this_step));
 			break;
 
-		case PEPA_TH_SHVA_OPEN_CONNECTION:
+			case PEPA_TH_SHVA_WAIT_OUT:
 			slog_note_l("START STEP: %s", pepa_shva_thread_state_str(this_step));
-			next_step = PEPA_TH_SHVA_WAIT_OUT;
+			next_step = PEPA_TH_SHVA_OPEN_CONNECTION;
+			rc = pepa_shva_thread_wait_out(core, my_name);
+			if (PEPA_ERR_OK != rc) {
+				next_step = PEPA_TH_SHVA_WAIT_OUT;
+			}
+			slog_note_l("END STEP:   %s", pepa_shva_thread_state_str(this_step));
+			break;
+
+			case PEPA_TH_SHVA_OPEN_CONNECTION:
+			slog_note_l("START STEP: %s", pepa_shva_thread_state_str(this_step));
+			next_step = PEPA_TH_SHVA_START_TRANSFER;
 			rc = pepa_shva_thread_open_connection(core, my_name);
 			if (PEPA_ERR_OK != rc) {
 				next_step = PEPA_TH_SHVA_OPEN_CONNECTION;
@@ -113,64 +120,53 @@ void *pepa_shva_thread_new(__attribute__((unused))void *arg)
 			slog_note_l("END STEP:   %s", pepa_shva_thread_state_str(this_step));
 			break;
 
-		case PEPA_TH_SHVA_WAIT_OUT:
-			slog_note_l("START STEP: %s", pepa_shva_thread_state_str(this_step));
-			next_step = PEPA_TH_SHVA_START_TRANSFER;
-			rc = pepa_shva_thread_wait_out(core, my_name);
-			if (PEPA_ERR_OK != rc) {
-				next_step = PEPA_TH_SHVA_WAIT_OUT;
-			}
-			slog_note_l("END STEP:   %s", pepa_shva_thread_state_str(this_step));
-			break;
-
-		case PEPA_TH_SHVA_START_TRANSFER:
+			case PEPA_TH_SHVA_START_TRANSFER:
 			slog_note_l("START STEP: %s", pepa_shva_thread_state_str(this_step));
 			/* TODO: Different steps depends on return status */
+	#if 0 /* SEB */
 			rc = pthread_create(&core->shva_forwarder.thread_id, NULL, pepa_shva_thread_new_forward, NULL);
 			if (rc < 0) {
 				slog_warn_l("%s: Could not start listening socket", my_name);
 				next_step = PEPA_TH_SHVA_CLOSE_SOCKET;
 			}
+	#endif
+			pepa_thread_start_shva_fw(core);
 			next_step = PEPA_TH_SHVA_WATCH_SOCKET;
+			pepa_thread_start_in(core);
 			slog_note_l("END STEP:   %s", pepa_shva_thread_state_str(this_step));
 			break;
 
-		case PEPA_TH_SHVA_WATCH_SOCKET:
+			case PEPA_TH_SHVA_WATCH_SOCKET:
 			slog_note_l("START STEP: %s", pepa_shva_thread_state_str(next_step));
-			next_step = PEPA_TH_SHVA_WATCH_SOCKET;
+			next_step = PEPA_TH_SHVA_CLOSE_SOCKET;
 			rc = pepa_shva_thread_wait_fail(core, my_name);
 			/* SHVA socket is invalid, we must reconnect */
 
-			if (-PEPA_ERR_THREAD_SHVA_DOWN == rc) {
-				next_step = PEPA_TH_SHVA_CLOSE_SOCKET;
-				slog_info_l("SHVA is down");
-			} else {
-				/* Else OUT is down */
-				slog_info_l("OUT is down");
-				next_step = PEPA_TH_SHVA_WAIT_OUT;
-			}
-
-			pepa_thread_kill_shva_forwarder(core);
-
+			// pepa_state_shva_set(core, PEPA_ST_FAIL);
 			slog_note_l("END STEP:   %s", pepa_shva_thread_state_str(next_step));
 			break;
 
-		case PEPA_TH_SHVA_CLOSE_SOCKET:
-			slog_note_l("START STEP: %s", pepa_shva_thread_state_str(this_step));
+			case PEPA_TH_SHVA_CLOSE_SOCKET:
+			slog_warn_l("START STEP: %s", pepa_shva_thread_state_str(this_step));
+			pepa_thread_kill_in(core);
+			pepa_thread_kill_shva_forwarder(core);
 			pepa_state_shva_set(core, PEPA_ST_FAIL);
 			pepa_socket_close_shva_rw(core);
-			next_step = PEPA_TH_SHVA_OPEN_CONNECTION;
+			pepa_state_shva_set(core, PEPA_ST_DOWN);
+
+			next_step = PEPA_TH_SHVA_WAIT_OUT;
 			slog_note_l("END STEP:   %s", pepa_shva_thread_state_str(this_step));
 			break;
 
-		case PEPA_TH_SHVA_TERMINATE:
+			case PEPA_TH_SHVA_TERMINATE:
 			slog_note_l("START STEP: %s", pepa_shva_thread_state_str(this_step));
 			pepa_state_shva_set(core, PEPA_ST_FAIL);
+			pepa_state_shva_set(core, PEPA_ST_DOWN);
 			sleep(10);
 			slog_note_l("END STEP:   %s", pepa_shva_thread_state_str(this_step));
 			break;
 
-		default:
+			default:
 			slog_fatal_l("Should never be here: next_steps = %d", next_step);
 			abort();
 			break;
@@ -184,17 +180,13 @@ void *pepa_shva_thread_new(__attribute__((unused))void *arg)
 // #define BUF_SIZE (2048)
 
 
-void pepa_shva_thread_new_forward_cleanup(__attribute__((unused))void *arg)
-{
-	thread_clean_args_t *clean_args = arg;
-	free(clean_args->buf);
-	close(clean_args->epoll_fd);
-}
-
-int pepa_shva_epoll_test_hang_up(pepa_core_t *core, struct epoll_event events[], int num_events)
-{
+int pepa_shva_epoll_test_hang_up(pepa_core_t *core, struct epoll_event events[], int num_events){
 	int i;
 	for (i = 0; i < num_events; i++) {
+		if (!(events[i].events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR))) {
+			//if (!(events[i].events & (EPOLLRDHUP | EPOLLHUP))) {
+			continue;
+		}
 
 		/* If one of the read/write sockets is diconnected, exit the thread */
 		if (events[i].events & (EPOLLRDHUP)) {
@@ -202,13 +194,13 @@ int pepa_shva_epoll_test_hang_up(pepa_core_t *core, struct epoll_event events[],
 			if (core->sockets.shva_rw == events[i].data.fd) {
 				slog_warn_l("SHVA socket: remote side of the socket is disconnected");
 				pepa_state_shva_set(core, PEPA_ST_FAIL);
-				return -PEPA_ERR_THREAD_SHVA_DOWN;
+				return -PEPA_ERR_THREAD_SHVA_FAIL;
 			}
 
 			if (core->sockets.out_write == events[i].data.fd) {
 				slog_warn_l("OUT socket: remote side of the socket is disconnected");
 				pepa_state_out_set(core, PEPA_ST_FAIL);
-				return -PEPA_ERR_THREAD_OUT_DOWN;
+				return -PEPA_ERR_THREAD_OUT_FAIL;
 			}
 
 		} /* if (events[i].events & (EPOLLRDHUP | EPOLLHUP)) */
@@ -218,13 +210,13 @@ int pepa_shva_epoll_test_hang_up(pepa_core_t *core, struct epoll_event events[],
 			if (core->sockets.shva_rw == events[i].data.fd) {
 				slog_warn_l("SHVA socket: this side of socket: hang up");
 				pepa_state_shva_set(core, PEPA_ST_FAIL);
-				return -PEPA_ERR_THREAD_SHVA_DOWN;
+				return -PEPA_ERR_THREAD_SHVA_FAIL;
 			}
 
 			if (core->sockets.out_write == events[i].data.fd) {
 				slog_warn_l("OUT socket: this side of socket: hang up");
 				pepa_state_out_set(core, PEPA_ST_FAIL);
-				return -PEPA_ERR_THREAD_OUT_DOWN;
+				return -PEPA_ERR_THREAD_OUT_FAIL;
 			}
 		} /* if (events[i].events & (EPOLLRDHUP | EPOLLHUP)) */
 	}
@@ -232,21 +224,34 @@ int pepa_shva_epoll_test_hang_up(pepa_core_t *core, struct epoll_event events[],
 	return PEPA_ERR_OK;
 }
 
-int32_t pepa_forwarder_process_buffers(pepa_core_t *core, char *buffer, struct epoll_event events[], uint32_t num_events)
-{
-	int32_t rc = PEPA_ERR_OK;
+void pepa_shva_thread_new_forward_cleanup(__attribute__((unused))void *arg){
+	pepa_core_t *core = pepa_get_core();
+	char                *my_name     = "SHVA-FW_CLEANUP";
+	thread_clean_args_t *clean_args = arg;
+	slog_warn("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$");
+	slog_warn("%s: Starting clean", my_name);
+	free(clean_args->buf);
+	close(clean_args->epoll_fd);
+	pepa_state_shva_set(core, PEPA_ST_FAIL);
+	slog_warn("%s: Finished clean", my_name);
+	slog_warn("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$");
+
+}
+
+int32_t pepa_forwarder_process_buffers(pepa_core_t *core, char *buffer, struct epoll_event events[], uint32_t num_events){
+	int32_t  rc = PEPA_ERR_OK;
 	uint32_t i;
 	for (i = 0; i < num_events; i++) {
 		/* Read /write from/to socket */
 		if ((events[i].data.fd == core->sockets.shva_rw) && (events[i].events & EPOLLIN)) {
 
-#if 0 /* SEB */
+	#if 0 /* SEB */
 			rc = pepa_one_direction_copy2(/* Send to : */core->sockets.out_write, "OUT",
 										  /* From: */core->sockets.shva_rw, "SHVA",
 										  buffer, core->internal_buf_size * 1024, /* Debug off */ 0,
 										  /* RX stat */&core->monitor.shva_rx,
 										  /* TX stat */&core->monitor.out_tx);
-#endif
+	#endif
 			rc = pepa_one_direction_copy3(/* Send to : */core->sockets.out_write, "OUT",
 										  /* From: */core->sockets.shva_rw, "SHVA",
 										  buffer, core->internal_buf_size * 1024, /* Debug off */ 0,
@@ -261,12 +266,13 @@ int32_t pepa_forwarder_process_buffers(pepa_core_t *core, char *buffer, struct e
 	return rc;
 }
 
-#define EVENTS_NUM (10)
+	#define EVENTS_NUM (10)
 
-void *pepa_shva_thread_new_forward(__attribute__((unused))void *arg)
-{
+void *pepa_shva_thread_new_forward(__attribute__((unused))void *arg){
+	thread_clean_args_t clean_args;
+	pthread_cleanup_push(pepa_shva_thread_new_forward_cleanup, &clean_args);
 	//int                i;
-	int32_t                rc;
+	int32_t            rc;
 	pepa_core_t        *core              = pepa_get_core();
 	char               *my_name           = "SHVA-FORWARD";
 	// char               buffer[BUF_SIZE];  //data buffer of 1K
@@ -288,8 +294,6 @@ void *pepa_shva_thread_new_forward(__attribute__((unused))void *arg)
 		pthread_exit(NULL);
 	}
 
-	thread_clean_args_t clean_args;
-
 	clean_args.buf = buffer;
 	clean_args.epoll_fd = epoll_fd;
 
@@ -300,8 +304,6 @@ void *pepa_shva_thread_new_forward(__attribute__((unused))void *arg)
 		close(epoll_fd);
 		pthread_exit(NULL);
 	}
-
-	pthread_cleanup_push(pepa_shva_thread_new_forward_cleanup, &clean_args);
 
 	/* Init epoll set */
 
@@ -320,7 +322,7 @@ void *pepa_shva_thread_new_forward(__attribute__((unused))void *arg)
 
 	while (1)   {
 		/* Wait until something happened */
-		int32_t event_count = epoll_wait(epoll_fd, events, EVENTS_NUM, -1);
+		int32_t event_count = epoll_wait(epoll_fd, events, EVENTS_NUM, 10);
 
 		/* Interrupted by a signal */
 		if (event_count < 0 && EINTR == errno) {
@@ -346,7 +348,7 @@ void *pepa_shva_thread_new_forward(__attribute__((unused))void *arg)
 
 		rc = pepa_forwarder_process_buffers(core, buffer, events, event_count);
 		if (-PEPA_ERR_BAD_SOCKET_READ == rc) {
-			slog_warn_l("%s: Could not write to OUT, closing read IN socket", my_name);
+			slog_warn_l("%s: Could read from SHVA, closing read IN socket", my_name);
 			close(epoll_fd);
 			pepa_state_shva_set(core, PEPA_ST_FAIL);
 		}
@@ -360,5 +362,6 @@ void *pepa_shva_thread_new_forward(__attribute__((unused))void *arg)
 	pthread_cleanup_pop(0);
 	pthread_exit(NULL);
 }
+#endif
 
 

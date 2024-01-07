@@ -1,6 +1,7 @@
 #ifndef _PEPA_STATE_MACHINE_H_
 #define _PEPA_STATE_MACHINE_H_
 
+void pepa_thread_cancel(pthread_t pid, const char *name);
 void pepa_back_to_disconnected_state_new(pepa_core_t *core);
 
 void pepa_thread_kill_shva_forwarder(pepa_core_t *core);
@@ -11,6 +12,7 @@ void pepa_thread_kill_in_fw(pepa_core_t *core);
 void pepa_thread_kill_monitor(pepa_core_t *core);
 
 void pepa_thread_start_shva(pepa_core_t *core);
+void pepa_thread_start_shva_fw(pepa_core_t *core);
 void pepa_thread_start_in(pepa_core_t *core);
 void pepa_thread_start_in_fw(pepa_core_t *core);
 void pepa_thread_start_monitor(pepa_core_t *core);
@@ -51,5 +53,6 @@ __attribute__((warn_unused_result))
  *  	   error
  */
 int32_t pepa_start_threads(pepa_core_t *core);
+char *pepa_pr_str(pepa_proc_t p);
 
 #endif /* _PEPA_STATE_MACHINE_H_ */

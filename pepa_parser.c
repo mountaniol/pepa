@@ -32,8 +32,10 @@ void pepa_show_help(void)
 		   "--log     | -l N - log level, accumulative: 0 = no log, 7 includes also {1-6}\n"
 		   "          ~        0: none, 1: falal, 2: trace, 3: error, 4: debug, 5: warn, 6: info, 7: note\n"
 		   "          ~        The same log level works for printing onto display and to the log file\n"
+		   "--dump    | -u - Dump every message into the log file\n"
 		   "--monitor | -m - Run  monitor, it will print status every 5 seconds\n"
 		   "--daemon  | -w - Run as a daemon process; pid file /var/run/pepa.pid will be created\n"
+		   "--color   | -c - Enable color in output printings\n"
 		   "--version | -v - show version + git revision + compilation time\n"
 		   "--help    | -h - show this help\n");
 }
@@ -83,8 +85,8 @@ long int pepa_string_to_int_strict(char *s, int *err)
 
 int pepa_parse_ip_string_get_port(const char *argument)
 {
-	int32_t  _err       = 0;
-	char *colon_ptr = NULL;
+	int32_t _err       = 0;
+	char    *colon_ptr = NULL;
 
 	TESTP_ASSERT(argument, "NULL argument");
 
@@ -176,6 +178,7 @@ int pepa_parse_arguments(int argi, char *argv[])
 		{"bsize",            no_argument,            0, 'b'},
 		{"monitor",          no_argument,            0, 'm'},
 		{"daemon",           no_argument,            0, 'w'},
+		{"color",            no_argument,            0, 'c'},
 		{"version",          no_argument,            0, 'v'},
 		{0, 0, 0, 0}
 	};
@@ -191,7 +194,7 @@ int pepa_parse_arguments(int argi, char *argv[])
 		return -1;
 
 	}
-	while ((opt = getopt_long(argi, argv, "s:o:i:n:l:f:d:b:phavmw", long_options, &option_index)) != -1) {
+	while ((opt = getopt_long(argi, argv, "s:o:i:n:l:f:d:b:phavmwc", long_options, &option_index)) != -1) {
 		switch (opt) {
 		case 's': /* SHVA Server address to connect to */
 			core->shva_thread.ip_string = pepa_parse_ip_string_get_ip(optarg);
@@ -313,6 +316,9 @@ int pepa_parse_arguments(int argi, char *argv[])
 		case 'w':
 			core->daemon = 1;
 			break;
+		case 'c':
+			core->slog_color = 1;
+			break;
 		default:
 			printf("Unknown argument: %c\n", opt);
 			pepa_show_help();
@@ -349,6 +355,7 @@ int pepa_config_slogger(pepa_core_t *core)
 
 	cfg.nTraceTid = 1;
 	cfg.eDateControl = SLOG_DATE_FULL;
+	cfg.eColorFormat = SLOG_COLORING_DISABLE;
 
 	if (NULL != core->slog_file) {
 		cfg.nToFile = 1;
@@ -367,11 +374,15 @@ int pepa_config_slogger(pepa_core_t *core)
 		cfg.nToScreen = 0;
 	}
 
+	if (0 != core->slog_color) {
+		cfg.eColorFormat = SLOG_COLORING_TAG;
+	}
+
 	slog_config_set(&cfg);
 	slog_enable(SLOG_TRACE);
 	//slog_init("pepa", core->slog_level, 1);
-	slog_config_set(&cfg);
 	slog_disable(SLOG_FLAGS_ALL);
+	slog_config_set(&cfg);
 	slog_enable(core->slog_flags);
 	return PEPA_ERR_OK;
 }
@@ -398,10 +409,10 @@ int pepa_config_slogger_daemon(pepa_core_t *core)
 		strcpy(cfg.sFilePath, core->slog_dir);
 	}
 
-	cfg.nToScreen = 0;
+	//cfg.nToScreen = 0;
 
-	slog_config_set(&cfg);
 	slog_disable(SLOG_FLAGS_ALL);
+	slog_config_set(&cfg);
 	slog_enable(core->slog_flags);
 	return PEPA_ERR_OK;
 }

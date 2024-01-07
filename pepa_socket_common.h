@@ -103,5 +103,8 @@ void pepa_socket_close_out_listen(pepa_core_t *core);
 
 void pepa_socket_close_in_listen(pepa_core_t *core);
 
+int pepa_find_socket_port(int sock);
+void pepa_reading_socket_close(int fd, const char *socket_name);
+
 //void pepa_print_pthread_create_error(const int32_t rc);
 #endif /* _PEPA_SOCKET_H__ */

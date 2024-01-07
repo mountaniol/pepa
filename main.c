@@ -9,34 +9,36 @@
 #include "pepa_state_machine.h"
 
 /* Catch Signal Handler function */
-static void signal_callback_handler(int signum, __attribute__((unused))siginfo_t *info, __attribute__((unused))void *extra)
+static void signal_callback_handler(int signum, __attribute__((unused)) siginfo_t *info, __attribute__((unused))void *extra)
 {
-	pepa_core_t *core = pepa_get_core();
+	//pepa_core_t *core = pepa_get_core();
 	printf("Caught signal %d\n", signum);
 	if (signum == SIGINT) {
 		printf("Caught signal SIGINT: %d\n", signum);
-		pepa_back_to_disconnected_state_new(core);
+		//pepa_back_to_disconnected_state_new(core);
 		exit(0);
 	}
 
 	if (signum == SIGUSR1) {
 		printf("Caught signal SIGINT: %d\n", signum);
-		pepa_back_to_disconnected_state_new(core);
+		//pepa_back_to_disconnected_state_new(core);
 		exit(0);
 	}
 }
 
 static void pepa_set_int_signal_handler(void)
 {
-    struct sigaction action;
+	struct sigaction action;
 
 	sigemptyset(&action.sa_mask);
 	action.sa_flags = 0;
 
-    action.sa_flags = SA_SIGINFO | SIGUSR1;     
-    action.sa_sigaction = signal_callback_handler;
-    sigaction(SIGINT, &action, NULL);
+	action.sa_flags = SA_SIGINFO | SIGUSR1;
+	action.sa_sigaction = signal_callback_handler;
+	sigaction(SIGINT, &action, NULL);
 }
+
+int pepa_go(pepa_core_t *core);
 
 int main(int argi, char *argv[])
 {
@@ -82,7 +84,12 @@ int main(int argi, char *argv[])
 	pepa_set_int_signal_handler();
 
 	slog_note_l("Going to start threads");
-	rc = pepa_start_threads(core);
+	//rc = pepa_start_threads(core);
+	if (core->monitor.onoff) {
+		slog_debug_l("Going to start MONITOR");
+		pepa_thread_start_monitor(core);
+	}
+	rc = pepa_go(core);
 	if (rc < 0) {
 		slog_fatal_l("Could not start threads");
 		exit(-11);

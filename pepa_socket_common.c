@@ -23,7 +23,7 @@ void set_sig_handler(void)
 	int sets = pthread_sigmask(SIG_BLOCK, &set, NULL);
 	if (sets != 0) {
 		handle_error_en(sets, "pthread_sigmask");
-		exit(-1);
+		exit(4);
 	}
 }
 
@@ -99,8 +99,8 @@ void pepa_set_tcp_send_size(pepa_core_t *core, int sock)
 	}
 }
 
-void pepa_set_tcp_connection_props(pepa_core_t *core, int sock)
-{
+#if 0 /* SEB */
+void pepa_set_tcp_connection_props(pepa_core_t *core, int sock){
 	struct timeval time_out;
 	time_out.tv_sec = 10;
 	time_out.tv_usec = 0;
@@ -124,6 +124,7 @@ void pepa_set_tcp_connection_props(pepa_core_t *core, int sock)
 		slog_debug_l("[from %s] tsetsockopt function has a problem", "EMU SHVA", strerror(errno));
 	}
 }
+#endif
 
 int pepa_one_direction_copy3(int fd_out, const char *name_out,
 							 int fd_in, const char *name_in,
@@ -183,7 +184,7 @@ int pepa_one_direction_copy3(int fd_out, const char *name_out,
 		do {
 			tx_current  = write(fd_out, buf, (rx - tx));
 
-			if (tx_current < 0) {
+			if (tx_current <= 0) {
 				ret = -PEPA_ERR_BAD_SOCKET_WRITE;
 				if (do_debug) {
 					slog_warn_l("Could not write to write to sock %s [%d]: returned -1: %s", name_out, fd_out, strerror(errno));
@@ -207,7 +208,7 @@ int pepa_one_direction_copy3(int fd_out, const char *name_out,
 		}
 
 		/* Run this loop as long as we have data on read socket, nut no more that max_iterations */
-	} while ( ((int32_t)buf_size == rx) && (iteration <= max_iterations)); 
+	} while (((int32_t)buf_size == rx) && (iteration <= max_iterations));
 
 	ret = PEPA_ERR_OK;
 endit:
@@ -228,11 +229,11 @@ endit:
 	return ret;
 }
 
+#if 0 /* SEB */
 int pepa_one_direction_copy2(int fd_out, const char *name_out,
 							 int fd_in, const char *name_in,
 							 char *buf, size_t buf_size, int do_debug,
-							 uint64_t *ext_rx, uint64_t *ext_tx)
-{
+							 uint64_t *ext_rx, uint64_t *ext_tx){
 	int ret       = PEPA_ERR_OK;
 	int rx        = 0;
 	int tx_total  = 0;
@@ -312,7 +313,7 @@ int pepa_one_direction_copy2(int fd_out, const char *name_out,
 	} while ((int)buf_size == rx); /* Tun this loop as long as we have data on read socket */
 
 	ret = PEPA_ERR_OK;
-endit:
+	endit:
 	if (do_debug) {
 		// slog_note_l("Finished transfering from %s to %s, returning %d, rx = %d, tx = %d, ", name_in, name_out, ret, rx_total, tx_total);
 	}
@@ -328,6 +329,7 @@ endit:
 	}
 	return ret;
 }
+#endif
 
 int32_t pepa_test_fd(int32_t fd)
 {
@@ -359,7 +361,7 @@ int32_t epoll_ctl_add(int epfd, int fd, uint32_t events)
 int32_t pepa_socket_shutdown_and_close(int sock, const char *my_name)
 {
 	if (sock < 0) {
-		slog_warn_l("%s: Looks like the socket is closed: == %d", my_name);
+		slog_warn_l("%s: Looks like the socket is closed: == %d", my_name, sock);
 		return -PEPA_ERR_FILE_DESCRIPTOR;
 	}
 
@@ -375,37 +377,83 @@ int32_t pepa_socket_shutdown_and_close(int sock, const char *my_name)
 		return -PEPA_ERR_CANNOT_CLOSE;
 	}
 
-	close(sock);
-	slog_note_l("%s: Closed socket %d", my_name, sock);
+	// close(sock);
+	slog_note_l("%s: Closed socket successfully %d", my_name, sock);
 	return PEPA_ERR_OK;
 }
 
 void pepa_socket_close(int fd, const char *socket_name)
 {
+	int i;
+	if (fd < 0) {
+		slog_error_l("Can not close socket %s, its value is %d", socket_name, fd);
+		return;
+	}
+
+	for (i = 0; i < 256 ; i++) {
+		int rc = close(fd);
+		if (0 == rc) {
+			slog_note_l("## Closed socket socket %s : %d, iterations: %d", socket_name, fd, i);
+			return;
+		}
+		usleep(100);
+		slog_error_l("Can not close socket %s, error %d: %s, iteration: %d", socket_name, rc, strerror(errno), i);
+	}
+}
+
+void pepa_reading_socket_close(int fd, const char *socket_name)
+{
+	int  i;
+	char buf[16];
+	int iterations = 0;
+	int read_from;
+
 	if (fd < 0) {
 		slog_error_l("Can not close socket %s, its value is %d", socket_name, fd);
 		return;
 	}
 
 	int rc = close(fd);
-	if (0 != rc) {
-		slog_error_l("Can not close socket %s, error %d:%s", socket_name, rc, strerror(errno));
+	if (0 == rc) {
+		slog_note_l("## Closed from the first try socket socket %s, iterations: %d ", socket_name, iterations);
 		return;
 	}
 
-	slog_note_l("## Closed socket socket %s");
+	/* Try to read from socket everything before it closed */
+	for (i = 0; i < 2048; i++) {
+		rc = read(fd, buf, 16);
+		if (read(fd, buf, 16) < 0) {
+			i = 2048;
+			continue;
+		}
+		read_from +=rc;
+		iterations++;
+	}
+
+#if 0 /* SEB */
+	rc = close(fd);
+	if (0 != rc) {
+		slog_error_l("Can not close socket %s, iterations: %d, error %d:%s", socket_name, iterations, rc, strerror(errno));
+		return;
+	}
+#endif
+	
+	pepa_socket_close(fd, socket_name);
+	slog_note_l("## Closed socket socket %s, iterations: %d ", socket_name, iterations);
 }
 
 void pepa_socket_close_shva_rw(pepa_core_t *core)
 {
-	close(core->sockets.shva_rw);
+	pepa_reading_socket_close(core->sockets.shva_rw, "SHVA RW");
+	//close(core->sockets.shva_rw);
 	core->sockets.shva_rw = -1;
 	slog_note_l("Closed core->sockets.shva_rw");
 }
 
 void pepa_socket_close_out_write(pepa_core_t *core)
 {
-	close(core->sockets.out_write);
+	pepa_reading_socket_close(core->sockets.out_write, "OUT WRITE");
+	//close(core->sockets.out_write);
 	core->sockets.out_write = -1;
 	slog_note_l("Closed core->sockets.out_write");
 }
@@ -568,5 +616,19 @@ int pepa_open_connection_to_server(const char *address, int port, const char *na
 	return (sock);
 }
 
+int pepa_find_socket_port(int sock)
+{
+	struct sockaddr_in sin;
+	socklen_t          len = sizeof(sin);
+	if (sock < 0) {
+		return -1;
+	}
 
+	if (getsockname(sock, (struct sockaddr *)&sin, &len) == -1) {
+		perror("getsockname");
+		return -1;
+	} else {
+		return ntohs(sin.sin_port);
+	}
+}
 
