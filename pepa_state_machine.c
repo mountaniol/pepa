@@ -567,7 +567,10 @@ static void pepa_set_int_signal_handler(void)
 void *pepa_monitor_thread(__attribute__((unused))void *arg)
 {
 	const char *my_name = "MONITOR";
-	pepa_set_int_signal_handler();
+	int active_in_readers;
+	int i;
+	
+//	pepa_set_int_signal_handler();
 
 	int32_t        rc       = pepa_pthread_init_phase(my_name);
 	if (rc < 0) {
@@ -613,9 +616,17 @@ void *pepa_monitor_thread(__attribute__((unused))void *arg)
 				   KB((core->monitor.shva_tx - monitor_prev.shva_tx) / MONITOR_SLEEP_TIME)
 				  );
 
+		active_in_readers = 0;
+		if (NULL != core->in_reading_sockets.sockets) {
+			for (i = 0; i < core->in_reading_sockets.number; i++) {
+				if (core->in_reading_sockets.sockets[i] > -1) {
+					active_in_readers++;
+				}
+			}
+		}
 
-		slog_debug("### STATUS: THREADS: out_listen: %d | out_write: %d | shva_rw: %d | in_listen: %d ###",
-				   core->sockets.out_listen, core->sockets.out_write, core->sockets.shva_rw, core->sockets.in_listen);
+		slog_debug("### STATUS: THREADS: out_listen: %d | out_write: %d | shva_rw: %d | in_listen: %d | in read: %d active sockets ###",
+				   core->sockets.out_listen, core->sockets.out_write, core->sockets.shva_rw, core->sockets.in_listen, active_in_readers);
 		slog_debug("### STATUS:  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
 
 		fflush(stdout); 

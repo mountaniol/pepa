@@ -471,7 +471,7 @@ void pepa_socket_close_out_listen(pepa_core_t *core)
 void pepa_socket_close_in_listen(pepa_core_t *core)
 {
 	if (PEPA_ERR_OK != pepa_socket_shutdown_and_close(core->sockets.in_listen, "IN LISTEN")) {
-		slog_debug_l("Close and shutdown od IN LISTEN is failed");
+		slog_debug_l("Close and shutdown of IN LISTEN is failed");
 	}
 	core->sockets.in_listen = -1;
 	slog_note_l("Closed core->sockets.in_listen");
