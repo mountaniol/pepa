@@ -11,10 +11,10 @@
 #define PEPA_IN_SOCKETS (1024)
 
 /* Predefined number of OUT clients */
-#define PEPA_OUT_SOCKETS (1)
+#define PEPA_OUT_SOCKETS (12)
 
 /* Predefined number of SHVA clients */
-#define PEPA_SHVA_SOCKETS (1)
+#define PEPA_SHVA_SOCKETS (12)
 
 #ifndef PPEPA_MAX
 	#define PEPA_MAX(a,b) ( a > b ? a : b)
