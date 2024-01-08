@@ -579,7 +579,7 @@ int pepa3_reset_sockets(pepa_core_t *core)
 	if (rc) {
 		slog_warn_l("Could not remove socket OUT Listen from epoll set: fd: %d, %s", core->sockets.out_listen, strerror(errno));
 	}
-#endif	
+#endif
 
 	rc = epoll_ctl(core->epoll_fd, EPOLL_CTL_DEL, core->sockets.out_write, NULL);
 	if (rc) {
@@ -606,7 +606,7 @@ int pepa3_reset_sockets(pepa_core_t *core)
 	}
 
 	core->sockets.out_listen = -1;
-#endif	
+#endif
 
 	slog_note_l("Finished 'close sockets' phase");
 	return PST_WAIT_OUT;
@@ -615,13 +615,15 @@ int pepa3_reset_sockets(pepa_core_t *core)
 int pepa3_wait_out(pepa_core_t *core)
 {
 	/* Both these functions are blocking and when they returned, both OUT sockets are opened */
-	pepa_out_thread_open_listening_socket(core);
-	pepa_out_thread_accept(core);
-
-	if (0 != epoll_ctl_add(core->epoll_fd, core->sockets.out_listen, EPOLLIN | EPOLLRDHUP | EPOLLHUP)) {
-		slog_error_l("Can not add OUT Listen socket to epoll set: %s", strerror(errno));
-		return PST_CLOSE_SOCKETS;
+	if (core->sockets.out_listen < 0) {
+		pepa_out_thread_open_listening_socket(core);
+		if (0 != epoll_ctl_add(core->epoll_fd, core->sockets.out_listen, EPOLLIN | EPOLLRDHUP | EPOLLHUP)) {
+			slog_error_l("Can not add OUT Listen socket to epoll set: %s", strerror(errno));
+			return PST_CLOSE_SOCKETS;
+		}
 	}
+
+	pepa_out_thread_accept(core);
 
 	if (0 != epoll_ctl_add(core->epoll_fd, core->sockets.out_write, EPOLLIN | EPOLLRDHUP | EPOLLHUP)) {
 		slog_error_l("Can not add OUT Write socket to epoll set: %s", strerror(errno));
@@ -647,7 +649,10 @@ int pepa3_open_shva(pepa_core_t *core)
 int pepa3_start_in(pepa_core_t *core)
 {
 	/* This is a blocking function */
+	if (core->sockets.in_listen >= 0) return PST_TRANSFER_LOOP;
+
 	pepa_in_thread_listen_socket(core);
+
 	if (0 != epoll_ctl_add(core->epoll_fd, core->sockets.in_listen, EPOLLIN | EPOLLRDHUP | EPOLLHUP)) {
 		slog_error_l("Can not add IN Listen socket to epoll set: %s", strerror(errno));
 		return PST_CLOSE_SOCKETS;
