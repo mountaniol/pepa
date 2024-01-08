@@ -573,10 +573,13 @@ int pepa3_close_sockets(pepa_core_t *core)
 
 int pepa3_reset_sockets(pepa_core_t *core)
 {
+	int rc;
+#if 0 /* SEB */
 	int rc = epoll_ctl(core->epoll_fd, EPOLL_CTL_DEL, core->sockets.out_listen, NULL);
 	if (rc) {
 		slog_warn_l("Could not remove socket OUT Listen from epoll set: fd: %d, %s", core->sockets.out_listen, strerror(errno));
 	}
+#endif	
 
 	rc = epoll_ctl(core->epoll_fd, EPOLL_CTL_DEL, core->sockets.out_write, NULL);
 	if (rc) {
@@ -588,7 +591,7 @@ int pepa3_reset_sockets(pepa_core_t *core)
 		slog_warn_l("Could not remove socket SHVA from epoll set: fd: %d, %s", core->sockets.shva_rw, strerror(errno));
 	}
 
-	pepa_in_reading_sockets_close_all(core);
+	// pepa_in_reading_sockets_close_all(core);
 
 	pepa_reading_socket_close(core->sockets.shva_rw, "SHVA");
 	core->sockets.shva_rw = -1;
@@ -596,12 +599,14 @@ int pepa3_reset_sockets(pepa_core_t *core)
 	pepa_socket_close(core->sockets.out_write, "OUT WRITE");
 	core->sockets.out_write = -1;
 
+#if 0 /* SEB */
 	rc = pepa_socket_shutdown_and_close(core->sockets.out_listen, "OUT LISTEN");
 	if (rc) {
 		slog_warn_l("Could not close socket OUT LISTEN: fd: %d", core->sockets.out_listen);
 	}
 
 	core->sockets.out_listen = -1;
+#endif	
 
 	slog_note_l("Finished 'close sockets' phase");
 	return PST_WAIT_OUT;
