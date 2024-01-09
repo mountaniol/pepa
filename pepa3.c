@@ -6,37 +6,56 @@
 #include <sys/socket.h>
 
 #include "slog/src/slog.h"
+#include "pepa_config.h"
 #include "pepa_socket_common.h"
 #include "pepa_errors.h"
 #include "pepa_core.h"
 #include "pepa_state_machine.h"
 
+/**
+ * @author Sebastian Mountaniol (1/9/24)
+ * @brief PEPA state machine states
+ * @details 
+ */
 enum pepa3_go_states {
-	PST_START = 1000,
-	PST_CLOSE_SOCKETS,
-	PST_WAIT_OUT,
-	PST_OPEN_SHVA,
-	PST_START_IN,
-	PST_RESTART_IN,
-	PST_TRANSFER_LOOP,
-	PST_END,
+	PST_START = 1000, /**< Start state, executed  once  */
+	PST_CLOSE_SOCKETS, /**< All sockets must be closed */
+	PST_RESET_SOCKETS, /**< Only reading sockets should be closed, listeners stay */
+	PST_WAIT_OUT, /**< Wit OUT thread connection */
+	PST_OPEN_SHVA, /**< Connect to SHVA server */
+	PST_START_IN, /**< Start IN listening socket */
+	PST_RESTART_IN, /**< IN listening socket reuires full restart */
+	PST_TRANSFER_LOOP, /**< Start transfering loop */
+	PST_END, /**< PEPA must exit */
 };
 
+#if 0 /* SEB */
 enum pepa3_transfer_states {
 	TR_IN_CONNECTION = 2000,
 	TR_SHVA_READ,
 	TR_SHVA_IN_READ,
 };
+#endif
 
+/**
+ * @author Sebastian Mountaniol (1/9/24)
+ * @brief Internal statuses 
+ * @details 
+ */
 enum pepa3_errors {
-	TE_RESTART = 3000,
-	TE_IN_RESTART,
-	TE_IN_REMOVED,
+	TE_RESTART = 3000, /**< All sockets need full restart */
+	TE_RESET, /**< Sockets need partial restart, listening sockets are OK */
+	TE_IN_RESTART, /**< IN sockets need full restart */
+	TE_IN_REMOVED, /**< On of IN listening sockets was removed */
 };
 
+/* Max number of events we acccept from epoll */
 #define EVENTS_NUM (100)
+
+/* epoll max timeout, milliseconds */
 #define EPOLL_TIMEOUT (100)
 
+/* Used internally in IN reading sockets array */
 #define EMPTY_SLOT (-1)
 
 static void pepa_in_reading_sockets_close_all(pepa_core_t *core)
@@ -218,7 +237,7 @@ int pepa_process_exceptions(pepa_core_t *core, struct epoll_event events[], int 
 static int32_t pepa_in_accept_new_connection(pepa_core_t *core)
 {
 	struct sockaddr_in address;
-	int32_t            new_socket = -1;
+	int32_t            new_socket = FD_CLOSED;
 	static int32_t     addrlen    = sizeof(address);
 
 	if ((new_socket = accept(core->sockets.in_listen,
@@ -267,8 +286,8 @@ static int pepa_process_fdx(pepa_core_t *core, struct epoll_event events[], int 
 	int32_t  rc             = PEPA_ERR_OK;
 	int32_t  i;
 
-	int      fd_read        = -1;
-	int      fd_write       = -1;
+	int      fd_read        = FD_CLOSED;
+	int      fd_write       = FD_CLOSED;
 	char     *fd_name_read  = NULL;
 	char     *fd_name_write = NULL;
 	uint64_t *read_stat;
@@ -431,7 +450,7 @@ static void pepa_out_thread_open_listening_socket(pepa_core_t *core)
 															  core->out_thread.clients,
 															  __func__);
 		if (core->sockets.out_listen < 0) {
-			core->sockets.out_listen = -1;
+			core->sockets.out_listen = FD_CLOSED;
 			//slog_warn_l("Can not open listening socket: %s", strerror(errno));
 			waiting_time += timeout;
 			usleep(1000000);
@@ -443,7 +462,7 @@ static int32_t pepa_out_wait_connection(pepa_core_t *core, int32_t fd_listen)
 {
 	struct sockaddr_in s_addr;
 	socklen_t          addrlen = sizeof(struct sockaddr);
-	int32_t            fd_read = -1;
+	int32_t            fd_read = FD_CLOSED;
 	do {
 		slog_info_l("Starting accept() waiting");
 		fd_read = accept4(fd_listen, &s_addr, &addrlen, SOCK_CLOEXEC);
@@ -467,8 +486,9 @@ static void pepa_shva_thread_open_connection(pepa_core_t *core)
 	do {
 		core->sockets.shva_rw = pepa_open_connection_to_server(core->shva_thread.ip_string->data, core->shva_thread.port_int, __func__);
 
-		if (core->sockets.shva_rw < 0) {
-			core->sockets.shva_rw = -1;
+		if ((core->sockets.shva_rw < 0) && 
+			(FD_CLOSED != core->sockets.shva_rw)) {
+			core->sockets.shva_rw = FD_CLOSED;
 			usleep(100000);
 			continue;
 		}
@@ -552,20 +572,20 @@ int pepa3_close_sockets(pepa_core_t *core)
 	if (rc) {
 		slog_warn_l("Could not close socket SHVA: fd: %d", core->sockets.shva_rw);
 	}
-	core->sockets.in_listen = -1;
+	core->sockets.in_listen = FD_CLOSED;
 
 	pepa_reading_socket_close(core->sockets.shva_rw, "SHVA");
-	core->sockets.shva_rw = -1;
+	core->sockets.shva_rw = FD_CLOSED;
 
 	pepa_socket_close(core->sockets.out_write, "OUT WRITE");
-	core->sockets.out_write = -1;
+	core->sockets.out_write = FD_CLOSED;
 
 	rc = pepa_socket_shutdown_and_close(core->sockets.out_listen, "OUT LISTEN");
 	if (rc) {
 		slog_warn_l("Could not close socket OUT LISTEN: fd: %d", core->sockets.out_listen);
 	}
 
-	core->sockets.out_listen = -1;
+	core->sockets.out_listen = FD_CLOSED;
 
 	slog_note_l("Finished 'close sockets' phase");
 	return PST_WAIT_OUT;
@@ -594,10 +614,10 @@ int pepa3_reset_sockets(pepa_core_t *core)
 	// pepa_in_reading_sockets_close_all(core);
 
 	pepa_reading_socket_close(core->sockets.shva_rw, "SHVA");
-	core->sockets.shva_rw = -1;
+	core->sockets.shva_rw = FD_CLOSED;
 
 	pepa_socket_close(core->sockets.out_write, "OUT WRITE");
-	core->sockets.out_write = -1;
+	core->sockets.out_write = FD_CLOSED;
 
 #if 0 /* SEB */
 	rc = pepa_socket_shutdown_and_close(core->sockets.out_listen, "OUT LISTEN");
@@ -605,7 +625,7 @@ int pepa3_reset_sockets(pepa_core_t *core)
 		slog_warn_l("Could not close socket OUT LISTEN: fd: %d", core->sockets.out_listen);
 	}
 
-	core->sockets.out_listen = -1;
+	core->sockets.out_listen = FD_CLOSED;
 #endif
 
 	slog_note_l("Finished 'close sockets' phase");
@@ -674,7 +694,7 @@ int pepa3_restart_in(pepa_core_t *core)
 	if (rc) {
 		slog_warn_l("Could not close socket SHVA: fd: %d", core->sockets.shva_rw);
 	}
-	core->sockets.in_listen = -1;
+	core->sockets.in_listen = FD_CLOSED;
 	return pepa3_start_in(core);
 }
 

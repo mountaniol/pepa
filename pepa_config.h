@@ -22,6 +22,9 @@
 
 #define PTHREAD_DEAD ((pthread_t)0xBEEFDEAD)
 
+/* Assign this value to closed file descriptor */
+#define FD_CLOSED (-1)
+
 #define MONITOR_TIMEOUT_USEC (500000)
 
 #define SLOG_LEVEL_FATAL (SLOG_FATAL)

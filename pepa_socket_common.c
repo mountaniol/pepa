@@ -6,6 +6,7 @@
 #include <sys/epoll.h>
 
 #include "slog/src/slog.h"
+#include "pepa_config.h"
 #include "pepa_socket_common.h"
 #include "pepa_errors.h"
 #include "pepa_core.h"
@@ -187,7 +188,7 @@ int pepa_one_direction_copy3(int fd_out, const char *name_out,
 			if (tx_current <= 0) {
 				ret = -PEPA_ERR_BAD_SOCKET_WRITE;
 				if (do_debug) {
-					slog_warn_l("Could not write to write to sock %s [%d]: returned -1: %s", name_out, fd_out, strerror(errno));
+					slog_warn_l("Could not write to write to sock %s [%d]: returned < 0: %s", name_out, fd_out, strerror(errno));
 				}
 				goto endit;
 			}
@@ -290,7 +291,7 @@ int pepa_one_direction_copy2(int fd_out, const char *name_out,
 			if (tx_current < 0) {
 				ret = -PEPA_ERR_BAD_SOCKET_WRITE;
 				if (do_debug) {
-					slog_warn_l("Could not write to write to sock %s [%d]: returned -1: %s", name_out, fd_out, strerror(errno));
+					slog_warn_l("Could not write to write to sock %s [%d]: returned < 0: %s", name_out, fd_out, strerror(errno));
 				}
 				goto endit;
 			}
@@ -446,7 +447,7 @@ void pepa_socket_close_shva_rw(pepa_core_t *core)
 {
 	pepa_reading_socket_close(core->sockets.shva_rw, "SHVA RW");
 	//close(core->sockets.shva_rw);
-	core->sockets.shva_rw = -1;
+	core->sockets.shva_rw = FD_CLOSED;
 	slog_note_l("Closed core->sockets.shva_rw");
 }
 
@@ -454,7 +455,7 @@ void pepa_socket_close_out_write(pepa_core_t *core)
 {
 	pepa_reading_socket_close(core->sockets.out_write, "OUT WRITE");
 	//close(core->sockets.out_write);
-	core->sockets.out_write = -1;
+	core->sockets.out_write = FD_CLOSED;
 	slog_note_l("Closed core->sockets.out_write");
 }
 
@@ -464,7 +465,7 @@ void pepa_socket_close_out_listen(pepa_core_t *core)
 	if (PEPA_ERR_OK != pepa_socket_shutdown_and_close(core->sockets.out_listen, "OUT LISTEN")) {
 		slog_debug_l("Close and shutdown of the OUT LISTEN is failed");
 	}
-	core->sockets.out_listen = -1;
+	core->sockets.out_listen = FD_CLOSED;
 	slog_note_l("Closed core->sockets.out_listen");
 }
 
@@ -473,7 +474,7 @@ void pepa_socket_close_in_listen(pepa_core_t *core)
 	if (PEPA_ERR_OK != pepa_socket_shutdown_and_close(core->sockets.in_listen, "IN LISTEN")) {
 		slog_debug_l("Close and shutdown of IN LISTEN is failed");
 	}
-	core->sockets.in_listen = -1;
+	core->sockets.in_listen = FD_CLOSED;
 	slog_note_l("Closed core->sockets.in_listen");
 }
 

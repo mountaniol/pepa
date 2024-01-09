@@ -525,8 +525,8 @@ void *pepa_emulator_shva_thread(__attribute__((unused))void *arg)
 	int32_t                rc          = -1;
 	pepa_core_t            *core       = pepa_get_core();
 	struct sockaddr_in     s_addr;
-	int                    sock_listen = -1;
-	// int                sock_rw     = -1;
+	int                    sock_listen = FD_CLOSED;
+	// int                sock_rw     = FD_CLOSED;
 
 	emu_set_int_signal_handler();
 
@@ -608,7 +608,7 @@ void *pepa_emulator_shva_thread(__attribute__((unused))void *arg)
 					slog_note_l("Emu SHVA: EXITED FROM ACCEPTING");
 					if (core->sockets.shva_rw < 0) {
 						slog_error_l("Emu SHVA: Could not accept: %s", strerror(errno));
-						core->sockets.shva_rw = -1;
+						core->sockets.shva_rw = FD_CLOSED;
 						continue;
 					}
 
@@ -694,12 +694,12 @@ int32_t in_thread_disconnect_all = 0;
 /* Create 1 read/write listening socket to emulate SHVA server */
 void *pepa_emulator_in_thread(__attribute__((unused))void *arg)
 {
-	int in_socket = -1;
+	int in_socket = FD_CLOSED;
 	pthread_cleanup_push(pepa_emulator_in_thread_cleanup, &in_socket);
 
 	int32_t  *my_num     = arg;
 	char     my_name[32] = {0};
-	int32_t  rc          = -1;
+	int32_t  rc          = FD_CLOSED;
 	//pepa_core_t *core  = pepa_get_core();
 
 	uint64_t writes      = 0;
@@ -769,7 +769,7 @@ void *pepa_emulator_in_thread(__attribute__((unused))void *arg)
 
 		slog_warn_l("%s: Closing connection", my_name);
 		close(in_socket);
-		in_socket = -1;
+		in_socket = FD_CLOSED;
 
 		/* If 'disconnect all IN threads' counter is UP, decrease it */
 		if (in_thread_disconnect_all > 0) {
