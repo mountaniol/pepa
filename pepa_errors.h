@@ -4,6 +4,7 @@
 typedef enum {
 	PEPA_ERR_OK = 0,
 
+#if 0 /* SEB */
 	/* Not so errors */
 	PEPA_ERR_EVENT, /* This is code telling an event received on event fd  */
 	PEPA_ERR_STOP, /* This is code telling to thread to stop */
@@ -19,6 +20,7 @@ typedef enum {
 
 	/* Memory related errors */
 	PEPA_ERR_NULL_POINTER,
+#endif	
 	PEPA_ERR_BUF_ALLOCATION,
 
 	/* File related */
@@ -31,9 +33,9 @@ typedef enum {
 
 	/* Core related errors */
 	PEPA_ERR_INIT_MITEX,
-	PEPA_ERR_DESTROY_MITEX,
+	// PEPA_ERR_DESTROY_MITEX,
 	PEPA_ERR_CORE_CREATE,
-	PEPA_ERR_CORE_DESTROY,
+	// PEPA_ERR_CORE_DESTROY,
 
 	/* Network related errors */
 	PEPA_ERR_ADDRESS_FORMAT,
@@ -43,19 +45,24 @@ typedef enum {
 	PEPA_ERR_SOCKET_LISTEN,
 	PEPA_ERR_SOCK_CONNECT,
 	PEPA_ERR_CONVERT_ADDR,
-	PEPA_ERR_SOCKET_CLOSE,
-	PEPA_ERR_CANNOT_SHUTDOWN,
+	// PEPA_ERR_SOCKET_CLOSE,
+	// PEPA_ERR_CANNOT_SHUTDOWN,
 
 	/* Data transfer */
+#if 0 /* SEB */
 	PEPA_ERR_SELECT_EXCEPTION_LEFT,
 	PEPA_ERR_SELECT_EXCEPTION_RIGHT,
 	PEPA_ERR_SELECT_ABNORMAL,
 	PEPA_ERR_SOCKET_READ,
+#endif	
 	PEPA_ERR_BAD_SOCKET_READ,
 	PEPA_ERR_BAD_SOCKET_WRITE,
+
+#if 0 /* SEB */
 	PEPA_ERR_SOCKET_READ_CLOSED,
 	PEPA_ERR_SOCKET_WRITE,
 	PEPA_ERR_SOCKET_WRITE_CLOSED,
+#endif	
 
 	/* Treads related */
 	PEPA_ERR_THREAD_CANNOT_CREATE,
@@ -63,7 +70,7 @@ typedef enum {
 	PEPA_ERR_THREAD_DETOUCH,
 
 	/* Socket related */
-	PEPA_ERR_SOCKET_IN_LISTEN_DOWN,
+	// PEPA_ERR_SOCKET_IN_LISTEN_DOWN,
 	
 	/* Unknown error number */
 	PEPA_ERR_ERROR_OUT_OF_RANGE,

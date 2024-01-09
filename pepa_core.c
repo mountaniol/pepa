@@ -119,16 +119,16 @@ static pepa_core_t *pepa_create_core_t(void)
 
 	/*** Init initial values of state machibe  */
 
-	core->state.signals[PEPA_PR_SHVA] = PEPA_ST_DOWN;
-	core->state.signals[PEPA_PR_IN] = PEPA_ST_DOWN;
-	core->state.signals[PEPA_PR_OUT] = PEPA_ST_DOWN;
+	//core->state.signals[PEPA_PR_SHVA] = PEPA_ST_DOWN;
+	//core->state.signals[PEPA_PR_IN] = PEPA_ST_DOWN;
+	//core->state.signals[PEPA_PR_OUT] = PEPA_ST_DOWN;
 
 	/*** Init threads pthread descriptors */
 	
 	core->shva_thread.thread_id = PTHREAD_DEAD;
-	core->shva_forwarder.thread_id = PTHREAD_DEAD;
+	// core->shva_forwarder.thread_id = PTHREAD_DEAD;
 	core->in_thread.thread_id = PTHREAD_DEAD;
-	core->in_forwarder.thread_id = PTHREAD_DEAD;
+	// core->in_forwarder.thread_id = PTHREAD_DEAD;
 	core->out_thread.thread_id = PTHREAD_DEAD;
 	core->monitor_thread.thread_id = PTHREAD_DEAD;
 
@@ -150,7 +150,12 @@ static pepa_core_t *pepa_create_core_t(void)
 	core->slog_file = NULL;
 	core->slog_dir = NULL;
 	core->slog_print = 1;
+	core->monitor_divider = 1;
+	core->emu_max_buf = 1024;
+	core->emu_min_buf = 1;
+	core->monitor_freq = 5;
 
+#if 0 /* SEB */
 	rc = pthread_mutex_init(&core->state.sync_sem, NULL);
 	if (rc < 0) {
 		slog_fatal_l("Can not init core->state.sync_sem");
@@ -168,6 +173,7 @@ static pepa_core_t *pepa_create_core_t(void)
 		slog_fatal_l("Can not init core->state.sync");
 		abort();
 	}
+#endif	
 
 	core->pid_file_name = strdup("/tmp/pepa.pid");
 

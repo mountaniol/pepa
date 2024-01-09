@@ -30,7 +30,7 @@ void pepa_thread_cancel(pthread_t pid, const char *name)
 
 	rc = pthread_kill(pid, 0);
 
-	while (0 == rc){
+	while (0 == rc) {
 		usleep(10);
 		rc = pthread_kill(pid, 0);
 	};
@@ -536,8 +536,8 @@ int32_t pepa_start_threads(pepa_core_t *core){
 #endif
 
 /* Catch Signal Handler function */
-static void signal_callback_handler(int signum, __attribute__((unused))siginfo_t *info, __attribute__((unused))void *extra)
-{
+#if 0 /* SEB */
+static void signal_callback_handler(int signum, __attribute__((unused))siginfo_t *info, __attribute__((unused))void *extra){
 	printf("Caught signal %d\n", signum);
 	if (signum == SIGINT) {
 		printf("Caught signal SIGINT: %d\n", signum);
@@ -547,18 +547,20 @@ static void signal_callback_handler(int signum, __attribute__((unused))siginfo_t
 		printf("Caught signal SIGINT: %d\n", signum);
 	}
 }
+#endif
 
-static void pepa_set_int_signal_handler(void)
-{
-    struct sigaction action;
+#if 0 /* SEB */
+static void pepa_set_int_signal_handler(void){
+	struct sigaction action;
 
 	sigemptyset(&action.sa_mask);
 	action.sa_flags = 0;
 
-    //action.sa_flags = SA_SIGINFO | SIGUSR1;     
-    action.sa_sigaction = signal_callback_handler;
-    sigaction(SIGINT, &action, NULL);
+	//action.sa_flags = SA_SIGINFO | SIGUSR1;
+	action.sa_sigaction = signal_callback_handler;
+	sigaction(SIGINT, &action, NULL);
 }
+#endif
 
 #define KB(x) ((x)/1024)
 #define MB(x) ((x)/(1024 * 1024))
@@ -566,13 +568,13 @@ static void pepa_set_int_signal_handler(void)
 
 void *pepa_monitor_thread(__attribute__((unused))void *arg)
 {
-	const char *my_name = "MONITOR";
-	int active_in_readers;
-	int i;
-	
+	const char *my_name          = "MONITOR";
+	int        active_in_readers;
+	int        i;
+
 //	pepa_set_int_signal_handler();
 
-	int32_t        rc       = pepa_pthread_init_phase(my_name);
+	int32_t    rc                = pepa_pthread_init_phase(my_name);
 	if (rc < 0) {
 		slog_fatal_l("%s: Could not init the thread", my_name);
 		pthread_exit(NULL);
@@ -596,25 +598,49 @@ void *pepa_monitor_thread(__attribute__((unused))void *arg)
 				   (PEPA_ERR_OK == in_st)? "UP"  : "DOWN",
 				   (PEPA_ERR_OK == in_fw_st)? "UP"  : "DOWN",
 				   (PEPA_ERR_OK == out_st)? "UP"  : "DOWN");
-#endif	
+#endif
 
 
-		slog_debug("### STATUS: (Kb) SHVA FW [+%lu | %lu / sec] ---> OUT [+%lu | %lu / sec] ### IN [+%lu | %lu / sec] ---> SHVA [+%lu | %lu / sec]  ###",
-				   KB(core->monitor.shva_rx - monitor_prev.shva_rx),
-				   KB((core->monitor.shva_rx - monitor_prev.shva_rx) / MONITOR_SLEEP_TIME),
+		if (core->monitor_divider_str[0] == 0) {
+			slog_debug("### STATUS: (Units: %d bytes) SHVA [+%lu | %lu / sec] ---> OUT [+%lu | %lu / sec] ### IN [+%lu | %lu / sec] ---> SHVA [+%lu | %lu / sec]  ###",
+					   core->monitor_divider,
+					   (core->monitor.shva_rx - monitor_prev.shva_rx) / core->monitor_divider,
+					   ((core->monitor.shva_rx - monitor_prev.shva_rx) / core->monitor_freq) / core->monitor_divider,
 
-				   KB(core->monitor.out_tx - monitor_prev.out_tx),
-				   KB((core->monitor.out_tx - monitor_prev.out_tx) / MONITOR_SLEEP_TIME),
+					   (core->monitor.out_tx - monitor_prev.out_tx) / core->monitor_divider,
+					   ((core->monitor.out_tx - monitor_prev.out_tx) / core->monitor_freq) / core->monitor_divider,
 
-				   /* KB(core->monitor.shva_tx - monitor_prev.shva_tx),
-				   KB((core->monitor.shva_tx - monitor_prev.shva_tx) / MONITOR_SLEEP_TIME), */
+					   (core->monitor.in_rx - monitor_prev.in_rx) / core->monitor_divider,
+					   ((core->monitor.in_rx - monitor_prev.in_rx) / core->monitor_freq) / core->monitor_divider,
 
-				   KB(core->monitor.in_rx - monitor_prev.in_rx),
-				   KB((core->monitor.in_rx - monitor_prev.in_rx) / MONITOR_SLEEP_TIME),
+					   (core->monitor.shva_tx - monitor_prev.shva_tx) / core->monitor_divider,
+					   ((core->monitor.shva_tx - monitor_prev.shva_tx) / core->monitor_freq) / core->monitor_divider
+					  );
+		} else {
+			char *divider_str = "Unknown";
 
-				   KB(core->monitor.shva_tx - monitor_prev.shva_tx),
-				   KB((core->monitor.shva_tx - monitor_prev.shva_tx) / MONITOR_SLEEP_TIME)
-				  );
+			if (core->monitor_divider_str[0] == 'K') {
+				divider_str = "Kbytes";
+			}
+
+			if (core->monitor_divider_str[0] == 'M') {
+				divider_str = "Mbytes";
+			}
+			slog_debug("### STATUS: (Freq: %d seconds, Units: %s) SHVA [+%lu | %lu / sec] ---> OUT [+%lu | %lu / sec] ### IN [+%lu | %lu / sec] ---> SHVA [+%lu | %lu / sec]  ###",
+					   core->monitor_freq, divider_str,
+					   (core->monitor.shva_rx - monitor_prev.shva_rx) / core->monitor_divider,
+					   ((core->monitor.shva_rx - monitor_prev.shva_rx) / core->monitor_freq) / core->monitor_divider,
+
+					   (core->monitor.out_tx - monitor_prev.out_tx) / core->monitor_divider,
+					   ((core->monitor.out_tx - monitor_prev.out_tx) / core->monitor_freq) / core->monitor_divider,
+
+					   (core->monitor.in_rx - monitor_prev.in_rx) / core->monitor_divider,
+					   ((core->monitor.in_rx - monitor_prev.in_rx) / core->monitor_freq) / core->monitor_divider,
+
+					   (core->monitor.shva_tx - monitor_prev.shva_tx) / core->monitor_divider,
+					   ((core->monitor.shva_tx - monitor_prev.shva_tx) / core->monitor_freq) / core->monitor_divider
+					  );
+		}
 
 		active_in_readers = 0;
 		if (NULL != core->in_reading_sockets.sockets) {
@@ -625,14 +651,14 @@ void *pepa_monitor_thread(__attribute__((unused))void *arg)
 			}
 		}
 
-		slog_debug("### STATUS: THREADS: out_listen: %d | out_write: %d | shva_rw: %d | in_listen: %d | in read: %d active sockets ###",
+		slog_debug("### STATUS: Sockets: out_listen: %d | out_write: %d | shva_rw: %d | in_listen: %d | in read: %d active sockets ###",
 				   core->sockets.out_listen, core->sockets.out_write, core->sockets.shva_rw, core->sockets.in_listen, active_in_readers);
-		slog_debug("### STATUS:  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
+		slog_debug("### STATUS:  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
 
-		fflush(stdout); 
+		fflush(stdout);
 
 		memcpy(&monitor_prev, &core->monitor, sizeof(monitor_prev));
-		sleep(MONITOR_SLEEP_TIME);
+		sleep(core->monitor_freq);
 	} while (1);
 }
 

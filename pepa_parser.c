@@ -20,24 +20,46 @@ void pepa_print_version(void)
 void pepa_show_help(void)
 {
 	printf("Use:\n"
-		   "--shva    | -s IP:PORT - address of SHVA server to connect to in form: '1.2.3.4:7887'\n"
-		   "--out     | -o IP:PORT - address of OUT listening socket, waiting for OUT stram connnection, in form '1.2.3.4:9779'\n"
-		   "--in      | -i IP:PORT - address of IN  listening socket, waiting for OUT stram connnection, in form '1.2.3.4:3748'\n"
-		   "--inum    | -n N - max number of IN clients, by default 1024\n"
-		   "--abort   | -a - abort on errors, for debug\n"
-		   "--bsize   | -b N - size of SEND / REVC buffer and internal buffer size, in Kb; if not given, 64 Kb will be set\n"
-		   "--dir     | -d DIR  - Name of directory to save the log into\n"
-		   "--file    | -f NAME - Name of log file to save the log into\n"
-		   "--noprint | -p - DO NOT print log onto terminal, by default it will be printed\n"
-		   "--log     | -l N - log level, accumulative: 0 = no log, 7 includes also {1-6}\n"
-		   "          ~        0: none, 1: falal, 2: trace, 3: error, 4: debug, 5: warn, 6: info, 7: note\n"
-		   "          ~        The same log level works for printing onto display and to the log file\n"
-		   "--dump    | -u - Dump every message into the log file\n"
-		   "--monitor | -m - Run  monitor, it will print status every 5 seconds\n"
-		   "--daemon  | -w - Run as a daemon process; pid file /var/run/pepa.pid will be created\n"
-		   "--color   | -c - Enable color in output printings\n"
-		   "--version | -v - show version + git revision + compilation time\n"
-		   "--help    | -h - show this help\n");
+		   "~~~~~~~~~~~ CONNECTION ADDRESSES AND PORTS (MANDATORY) ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
+		   "--shva     | -s IP:PORT : Address of SHVA server to connect to in form: '1.2.3.4:7887'\n"
+		   "--out      | -o IP:PORT : Address of OUT listening socket, waiting for OUT stream connection, in form '1.2.3.4:9779'\n"
+		   "--in       | -i IP:PORT : Address of IN  listening socket, waiting for OUT stream connection, in form '1.2.3.4:3748'\n"
+		   "\n"
+		   "~~~~~~~~~~~ CONNECTION ADDITIONAL OPTIONS (OPTIONAL)~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
+		   "--inum     | -n N :   Max number of IN clients, by default 1024\n"
+		   "--bsize    | -b N :   Size of SEND / RECV buffer, in Kb; if not given, 64 Kb used\n"
+		   "\n"
+		   "~~~~~~~~~~~ PEPA MODE OPTION (OPTIONAL) ~~ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
+		   "--daemon   | -w  :    Run as a daemon process\n"
+		   "--pid      | -P file: Create PID file 'file'; full path should be provided. By defailt, /tmp/pepa.pid file created\n"
+		   "\n"
+		   "~~~~~~~~~~~ LOGGER OPTIONS (OPTIONAL) ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
+		   "--log      | -l N :   Logger level, accumulative: 0 = no log, 7 includes also {1-6}\n"
+		   "           ~          0: none, 1: fatal, 2: trace, 3: error, 4: debug, 5: warn, 6: info, 7: note\n"
+		   "           ~          The same log level works for printing onto the terminal and to the log file\n"
+		   "--file     | -f :     NAME - Name of log file to save the log into\n"
+		   "--dir      | -d DIR : Name of directory to save the log into\n"
+		   "--noprint  | -p :     DO NOT print log onto the terminal. By default, it will be printed\n"
+		   "--dump     | -u :     Dump every message into the log file\n"
+		   "--color    | -c :     Enable color in terminal printings (always disabled in 'daemon' mode)\n"
+		   "\n"
+		   "~~~~~~~~~~~ MONITOR OPTIONS (OPTIONAL) ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
+		   "--monitor  | -m N   : Run  monitor. It will print status every N seconds; default output in bytes\n"
+		   "--divider  | -r N|C : Monitor units: it can be a character (C) or a number (N):\n"
+		   "           ~          The character argument to print units: 'b' for Bytes, 'k' for Kbytes, 'm' for Mbytes\n"
+		   "           ~          The argument can be also numeric: --divider 100 to print in 100 byte units\n"
+		   "           ~          Example of monitor config: '--monitor 10 --divider k' - print status every 10 sec in Kbytes\n"
+		   "\n"
+		   "~~~~~~~~~~~ EMULATOR OPTIONS (FOR TEST ONLY, OPTIONAL) ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
+		   "--emusleep | -S N :   Emulator only: Sleep N microseconds between buffer sending; 0 by default\n"
+		   "--emubuf   | -B N :   Emulator only: Max size of a buffer, N must be, >= 1; It is 1024 by default\n"
+		   "--emubufmin| -M N :   Emulator only: Min size of a buffer, N must be; >= 1; It is 1 by default\n"
+		   "\n"
+		   "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
+		   "--abort    | -a :     Abort on errors for debug\n"
+		   "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
+		   "--version  | -v :     Show version + git revision + compilation time\n"
+		   "--help     | -h :     Show this help\n");
 }
 
 long int pepa_string_to_int_strict(char *s, int *err)
@@ -173,12 +195,17 @@ int pepa_parse_arguments(int argi, char *argv[])
 		{"log",              required_argument,      0, 'l'},
 		{"file",             required_argument,      0, 'f'},
 		{"dir",              required_argument,      0, 'd'},
-		{"noprint",          no_argument,            0, 'p'},
+		{"divider",          required_argument,      0, 'r'},
+		{"emusleep",         required_argument,      0, 'S'},
+		{"emubuf",           required_argument,      0, 'B'},
+		{"emubufmin",        required_argument,      0, 'M'},
 		{"abort",            no_argument,            0, 'a'},
 		{"bsize",            no_argument,            0, 'b'},
-		{"monitor",          no_argument,            0, 'm'},
+		{"monitor",          required_argument,      0, 'm'},
+		{"pid",              required_argument,      0, 'P'},
 		{"daemon",           no_argument,            0, 'w'},
 		{"color",            no_argument,            0, 'c'},
+		{"dump",             no_argument,            0, 'u'},
 		{"version",          no_argument,            0, 'v'},
 		{0, 0, 0, 0}
 	};
@@ -194,7 +221,7 @@ int pepa_parse_arguments(int argi, char *argv[])
 		return -1;
 
 	}
-	while ((opt = getopt_long(argi, argv, "s:o:i:n:l:f:d:b:phavmwc", long_options, &option_index)) != -1) {
+	while ((opt = getopt_long(argi, argv, "s:o:i:n:l:f:d:b:r:S:B:m:phavwcu", long_options, &option_index)) != -1) {
 		switch (opt) {
 		case 's': /* SHVA Server address to connect to */
 			core->shva_thread.ip_string = pepa_parse_ip_string_get_ip(optarg);
@@ -243,6 +270,113 @@ int pepa_parse_arguments(int argi, char *argv[])
 			slog_info_l("Internal buffer size is set to: %d", core->internal_buf_size);
 		}
 			break;
+		case 'P':
+		{
+			core->pid_file_name = strdup(optarg);
+			slog_info_l("PID file is set to: %d", core->pid_file_name);
+		}
+			break;
+		case 'r':
+		{
+			if (optarg[0] == 'k') {
+				core->monitor_divider = 1024;
+				core->monitor_divider_str[0] = 'K';
+				slog_info_l("Monitor divider is set to Kbytes = %d", core->monitor_divider);
+				break;
+			}
+
+			if (optarg[0] == 'm') {
+				core->monitor_divider = 1024 * 1024;
+				core->monitor_divider_str[0] = 'M';
+				slog_info_l("Monitor divider is set to Mbytes = %d", core->monitor_divider);
+				break;
+			}
+
+			if (optarg[0] == 'b') {
+				core->monitor_divider = 1;
+				core->monitor_divider_str[0] = 'B';
+				slog_info_l("Monitor divider is set to Bytes = %d",  core->monitor_divider);
+				break;
+			}
+
+			core->monitor_divider = pepa_string_to_int_strict(optarg, &err);
+			if (err < 0) {
+				slog_fatal_l("Could not parse internal buffer size: %s", optarg);
+				abort();
+			}
+
+			if (core->monitor_divider <= 0) {
+				slog_fatal_l("Monitor divider is invalid: %s, it must be >= 1", optarg);
+				abort();
+			}
+
+			slog_info_l("Monitor divider is set to: %d", core->monitor_divider);
+		}
+			break;
+		case 'S':
+		{
+			core->emu_timeout = pepa_string_to_int_strict(optarg, &err);
+			if (err < 0) {
+				slog_fatal_l("Could not parse emulator sleep time: %s", optarg);
+				abort();
+			}
+
+			if (core->emu_timeout <= 0) {
+				slog_fatal_l("Emulator sleep is invalid: %s, it must be >= 1", optarg);
+				abort();
+			}
+
+			slog_info_l("Emulator sleep is set to: %d", core->emu_timeout);
+		}
+			break;
+		case 'B':
+		{
+			core->emu_max_buf = pepa_string_to_int_strict(optarg, &err);
+			if (err < 0) {
+				slog_fatal_l("Could not emulator max buffer size: %s", optarg);
+				abort();
+			}
+
+			if (core->emu_max_buf <= 0) {
+				slog_fatal_l("Emulator max size is invalid: %s, it must be >= 1", optarg);
+				abort();
+			}
+
+			slog_info_l("Emulator max buffer size is set to: %d", core->emu_max_buf);
+		}
+			break;
+		case 'M':
+		{
+			core->emu_min_buf = pepa_string_to_int_strict(optarg, &err);
+			if (err < 0) {
+				slog_fatal_l("Could not parse emulator min buffer size: %s", optarg);
+				abort();
+			}
+
+			if (core->emu_min_buf <= 0) {
+				slog_fatal_l("Emulator min size is invalid: %s, it must be >= 1", optarg);
+				abort();
+			}
+
+			slog_info_l("Emulator max buffer size is set to: %d", core->emu_min_buf);
+		}
+			break;
+		case 'm':
+		{
+			core->monitor_freq = pepa_string_to_int_strict(optarg, &err);
+			if (err < 0) {
+				slog_fatal_l("Could not parse monitor frequency: %s", optarg);
+				abort();
+			}
+
+			if (core->monitor_freq <= 0) {
+				slog_fatal_l("Monitor frequency is invalid: %s, it must be >= 1", optarg);
+				abort();
+			}
+			core->monitor.onoff = 1;
+			slog_info_l("Monitor frequency is set to: %d", core->monitor_freq);
+		}
+			break;
 		case 'a':
 			/* Set abort flag*/
 			core->abort_flag = 1;
@@ -258,7 +392,7 @@ int pepa_parse_arguments(int argi, char *argv[])
 			slog_info_l("Log file name is set to: %s", core->slog_dir);
 			break;
 		case 'p':
-			/* Set abort flag*/
+			/* Disable terminal printings */
 			core->slog_print = 0;
 			slog_info_l("Log display is disabled");
 			break;
@@ -309,15 +443,14 @@ int pepa_parse_arguments(int argi, char *argv[])
 		case 'v': /* Show help */
 			pepa_print_version();
 			exit(0);
-		case 'm':
-			slog_debug_l("Asked to start MONITOR");
-			core->monitor.onoff = 1;
-			break;
 		case 'w':
 			core->daemon = 1;
 			break;
 		case 'c':
 			core->slog_color = 1;
+			break;
+		case 'u':
+			core->dump_messages = 1;
 			break;
 		default:
 			printf("Unknown argument: %c\n", opt);

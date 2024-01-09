@@ -334,13 +334,14 @@ static int pepa_process_fdx(pepa_core_t *core, struct epoll_event events[], int 
 		/* Read /write from/to socket */
 
 		/* We must lock SHVA socket since IN can run several instances of this thread */
-		rc = pepa_one_direction_copy3(/* Send to : */fd_write, fd_name_write,
+		rc = pepa_one_direction_copy3(core,
+									  /* Send to : */fd_write, fd_name_write,
 									  /* From: */ fd_read, fd_name_read,
 									  core->buffer, core->internal_buf_size * 1024,
 									  /*Debug is ON */ 1,
 									  /* RX stat */read_stat,
 									  /* TX stat */write_stat,
-									  /* Max iterations */ 1);
+									  /* Max iterations */ 4);
 
 		if (PEPA_ERR_OK == rc) {
 			//slog_warn_l("%s: Sent from socket %d", "IN-FORWARD", events[i].data.fd);

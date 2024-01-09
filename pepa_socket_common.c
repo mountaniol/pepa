@@ -127,16 +127,25 @@ void pepa_set_tcp_connection_props(pepa_core_t *core, int sock){
 }
 #endif
 
-int pepa_one_direction_copy3(int fd_out, const char *name_out,
+int pepa_one_direction_copy3(pepa_core_t *core,
+							 int fd_out, const char *name_out,
 							 int fd_in, const char *name_in,
-							 char *buf, size_t buf_size, int do_debug,
-							 uint64_t *ext_rx, uint64_t *ext_tx, int max_iterations)
+							 char *buf, const size_t buf_size,
+							 const int do_debug,
+							 uint64_t *ext_rx, uint64_t *ext_tx,
+							 const int max_iterations)
 {
-	int ret       = PEPA_ERR_OK;
-	int rx        = 0;
-	int tx_total  = 0;
-	int rx_total  = 0;
-	int iteration = 0;
+	int ret          = PEPA_ERR_OK;
+	int rx           = 0;
+	int tx_total     = 0;
+	int rx_total     = 0;
+	int iteration    = 0;
+	int buf_size_use = buf_size;
+
+	/* If message dump is enabled, keep 1 character for \0 */
+	if (core->dump_messages) {
+		buf_size_use--;
+	}
 
 	if (do_debug) {
 		// slog_note_l("Starrting transfering from %s to %s", name_in, name_out);
@@ -152,11 +161,12 @@ int pepa_one_direction_copy3(int fd_out, const char *name_out,
 		}
 
 		/* Read one time, then we will transfer it possibly in pieces */
-		rx = read(fd_in, buf, buf_size);
+		rx = read(fd_in, buf, buf_size_use);
 
 		if (do_debug) {
 			// slog_note_l("Iteration: %d, finised read(), there is %d bytes", iteration, rx);
 		}
+
 
 		if (rx < 0) {
 			if (do_debug) {
@@ -166,7 +176,7 @@ int pepa_one_direction_copy3(int fd_out, const char *name_out,
 			goto endit;
 		}
 
-		/* nothing to read*/
+		/* nothing to read on the furst iteraion; it means, this socket is invalid */
 		if ((0 == rx) && (1 == iteration)) {
 			/* If we can not read on the first iteration, it probably means the fd was closed */
 			ret = -PEPA_ERR_BAD_SOCKET_READ;
@@ -179,6 +189,14 @@ int pepa_one_direction_copy3(int fd_out, const char *name_out,
 
 		if (PEPA_ERR_OK != ret) {
 			goto endit;
+		}
+
+		/* If messuge dump is enabled, forcely add \0 terminator;
+		   we reserved one character for the \0 in the beginning of this function */
+		if (core->dump_messages) {
+			buf[rx] = 0;
+			slog_note("+++ MES: %s [fd:%.2d] -> %s [fd:%.2d], LEN: %d bytes |%s|", name_in, fd_in, name_out, fd_out, rx, buf);
+			//printf("received: %d bytes, |%s|\n", rx, buf);
 		}
 
 		/* Write until transfer the whole received buffer */
@@ -209,7 +227,7 @@ int pepa_one_direction_copy3(int fd_out, const char *name_out,
 		}
 
 		/* Run this loop as long as we have data on read socket, nut no more that max_iterations */
-	} while (((int32_t)buf_size == rx) && (iteration <= max_iterations));
+	} while (((int32_t)buf_size_use == rx) && (iteration <= max_iterations));
 
 	ret = PEPA_ERR_OK;
 endit:
@@ -391,7 +409,7 @@ void pepa_socket_close(int fd, const char *socket_name)
 		return;
 	}
 
-	for (i = 0; i < 256 ; i++) {
+	for (i = 0; i < 256; i++) {
 		int rc = close(fd);
 		if (0 == rc) {
 			slog_note_l("## Closed socket socket %s : %d, iterations: %d", socket_name, fd, i);
@@ -406,8 +424,8 @@ void pepa_reading_socket_close(int fd, const char *socket_name)
 {
 	int  i;
 	char buf[16];
-	int iterations = 0;
-	int read_from;
+	int  iterations = 0;
+	int  read_from;
 
 	if (fd < 0) {
 		slog_error_l("Can not close socket %s, its value is %d", socket_name, fd);
@@ -427,7 +445,7 @@ void pepa_reading_socket_close(int fd, const char *socket_name)
 			i = 2048;
 			continue;
 		}
-		read_from +=rc;
+		read_from += rc;
 		iterations++;
 	}
 
@@ -438,7 +456,7 @@ void pepa_reading_socket_close(int fd, const char *socket_name)
 		return;
 	}
 #endif
-	
+
 	pepa_socket_close(fd, socket_name);
 	slog_note_l("## Closed socket socket %s, iterations: %d ", socket_name, iterations);
 }

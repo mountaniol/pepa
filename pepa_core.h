@@ -34,6 +34,7 @@ typedef struct {
 	int in_listen;
 } pepa_sockets_t;
 
+#if 0 /* SEB */
 typedef enum {
 	PEPA_TH_OUT_START = 0, /* Start thread routines */
 	PEPA_TH_OUT_CREATE_LISTEN, /* Create listening socket */
@@ -42,8 +43,11 @@ typedef enum {
 	PEPA_TH_OUT_CLOSE_WRITE_SOCKET, /* Close Write socket */
 	PEPA_TH_OUT_CLOSE_LISTEN_SOCKET, /* Close listening socket */
 	PEPA_TH_OUT_TERMINATE /* Terminate thread */
-} pepa_out_thread_state_t;
+}
+pepa_out_thread_state_t;
+#endif
 
+#if 0 /* SEB */
 typedef enum {
 	PEPA_TH_SHVA_START = 0, /* Start thread routines */
 	PEPA_TH_SHVA_OPEN_CONNECTION,
@@ -52,8 +56,11 @@ typedef enum {
 	PEPA_TH_SHVA_WATCH_SOCKET, /* Watch the status of SHAV serrver socket */
 	PEPA_TH_SHVA_CLOSE_SOCKET, /* Close connection to SHVA sserver */
 	PEPA_TH_SHVA_TERMINATE /* Terminate thread */
-} pepa_shva_thread_state_t;
+}
+pepa_shva_thread_state_t;
+#endif
 
+#if 0 /* SEB */
 typedef enum {
 	PEPA_TH_IN_START = 0, /* Start thread routines */
 	PEPA_TH_IN_CREATE_LISTEN, /* Create listening socket */
@@ -63,30 +70,41 @@ typedef enum {
 	PEPA_TH_IN_WAIT_SHVA_DOWN, /* Wait until SHVA is connected  */
 	PEPA_TH_IN_START_TRANSFER, /* Start transfering thread */
 	PEPA_TH_IN_TERMINATE /* Terminate thread */
-} pepa_in_thread_state_t;
+}
+pepa_in_thread_state_t;
+#endif
 
+#if 0 /* SEB */
 typedef enum {
 	PEPA_ST_DOWN = 0,
 	PEPA_ST_RUN,
 	PEPA_ST_FAIL,
 	PEPA_ST_SOCKET_RESET,
 	PEPA_ST_MAX
-} pepa_sig_t;
+}
+pepa_sig_t;
+#endif
 
+#if 0 /* SEB */
 typedef enum {
 	PEPA_PR_OUT = 0,
 	PEPA_PR_SHVA, /* Only SHVA writes to this register */
 	PEPA_PR_IN, /* Only PEPA_PR_IN writes to this register */
 	PEPA_PR_MAX
-} pepa_proc_t;
+}
+pepa_proc_t;
+#endif
 
+#if 0 /* SEB */
 typedef struct {
 	pepa_proc_t emiter; /* Who produced the last signal? */
 	pepa_sig_t signals[PEPA_PR_MAX]; /* Signals from all processes */
 	pthread_mutex_t signals_sem;
 	pthread_cond_t sync;
 	pthread_mutex_t sync_sem;
-} pepa_status_t;
+}
+pepa_status_t;
+#endif
 
 typedef struct {
 	int onoff;
@@ -113,30 +131,38 @@ typedef struct {
 typedef struct {
 	sem_t mutex; /**< A semaphor used to sync the core struct between multiple threads */
 
+	/* Logger configs */
 	int slog_flags; /* Keep slog logger verbosity level*/
 	char *slog_file; /* Keep slog output file name; if given, log will be saved there */
 	char *slog_dir; /* Keep slog output file in this directory */
 	int slog_print; /* Show slog output on terminal */
 	int slog_color; /* Output on terminal should use color or not (by defailt: no) */
+	int dump_messages; /* Output on terminal should use color or not (by defailt: no) */
+	int monitor_divider; /* Divide monitor output (vytes) by this diveder */
+	char monitor_divider_str[1]; /* Monitor divider as a string: B for bytess, K for kilobytes, M for megabytes */
+	int emu_timeout; /* Timeout in microseconds between buffer sendings from emulator; defailt is 0 */
+	int emu_max_buf; /* Max size of buffer of a buffer send from emulator */
+	int emu_min_buf; /* Min size of buffer of a buffer send from emulator; defailt 1; must be > 0 */
 
 	thread_vars_t shva_thread; /**< Configuration of SHVA thread */
-	thread_vars_t shva_forwarder; /**< Configuration of SHVA thread */
+	// thread_vars_t shva_forwarder; /**< Configuration of SHVA thread */
 	thread_vars_t in_thread; /**< Configuration of IN thread */
-	thread_vars_t in_forwarder; /**< Configuration of IN thread */
+	// thread_vars_t in_forwarder; /**< Configuration of IN thread */
 	thread_vars_t out_thread; /**< Configuration of OUT thread */
 	thread_vars_t monitor_thread; /**< Configuration of OUT thread */
+	int monitor_freq; /* How often (in seconds) print out statistics from the monitor; by default every 5 seconds */
 	pepa_in_read_sockets_t in_reading_sockets; /**< Reading sockets opened when accept new connections */
 	uint32_t internal_buf_size; /**< Size of buffer used to pass packages, by defaiult COPY_BUF_SIZE bytes, see pepa_config.h */
 	int32_t abort_flag; /**< Abort flag, if enabled, PEPA file abort on errors; for debug only */
 	pepa_sockets_t sockets;
 	int32_t monitor_timeout; /**< How many microseconds to sleep between tests in microseconds */
-	pepa_status_t state;
+	// pepa_status_t state;
 	pepa_stat_t monitor;
 	int32_t daemon; /* If not 0, start as a daemon */
 	int pid_fd; /* File descriptor of PID file */
 	char *pid_file_name; /* File name of PID file  */
 	void *buffer;
-	uint32_t buffer_size;
+	//uint32_t buffer_size;
 	int epoll_fd;
 } pepa_core_t;
 
@@ -204,9 +230,11 @@ int32_t pepa_core_unlock(void);
 int32_t pepa_if_abort(void);
 
 
+#if 0 /* SEB */
 const char *pepa_out_thread_state_str(pepa_out_thread_state_t s);
 const char *pepa_shva_thread_state_str(pepa_shva_thread_state_t s);
 const char *pepa_in_thread_state_str(pepa_in_thread_state_t s);
+#endif
 
 void pepa_shva_socket_lock(pepa_core_t *core);
 void pepa_shva_socket_unlock(pepa_core_t *core);

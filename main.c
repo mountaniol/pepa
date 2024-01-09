@@ -100,8 +100,8 @@ int main(int argi, char *argv[])
 	while (1) {
 		sleep(60);
 	}
-	pepa_kill_all_threads(core);
-	sleep(1);
+	//pepa_kill_all_threads(core);
+	//sleep(1);
 	slog_note_l("PEPA Exit");
 	return (0);
 }

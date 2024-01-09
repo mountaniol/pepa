@@ -29,13 +29,15 @@ void pepa_thread_start_out(pepa_core_t *core);
 void pepa_state_sig(pepa_core_t *core);
 void pepa_state_wait(pepa_core_t *core);
 
+#if 0 /* SEB */
 __attribute__((warn_unused_result))
-const char *pepa_sig_str(pepa_sig_t p);
+// const char *pepa_sig_str(pepa_sig_t p);
 void pepa_kill_all_threads(pepa_core_t *core);
+#endif
 
-void pepa_state_shva_set(pepa_core_t *core, pepa_sig_t sig);
-void pepa_state_in_set(pepa_core_t *core, pepa_sig_t sig);
-void pepa_state_out_set(pepa_core_t *core, pepa_sig_t sig);
+//void pepa_state_shva_set(pepa_core_t *core, pepa_sig_t sig);
+//void pepa_state_in_set(pepa_core_t *core, pepa_sig_t sig);
+//void pepa_state_out_set(pepa_core_t *core, pepa_sig_t sig);
 //void pepa_state_in_fw_set(pepa_core_t *core, pepa_sig_t sig);
 
 __attribute__((warn_unused_result))
@@ -53,6 +55,6 @@ __attribute__((warn_unused_result))
  *  	   error
  */
 int32_t pepa_start_threads(pepa_core_t *core);
-char *pepa_pr_str(pepa_proc_t p);
+// char *pepa_pr_str(pepa_proc_t p);
 
 #endif /* _PEPA_STATE_MACHINE_H_ */

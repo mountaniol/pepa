@@ -14,18 +14,22 @@
 #include "pepa_socket_common.h"
 #include "pepa_state_machine.h"
 
+/* Sleep time between sending a buffer */
+#define SLEEPTIME_US (100000)
+
+#define SHUTDOWN_DIVIDER (100003573)
+#define SHOULD_EMULATE_DISCONNECT() (0 == (rand() % SHUTDOWN_DIVIDER))
+#define RX_TX_PRINT_DIVIDER (1000000)
+
+#define PEPA_MIN(a,b) ((a<b) ? a : b )
+
 /* Keep here PIDs of IN threads */
 pthread_t  *in_thread_idx;
 uint32_t   number_of_in_threads = 4;
 
-  #define SHUTDOWN_DIVIDER (100003573)
-  #define SHOULD_EMULATE_DISCONNECT() (0 == (rand() % SHUTDOWN_DIVIDER))
-  #define RX_TX_PRINT_DIVIDER (1000000)
-
 int        shva_to_out          = 0;
 int        in_to_shva           = 0;
 
-				 #define PEPA_MIN(a,b) ((a<b) ? a : b )
 const char *lorem_ipsum         = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.\0";
 uint64_t   lorem_ipsum_len      = 0;
 
@@ -102,6 +106,42 @@ void pepa_emulator_disconnect_mes(const char *name)
 }
 
 int32_t pepa_emulator_generate_buffer_buf(buf_t *buf, int64_t buffer_size)
+{
+	int32_t    rc   = 0;
+	TESTP(buf, -1);
+	buf->used = 0;
+
+	if (buf->room < buffer_size) {
+		rc = buf_test_room(buf, buffer_size - buf->room);
+	}
+	if (BUFT_OK != rc) {
+		slog_fatal_l("Could not allocate boof room: %s", buf_error_code_to_string(rc));
+		abort();
+	}
+
+	//slog_note_l("Buf allocated room");
+
+	uint64_t rest = buffer_size;
+
+	// slog_note_l("Starting copying into buf, asked len: %d", buffer_size);
+
+	while (rest > 0) {
+		uint64_t to_copy_size = PEPA_MIN(lorem_ipsum_len, (uint64_t)rest);
+		int32_t  rc           = buf_add(buf, lorem_ipsum, to_copy_size);
+
+		if (rc != BUFT_OK) {
+			slog_fatal_l("Could not create text buffer: %s", buf_error_code_to_string(rc));
+			return -PEPA_ERR_BUF_ALLOCATION;
+		}
+		rest -= to_copy_size;
+	}
+	//slog_note_l("Finished copying into buf");
+	// slog_note_l("Finished copying into buf: len = %d", buffer_size);
+
+	return PEPA_ERR_OK;
+}
+
+int32_t pepa_emulator_generate_buffer_buf_prev(buf_t *buf, int64_t buffer_size)
 {
 	int32_t    rc   = 0;
 	buf_head_t head;
@@ -455,15 +495,21 @@ void *pepa_emulator_shva_writer_thread(__attribute__((unused))void *arg)
 
 	/* In this thread we read from socket as fast as we can */
 
-	buf_t       *buf   = buf_new(2048);
+	buf_t *buf     = buf_new(core->emu_max_buf);
 
 	do {
-		if (0 != pepa_emulator_generate_buffer_buf(buf, (rand() % 750) + 16)) {
+
+		int buf_size = (rand() % core->emu_max_buf); //core->emu_max_buf;
+		if (buf_size < core->emu_min_buf) {
+			buf_size = core->emu_min_buf;
+		}
+
+		if (0 != pepa_emulator_generate_buffer_buf(buf, buf_size)) {
 			slog_fatal_l("SHVA WRITE: Can't generate buf");
 			pthread_exit(NULL);
 		}
 
-		// slog_note_l("SHVA WRITE: : Trying to write");
+// slog_note_l("SHVA WRITE: : Trying to write");
 		rc = write(core->sockets.shva_rw, buf->data, buf->used);
 		writes++;
 
@@ -479,11 +525,15 @@ void *pepa_emulator_shva_writer_thread(__attribute__((unused))void *arg)
 			continue;
 		}
 
-		//slog_debug_l("SHVA WRITE: ~~~~>>> Written %d bytes", rc);
+//slog_debug_l("SHVA WRITE: ~~~~>>> Written %d bytes", rc);
 		rx += rc;
 
 		if (0 == (writes % RX_TX_PRINT_DIVIDER)) {
 			slog_debug_l("SHVA WRITE: %-7lu reads, bytes: %-7lu, Kb: %-7lu", writes, rx, (rx / 1024));
+		}
+
+		if (core->emu_timeout > 0) {
+			usleep(core->emu_timeout);
 		}
 
 	} while (1); /* Generating and sending data */
@@ -694,7 +744,8 @@ int32_t in_thread_disconnect_all = 0;
 /* Create 1 read/write listening socket to emulate SHVA server */
 void *pepa_emulator_in_thread(__attribute__((unused))void *arg)
 {
-	int in_socket = FD_CLOSED;
+	pepa_core_t *core     = pepa_get_core();
+	int         in_socket = FD_CLOSED;
 	pthread_cleanup_push(pepa_emulator_in_thread_cleanup, &in_socket);
 
 	int32_t  *my_num     = arg;
@@ -725,7 +776,12 @@ void *pepa_emulator_in_thread(__attribute__((unused))void *arg)
 				break;
 			}
 
-			if (0 != pepa_emulator_generate_buffer_buf(buf, (rand() % 750) + 16)) {
+			int buf_size = (rand() % core->emu_max_buf); //core->emu_max_buf;
+			if (buf_size < core->emu_min_buf) {
+				buf_size = core->emu_min_buf;
+			}
+
+			if (0 != pepa_emulator_generate_buffer_buf(buf, buf_size)) {
 				slog_fatal_l("%s: Can't generate buf", my_name);
 				break;
 			}
@@ -744,6 +800,7 @@ void *pepa_emulator_in_thread(__attribute__((unused))void *arg)
 				usleep(10000);
 				break;
 			}
+
 
 			//slog_debug_l("SHVA WRITE: ~~~~>>> Written %d bytes", rc);
 			rx += rc;
@@ -764,6 +821,11 @@ void *pepa_emulator_in_thread(__attribute__((unused))void *arg)
 				in_thread_disconnect_all = number_of_in_threads;
 				break;
 			}
+
+			if (core->emu_timeout > 0) {
+				usleep(core->emu_timeout);
+			}
+
 
 		} while (1); /* Generating and sending data */
 
@@ -867,6 +929,6 @@ int main(int argi, char *argv[])
 		sleep(600);
 	}
 
-	slog_warn_l ("We should never be here, but this is the fact: we are here, my dear friend. This is the time to say farewell.");
+	slog_warn_l("We should never be here, but this is the fact: we are here, my dear friend. This is the time to say farewell.");
 	return (10);
 }

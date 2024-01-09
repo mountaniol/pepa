@@ -26,16 +26,21 @@ void pepa_set_tcp_connection_props(pepa_core_t *core, int32_t sock);
 
 //int32_t pepa_open_connection_to_server(pepa_core_t *core, const char *address, int32_t port, const char *name);
 
+#if 0 /* SEB */
 __attribute__((warn_unused_result))
 int32_t pepa_one_direction_copy2(int32_t fd_out, const char *name_out,
-							 int32_t fd_in, const char *name_in,
-							 char *buf, size_t buf_size, int32_t do_debug, 
-							 uint64_t *ext_rx, uint64_t *ext_tx);
+								 int32_t fd_in, const char *name_in,
+								 char *buf, size_t buf_size, int32_t do_debug,
+								 uint64_t *ext_rx, uint64_t *ext_tx);
+#endif
 
-int32_t pepa_one_direction_copy3(int32_t fd_out, const char *name_out,
-							 int32_t fd_in, const char *name_in,
-							 char *buf, size_t buf_size, int32_t do_debug,
-							 uint64_t *ext_rx, uint64_t *ext_tx, int32_t max_iterations);
+int pepa_one_direction_copy3(pepa_core_t *core,
+							 int fd_out, const char *name_out,
+							 int fd_in, const char *name_in,
+							 char *buf, const size_t buf_size,
+							 const int do_debug,
+							 uint64_t *ext_rx, uint64_t *ext_tx,
+							 const int max_iterations);
 
 /**
  * @author Sebastian Mountaniol (12/14/23)
@@ -66,10 +71,10 @@ __attribute__((nonnull(1, 2)))
  *  	   code
  */
 int32_t pepa_open_listening_socket(struct sockaddr_in *s_addr,
-							   const buf_t *ip_address,
-							   const int32_t port,
-							   const int32_t num_of_clients,
-							   const char *caller_name);
+								   const buf_t *ip_address,
+								   const int32_t port,
+								   const int32_t num_of_clients,
+								   const char *caller_name);
 
 
 __attribute__((warn_unused_result))
