@@ -425,7 +425,7 @@ void pepa_reading_socket_close(int fd, const char *socket_name)
 	int  i;
 	char buf[16];
 	int  iterations = 0;
-	int  read_from;
+	int  read_from = 0;
 
 	if (fd < 0) {
 		slog_error_l("Can not close socket %s, its value is %d", socket_name, fd);
@@ -448,14 +448,6 @@ void pepa_reading_socket_close(int fd, const char *socket_name)
 		read_from += rc;
 		iterations++;
 	}
-
-#if 0 /* SEB */
-	rc = close(fd);
-	if (0 != rc) {
-		slog_error_l("Can not close socket %s, iterations: %d, error %d:%s", socket_name, iterations, rc, strerror(errno));
-		return;
-	}
-#endif
 
 	pepa_socket_close(fd, socket_name);
 	slog_note_l("## Closed socket socket %s, iterations: %d ", socket_name, iterations);
