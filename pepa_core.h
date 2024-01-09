@@ -34,78 +34,6 @@ typedef struct {
 	int in_listen;
 } pepa_sockets_t;
 
-#if 0 /* SEB */
-typedef enum {
-	PEPA_TH_OUT_START = 0, /* Start thread routines */
-	PEPA_TH_OUT_CREATE_LISTEN, /* Create listening socket */
-	PEPA_TH_OUT_ACCEPT, /* Run accept() which creates Write socket */
-	PEPA_TH_OUT_WATCH_WRITE_SOCK, /* Watch the status of Write  socket */
-	PEPA_TH_OUT_CLOSE_WRITE_SOCKET, /* Close Write socket */
-	PEPA_TH_OUT_CLOSE_LISTEN_SOCKET, /* Close listening socket */
-	PEPA_TH_OUT_TERMINATE /* Terminate thread */
-}
-pepa_out_thread_state_t;
-#endif
-
-#if 0 /* SEB */
-typedef enum {
-	PEPA_TH_SHVA_START = 0, /* Start thread routines */
-	PEPA_TH_SHVA_OPEN_CONNECTION,
-	PEPA_TH_SHVA_WAIT_OUT, /* Wait until OUT thread is connected */
-	PEPA_TH_SHVA_START_TRANSFER, /* Start transfering thread */
-	PEPA_TH_SHVA_WATCH_SOCKET, /* Watch the status of SHAV serrver socket */
-	PEPA_TH_SHVA_CLOSE_SOCKET, /* Close connection to SHVA sserver */
-	PEPA_TH_SHVA_TERMINATE /* Terminate thread */
-}
-pepa_shva_thread_state_t;
-#endif
-
-#if 0 /* SEB */
-typedef enum {
-	PEPA_TH_IN_START = 0, /* Start thread routines */
-	PEPA_TH_IN_CREATE_LISTEN, /* Create listening socket */
-	PEPA_TH_IN_CLOSE_LISTEN, /* Create listening socket */
-	PEPA_TH_IN_TEST_LISTEN_SOCKET, /* Create listening socket */
-	PEPA_TH_IN_WAIT_SHVA_UP, /* Wait until SHVA is connected  */
-	PEPA_TH_IN_WAIT_SHVA_DOWN, /* Wait until SHVA is connected  */
-	PEPA_TH_IN_START_TRANSFER, /* Start transfering thread */
-	PEPA_TH_IN_TERMINATE /* Terminate thread */
-}
-pepa_in_thread_state_t;
-#endif
-
-#if 0 /* SEB */
-typedef enum {
-	PEPA_ST_DOWN = 0,
-	PEPA_ST_RUN,
-	PEPA_ST_FAIL,
-	PEPA_ST_SOCKET_RESET,
-	PEPA_ST_MAX
-}
-pepa_sig_t;
-#endif
-
-#if 0 /* SEB */
-typedef enum {
-	PEPA_PR_OUT = 0,
-	PEPA_PR_SHVA, /* Only SHVA writes to this register */
-	PEPA_PR_IN, /* Only PEPA_PR_IN writes to this register */
-	PEPA_PR_MAX
-}
-pepa_proc_t;
-#endif
-
-#if 0 /* SEB */
-typedef struct {
-	pepa_proc_t emiter; /* Who produced the last signal? */
-	pepa_sig_t signals[PEPA_PR_MAX]; /* Signals from all processes */
-	pthread_mutex_t signals_sem;
-	pthread_cond_t sync;
-	pthread_mutex_t sync_sem;
-}
-pepa_status_t;
-#endif
-
 typedef struct {
 	int onoff;
 	uint64_t shva_rx;
@@ -178,15 +106,6 @@ typedef struct {
  */
 int32_t pepa_core_init(void);
 
-/**
- * @author Sebastian Mountaniol (12/10/23)
- * @brief Destroy core structure
- * @param  void  
- * @return int32_t 0 on success
- * @details 
- */
-int32_t pepa_core_finish(void);
-
 /* Get pointer to codre */
 /**
  * @author Sebastian Mountaniol (12/6/23)
@@ -229,13 +148,4 @@ int32_t pepa_core_unlock(void);
  */
 int32_t pepa_if_abort(void);
 
-
-#if 0 /* SEB */
-const char *pepa_out_thread_state_str(pepa_out_thread_state_t s);
-const char *pepa_shva_thread_state_str(pepa_shva_thread_state_t s);
-const char *pepa_in_thread_state_str(pepa_in_thread_state_t s);
-#endif
-
-void pepa_shva_socket_lock(pepa_core_t *core);
-void pepa_shva_socket_unlock(pepa_core_t *core);
 #endif /* _PEPA_CORE_H_ */

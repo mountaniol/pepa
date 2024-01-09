@@ -7,12 +7,6 @@
 #include "buf_t/buf_t.h"
 #include "pepa_core.h"
 
-/* Arguments for thread clean hook  */
-typedef struct {
-	int32_t epoll_fd;
-	char *buf;
-} thread_clean_args_t;
-
 void set_sig_handler(void);
 
 __attribute__((warn_unused_result))
@@ -22,17 +16,6 @@ void pepa_parse_pthread_create_error(const int32_t rc);
 void pepa_set_tcp_timeout(int32_t sock);
 void pepa_set_tcp_recv_size(pepa_core_t *core, int32_t sock);
 void pepa_set_tcp_send_size(pepa_core_t *core, int32_t sock);
-void pepa_set_tcp_connection_props(pepa_core_t *core, int32_t sock);
-
-//int32_t pepa_open_connection_to_server(pepa_core_t *core, const char *address, int32_t port, const char *name);
-
-#if 0 /* SEB */
-__attribute__((warn_unused_result))
-int32_t pepa_one_direction_copy2(int32_t fd_out, const char *name_out,
-								 int32_t fd_in, const char *name_in,
-								 char *buf, size_t buf_size, int32_t do_debug,
-								 uint64_t *ext_rx, uint64_t *ext_tx);
-#endif
 
 int pepa_one_direction_copy3(pepa_core_t *core,
 							 int fd_out, const char *name_out,
@@ -87,24 +70,12 @@ __attribute__((warn_unused_result))
  */
 int32_t pepa_open_connection_to_server(const char *address, int32_t port, const char *name);
 
-void *pepa_shva_thread_new(__attribute__((unused))void *arg);
-
 void pepa_parse_pthread_create_error(const int32_t rc);
-
-void *pepa_in_thread(__attribute__((unused))void *arg);
-
-void *pepa_out_thread(__attribute__((unused))void *arg);
 
 __attribute__((warn_unused_result))
 int32_t pepa_socket_shutdown_and_close(int32_t sock, const char *my_name);
 
 void pepa_socket_close(int32_t fd, const char *socket_name);
-
-void pepa_socket_close_shva_rw(pepa_core_t *core);
-
-void pepa_socket_close_out_write(pepa_core_t *core);
-
-void pepa_socket_close_out_listen(pepa_core_t *core);
 
 void pepa_socket_close_in_listen(pepa_core_t *core);
 

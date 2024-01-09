@@ -560,7 +560,8 @@ void pepa_emulator_shva_thread_cleanup(__attribute__((unused))void *arg)
 		slog_error_l("Could not close listening socket");
 	}
 
-	pepa_socket_close_shva_rw(core);
+	pepa_reading_socket_close(core->sockets.shva_rw, "SHVA RW");
+	core->sockets.shva_rw = FD_CLOSED;
 	slog_note("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$");
 	//pepa_socket_shutdown_and_close(core->sockets.shva_rw, "SHVA SERVER");
 }
@@ -694,7 +695,9 @@ void *pepa_emulator_shva_thread(__attribute__((unused))void *arg)
 		if (rc) {
 			slog_warn_l("%s: Could not remove socket %d from epoll set %d", "OUT RW", core->sockets.out_write, epoll_fd);
 		}
-		pepa_socket_close_shva_rw(core);
+		pepa_reading_socket_close(core->sockets.shva_rw, "SHVA RW");
+		core->sockets.shva_rw = FD_CLOSED;
+
 		rc = pepa_socket_shutdown_and_close(sock_listen, "EMU");
 		if (PEPA_ERR_OK != rc) {
 			slog_error_l("Could not close listening socket");
