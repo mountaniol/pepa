@@ -204,6 +204,7 @@ int pepa_parse_arguments(int argi, char *argv[])
 		{"monitor",          required_argument,      0, 'm'},
 		{"pid",              required_argument,      0, 'P'},
 		{"daemon",           no_argument,            0, 'w'},
+		{"noprint",          no_argument,            0, 'p'},
 		{"color",            no_argument,            0, 'c'},
 		{"dump",             no_argument,            0, 'u'},
 		{"version",          no_argument,            0, 'v'},
