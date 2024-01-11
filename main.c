@@ -3,10 +3,56 @@
 
 #include "slog/src/slog.h"
 #include "pepa_core.h"
+#include "pepa3.h"
 #include "pepa_errors.h"
 #include "pepa_parser.h"
 #include "pepa_server.h"
 #include "pepa_state_machine.h"
+
+static void pepa_clean_on_exit(void)
+{
+	int rc;
+	pepa_core_t *core = pepa_get_core();
+
+	slog_warn_l("=============================================");
+	slog_warn_l("=============================================");
+	slog_warn_l("Finishing PEPA");
+
+	/* Remove PID file */
+	if (NULL != core->pid_file_name) {
+		slog_warn_l("Removing PID file %s", core->pid_file_name);
+		rc = unlink(core->pid_file_name);
+		if (0 != rc) {
+			slog_error_l("Can not remove PID file: %s", core->pid_file_name);
+		} else {
+			slog_warn_l("Removed PID file: %d", core->pid_file_name);
+		}
+
+		free(core->pid_file_name);
+	}
+
+	/* Terminate monithor thread */
+	if (0 != core->monitor.onoff) {
+		slog_warn_l("Terminating the monitor thread");
+		pepa_thread_kill_monitor(core);
+	}
+
+	/* Close all sockets, if not closed */
+	slog_warn_l("Closing all sockets");
+	pepa3_close_sockets(core);
+
+	/* Free buffers */
+	slog_warn_l("Freeing all buffers");
+	if (NULL != core->buffer) {
+		free(core->buffer);
+	}
+
+	/* Close slogger */
+	slog_warn_l("Destroying the logger");
+	slog_warn_l("=============================================");
+	slog_warn_l("=============================================");
+	slog_destroy();
+}
 
 /* Catch Signal Handler function */
 static void signal_callback_handler(int signum, __attribute__((unused)) siginfo_t *info, __attribute__((unused))void *extra)
@@ -16,12 +62,14 @@ static void signal_callback_handler(int signum, __attribute__((unused)) siginfo_
 	if (signum == SIGINT) {
 		printf("Caught signal SIGINT: %d\n", signum);
 		//pepa_back_to_disconnected_state_new(core);
+		pepa_clean_on_exit();
 		exit(0);
 	}
 
 	if (signum == SIGUSR1) {
 		printf("Caught signal SIGINT: %d\n", signum);
 		//pepa_back_to_disconnected_state_new(core);
+		pepa_clean_on_exit();
 		exit(0);
 	}
 }
@@ -77,8 +125,8 @@ int main(int argi, char *argv[])
 		/* Set hight limit of opened files */
 		pepa_set_rlimit();
 		/* After demonization we must reinit the logger */
-		slog_init("pepa", SLOG_FLAGS_ALL, 0);
-		rc = pepa_config_slogger_daemon(core);
+		//slog_init("pepa", SLOG_FLAGS_ALL, 0);
+		//rc = pepa_config_slogger_daemon(core);
 	}
 
 	pepa_set_int_signal_handler();

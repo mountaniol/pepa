@@ -99,7 +99,6 @@ void pepa_set_tcp_send_size(pepa_core_t *core, int sock)
 	}
 }
 
-
 int pepa_one_direction_copy3(pepa_core_t *core,
 							 int fd_out, const char *name_out,
 							 int fd_in, const char *name_in,

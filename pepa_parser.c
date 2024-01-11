@@ -31,10 +31,11 @@ void pepa_show_help(void)
 		   "\n"
 		   "~~~~~~~~~~~ PEPA MODE OPTION (OPTIONAL) ~~ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
 		   "--daemon   | -w  :    Run as a daemon process\n"
+		   "           ~          WARNING: When --daemon is ON, it disables terminal printings and disbales colors\n"
 		   "--pid      | -P file: Create PID file 'file'; full path should be provided. By defailt, /tmp/pepa.pid file created\n"
 		   "\n"
 		   "~~~~~~~~~~~ LOGGER OPTIONS (OPTIONAL) ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
-		   "--log      | -l N :   Logger level, accumulative: 0 = no log, 7 includes also {1-6}\n"
+		   "--log      | -l N :   Logger level, accumulative: 0 = no log, 7 includes also {1-6}; Default level is 7 (everything)\n"
 		   "           ~          0: none, 1: fatal, 2: trace, 3: error, 4: debug, 5: warn, 6: info, 7: note\n"
 		   "           ~          The same log level works for printing onto the terminal and to the log file\n"
 		   "--file     | -f :     NAME - Name of log file to save the log into\n"
@@ -274,7 +275,7 @@ int pepa_parse_arguments(int argi, char *argv[])
 		case 'P':
 		{
 			core->pid_file_name = strdup(optarg);
-			slog_info_l("PID file is set to: %d", core->pid_file_name);
+			slog_info_l("PID file is set to: %s", core->pid_file_name);
 		}
 			break;
 		case 'r':

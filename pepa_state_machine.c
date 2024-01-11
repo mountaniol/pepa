@@ -143,8 +143,20 @@ void *pepa_monitor_thread(__attribute__((unused))void *arg)
 			}
 		}
 
-		slog_debug("### STATUS: Sockets: OUT LISTEN FD: %d | OUT WRITE FD: %d | SHVA FD: %d | IN LISTEN FD: %d | IN-READERS: %d sockets ###",
-				   core->sockets.out_listen, core->sockets.out_write, core->sockets.shva_rw, core->sockets.in_listen, active_in_readers);
+		slog_debug("### STATUS: Sockets: OUT LISTEN FD[%d]: %d | OUT WRITE FD[%d]: %d | SHVA FD[%d]: %d | IN LISTEN FD[%d]: %d | IN ACCEPTORS[%d] ###",
+				   (core->sockets.out_listen >= 0) ? 1 : 0,
+				   core->sockets.out_listen,
+
+				   (core->sockets.out_write >= 0) ? 1 : 0,
+				   core->sockets.out_write,
+
+				   (core->sockets.shva_rw >= 0) ? 1 : 0,
+				   core->sockets.shva_rw,
+
+				   (core->sockets.in_listen >= 0) ? 1 : 0,
+				   core->sockets.in_listen,
+
+				   active_in_readers);
 		slog_debug("### STATUS:  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
 
 		fflush(stdout);

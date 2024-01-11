@@ -2,6 +2,9 @@
 #define _PEPA_PARSE_H__
 
 #include <stdint.h>
+#include "buf_t/buf_t.h"
+#include "pepa_core.h"
+
 void pepa_show_help(void);
 
 __attribute__((warn_unused_result))

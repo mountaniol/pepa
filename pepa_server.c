@@ -15,6 +15,7 @@
 
 
 #include "slog/src/slog.h"
+#include "pepa_parser.h"
 #include "pepa_core.h"
 
 void pepa_set_rlimit(void)
@@ -38,9 +39,9 @@ void pepa_set_rlimit(void)
 
 void daemonize(pepa_core_t *core)
 {
-	pid_t pid = 0;
-	int32_t   fd;
-	int32_t   rc;
+	pid_t   pid = 0;
+	int32_t fd;
+	int32_t rc;
 
 	/* Fork off the parent process */
 	pid = fork();
@@ -101,15 +102,24 @@ void daemonize(pepa_core_t *core)
 	stdout = fopen("/dev/null", "w+");
 	stderr = fopen("/dev/null", "w+");
 
+	//slog_init("pepa", SLOG_FLAGS_ALL, 0);
+	rc = pepa_config_slogger_daemon(core);
+
 	/* Try to write PID of daemon to lockfile */
 	if (core->pid_file_name != NULL) {
+		slog_note_l("Going to create PEPA PID file: %s", core->pid_file_name);
 		char str[256];
 		core->pid_fd = open(core->pid_file_name, O_RDWR | O_CREAT, 0640);
 		if (core->pid_fd < 0) {
 			/* Can't open lockfile */
 			slog_fatal_l("Can not open lock file", strerror(errno));
 			exit(EXIT_FAILURE);
+		} else {
+			int err = errno;
+			slog_error_l("Can not create PEPA PID file: %s, %s", core->pid_file_name, strerror(err));
+			return;
 		}
+
 		if (lockf(core->pid_fd, F_TLOCK, 0) < 0) {
 			/* Can't lock file */
 			slog_fatal_l("Can not lock PID file", strerror(errno));
@@ -119,10 +129,13 @@ void daemonize(pepa_core_t *core)
 		sprintf(str, "%d\n", getpid());
 		/* Write PID to lockfile */
 		rc = write(core->pid_fd, str, strlen(str));
-		if (rc != (int32_t) strlen(str)) {
+		if (rc != (int32_t)strlen(str)) {
 			slog_fatal_l("Can not write PID into PID file: %s", strerror(errno));
 			exit(EXIT_FAILURE);
 		}
+		
+		slog_note_l("Created PEPA PID file: %s, the PID is %s", core->pid_file_name, str);
+		// close(core->pid_fd);
 	}
 }
 
