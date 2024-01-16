@@ -817,11 +817,11 @@ int main(int argi, char *argv[])
 
 	if (NULL != core->in_thread.ip_string) {
 		for (i = 0; i < number_of_in_threads; i++) {
-			slog_info_l("Starting IN[%d] thread", i);
+			slog_info_l("Starting IN[%u] thread", i);
 			//rc = pthread_create(&core->in_thread.thread_id, NULL, pepa_emulator_in_thread, NULL);
 			rc = pthread_create(&in_thread_idx[i], NULL, pepa_emulator_in_thread, &i);
 			if (0 == rc) {
-				slog_note_l("IN[%d] thread is started", i);
+				slog_note_l("IN[%u] thread is started", i);
 			} else {
 				pepa_parse_pthread_create_error(rc);
 				return -PEPA_ERR_THREAD_CANNOT_CREATE;

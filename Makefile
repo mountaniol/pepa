@@ -4,7 +4,9 @@
 #GCC=clang-10
 GCC=gcc
 #GCC=gcc-10
-CFLAGS=-Wall -Wextra -O2 -Wswitch-enum -Wimplicit-fallthrough -Wno-error=unused-but-set-variable -Wswitch -Wreturn-type -Wpedantic -Wabi=11
+CFLAGS=-Wall -Wextra -O2 -Wswitch-enum -Wimplicit-fallthrough -Wno-error=unused-but-set-variable \
+			-Wswitch -Wreturn-type -Wpedantic -Wformat-overflow=2 -Wformat-nonliteral -Wformat-security -Wformat-signedness
+
 #CFLAGS=-Wall -Wextra -O2
 #DEBUG=-DDEBUG3
 #DEBUG+=-ggdb

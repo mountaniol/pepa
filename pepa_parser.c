@@ -86,7 +86,7 @@ long int pepa_string_to_int_strict(char *s, int *err)
 	}
 
 	if ((size_t)(endptr - s) != strlen(s)) {
-		slog_fatal_l("Only part of the string '%s' converted: strlen = %zd, converted %zd", s, strlen(s), (size_t)(endptr - s));
+		slog_fatal_l("Only part of the string '%s' converted: strlen = %zu, converted %zu", s, strlen(s), (size_t)(endptr - s));
 		*err = 1;
 		PEPA_TRY_ABORT();
 		return -PEPA_ERR_INVALID_INPUT;
@@ -259,7 +259,7 @@ int pepa_parse_arguments(int argi, char *argv[])
 				slog_fatal_l("Could not parse number of client: %s", optarg);
 				abort();
 			}
-			slog_info_l("Number of client of IN socket: %d", core->in_thread.clients);
+			slog_info_l("Number of client of IN socket: %u", core->in_thread.clients);
 		}
 			break;
 		case 'b':
@@ -269,7 +269,7 @@ int pepa_parse_arguments(int argi, char *argv[])
 				slog_fatal_l("Could not parse internal buffer size: %s", optarg);
 				abort();
 			}
-			slog_info_l("Internal buffer size is set to: %d", core->internal_buf_size);
+			slog_info_l("Internal buffer size is set to: %u", core->internal_buf_size);
 		}
 			break;
 		case 'P':
