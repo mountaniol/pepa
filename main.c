@@ -25,7 +25,7 @@ static void pepa_clean_on_exit(void)
 		if (0 != rc) {
 			slog_error_l("Can not remove PID file: %s", core->pid_file_name);
 		} else {
-			slog_warn_l("Removed PID file: %d", core->pid_file_name);
+			slog_warn_l("Removed PID file: %s", core->pid_file_name);
 		}
 
 		free(core->pid_file_name);

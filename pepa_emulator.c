@@ -18,7 +18,10 @@
 #define SLEEPTIME_US (100000)
 
 #define SHUTDOWN_DIVIDER (100003573)
+
+#define SHVA_SHUTDOWN_DIVIDER (10000357)
 #define SHOULD_EMULATE_DISCONNECT() (0 == (rand() % SHUTDOWN_DIVIDER))
+#define SHVA_SHOULD_EMULATE_DISCONNECT() (0 == (rand() % SHVA_SHUTDOWN_DIVIDER))
 #define RX_TX_PRINT_DIVIDER (1000000)
 
 #define PEPA_MIN(a,b) ((a<b) ? a : b )
@@ -249,7 +252,7 @@ void *pepa_emulator_out_thread(__attribute__((unused))void *arg)
 			}
 
 			/* Sometimes emulate broken connection: break the loop, then the socket will be closed */
-			if (SHOULD_EMULATE_DISCONNECT()) {
+			if (SHVA_SHOULD_EMULATE_DISCONNECT()) {
 				slog_note_l("OUT      : EMULATING DISCONNECT");
 				pepa_emulator_disconnect_mes("OUT");
 				goto closeit;
@@ -526,7 +529,7 @@ void *pepa_emulator_shva_thread(__attribute__((unused))void *arg)
 			if (0 == event_count) {
 
 				/* Emulate socket closing */
-				if (SHOULD_EMULATE_DISCONNECT()) {
+				if (SHVA_SHOULD_EMULATE_DISCONNECT()) {
 					// slog_debug_l("SHVA: EMULATING DISCONNECT");
 					pepa_emulator_disconnect_mes("SHVA");
 					goto reset;

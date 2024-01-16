@@ -73,10 +73,10 @@ void pepa_set_tcp_timeout(int sock)
 	time_out.tv_usec = 0;
 
 	if (0 != setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char *)&time_out, sizeof(time_out))) {
-		slog_debug_l("[from %s] SO_RCVTIMEO has a problem", "EMU SHVA", strerror(errno));
+		slog_debug_l("[from %s] SO_RCVTIMEO has a problem: %s", "EMU SHVA", strerror(errno));
 	}
 	if (0 != setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, (char *)&time_out, sizeof(time_out))) {
-		slog_debug_l("[from %s] SO_SNDTIMEO has a problem", "EMU SHVA", strerror(errno));
+		slog_debug_l("[from %s] SO_SNDTIMEO has a problem: %s", "EMU SHVA", strerror(errno));
 	}
 }
 
@@ -86,7 +86,7 @@ void pepa_set_tcp_recv_size(pepa_core_t *core, int sock)
 
 	/* Set TCP receive window size */
 	if (0 != setsockopt(sock, SOL_SOCKET, SO_RCVBUF, (char *)&buf_size, sizeof(buf_size))) {
-		slog_debug_l("[from %s] SO_RCVBUF has a problem", "EMU SHVA", strerror(errno));
+		slog_debug_l("[from %s] SO_RCVBUF has a problem: %s", "EMU SHVA", strerror(errno));
 	}
 }
 
@@ -95,7 +95,7 @@ void pepa_set_tcp_send_size(pepa_core_t *core, int sock)
 	int32_t buf_size = core->internal_buf_size * 1024;
 	/* Set TCP sent window size */
 	if (0 != setsockopt(sock, SOL_SOCKET, SO_SNDBUF, (char *)&buf_size, sizeof(buf_size))) {
-		slog_debug_l("[from %s] SO_SNDBUF has a problem", "EMU SHVA", strerror(errno));
+		slog_debug_l("[from %s] SO_SNDBUF has a problem: %s", "EMU SHVA", strerror(errno));
 	}
 }
 

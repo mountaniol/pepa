@@ -195,6 +195,8 @@ void slog_enable(slog_flag_t eFlag);
 void slog_disable(slog_flag_t eFlag);
 
 void slog_init(const char* pName, uint16_t nFlags, uint8_t nTdSafe);
+
+__attribute__ ((format (printf, 3, 4)))
 void slog_display(slog_flag_t eFlag, uint8_t nNewLine, char *pFormat, ...);
 void slog_destroy(); // Required only if (nTdSafe > 0 || nKeepOpen > 0)
 

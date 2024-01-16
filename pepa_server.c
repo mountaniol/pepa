@@ -112,7 +112,7 @@ void daemonize(pepa_core_t *core)
 		core->pid_fd = open(core->pid_file_name, O_RDWR | O_CREAT, 0640);
 		if (core->pid_fd < 0) {
 			/* Can't open lockfile */
-			slog_fatal_l("Can not open lock file", strerror(errno));
+			slog_fatal_l("Can not open lock file: %s", strerror(errno));
 			exit(EXIT_FAILURE);
 		} else {
 			int err = errno;
@@ -122,7 +122,7 @@ void daemonize(pepa_core_t *core)
 
 		if (lockf(core->pid_fd, F_TLOCK, 0) < 0) {
 			/* Can't lock file */
-			slog_fatal_l("Can not lock PID file", strerror(errno));
+			slog_fatal_l("Can not lock PID file: %s", strerror(errno));
 			exit(EXIT_FAILURE);
 		}
 		/* Get current PID */

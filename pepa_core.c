@@ -11,58 +11,6 @@ pepa_core_t *g_pepa_core = NULL;
 
 /**
  * @author Sebastian Mountaniol (7/20/23)
- * @brief Init the semaphore (->mutex) of the pepa_core_t
- *  	  structure
- * @param pepa_core_t* core  An instance of pepa_core_t
- *  				 structure to init semaphore
- * @return int32_t 0 on success, -1 on an error
- * @details You need to use this function if you clean an
- *  		existing core structure, and want to reuse it. After
- *  		cleaning the structure, the semaphore is destroyes
- *  		and not reinited
- */
-static int32_t pepa_core_sem_init(pepa_core_t *core)
-{
-	TESTP(core, -1);
-	int32_t sem_rc = sem_init(&core->mutex, 0, 1);
-
-	if (0 != sem_rc) {
-		slog_fatal_l("Could not init mutexes");
-		perror("sem init failure: ");
-		PEPA_TRY_ABORT();
-		return (-PEPA_ERR_INIT_MITEX);
-	}
-
-	return PEPA_ERR_OK;
-}
-
-static int32_t pepa_shva_mutex_init(pepa_core_t *core)
-{
-	TESTP(core, -1);
-	int32_t sem_rc = sem_init(&core->sockets.shva_rw_mutex, 0, 1);
-
-	if (0 != sem_rc) {
-		slog_fatal_l("Could not init SHVA mutexes");
-		perror("sem init failure: ");
-		PEPA_TRY_ABORT();
-		return (-PEPA_ERR_INIT_MITEX);
-	}
-
-	return PEPA_ERR_OK;
-}
-
-static void pepa_core_set_default_values(pepa_core_t *core)
-{
-	TESTP_VOID(core);
-	// core->shva_thread.fd_listen = -1;
-	core->sockets.shva_rw = -1;
-	core->sockets.out_listen = -1;
-	core->sockets.out_write = -1;
-	core->sockets.in_listen = -1;
-}
-
-/**
- * @author Sebastian Mountaniol (7/20/23)
  * @brief Create (allocate)  'pepa_core_t' struct and feel it
  *  	  with defailt values, like '-1' for file descriptors
  * @param  void  
@@ -72,29 +20,16 @@ static void pepa_core_set_default_values(pepa_core_t *core)
  */
 static pepa_core_t *pepa_create_core_t(void)
 {
-	int32_t         rc;
-
 	pepa_core_t *core = calloc(sizeof(pepa_core_t), 1);
 	TESTP_ASSERT(core, "Can not create core");
-	pepa_core_set_default_values(core);
-	rc = pepa_core_sem_init(core);
-	if (rc) {
-		slog_fatal_l("Could not init mutex - returning NULL");
-		free(core);
-		PEPA_TRY_ABORT();
-		return NULL;
-	}
-
-	rc = pepa_shva_mutex_init(core);
-	if (rc) {
-		slog_fatal_l("Could not init SHAV mutex - returning NULL");
-		free(core);
-		PEPA_TRY_ABORT();
-		return NULL;
-	}
 
 	/*** Init threads pthread descriptors */
-	
+
+	core->sockets.shva_rw = FD_CLOSED;
+	core->sockets.out_listen = FD_CLOSED;
+	core->sockets.out_write = FD_CLOSED;
+	core->sockets.in_listen = FD_CLOSED;
+
 	core->shva_thread.thread_id = PTHREAD_DEAD;
 	core->in_thread.thread_id = PTHREAD_DEAD;
 	core->out_thread.thread_id = PTHREAD_DEAD;
@@ -124,6 +59,9 @@ static pepa_core_t *pepa_create_core_t(void)
 	core->monitor_freq = 5;
 	core->pid_file_name = strdup("/tmp/pepa.pid");
 
+	core->epoll_fd = FD_CLOSED;
+	core->pid_fd = FD_CLOSED;
+
 	return core;
 }
 
@@ -146,29 +84,6 @@ pepa_core_t *pepa_get_core(void)
 	TESTP_ASSERT(g_pepa_core, "Core is NULL!");
 	return g_pepa_core;
 }
-
-int32_t pepa_core_lock(void)
-{
-	int32_t rc;
-	TESTP_ASSERT(g_pepa_core, "Core is NULL!");
-	sem_getvalue(&g_pepa_core->mutex, &rc);
-	if (rc > 1) {
-		slog_fatal_l("Semaphor count is too high: %d > 1", rc);
-		PEPA_TRY_ABORT();
-		abort();
-	}
-
-	rc = sem_wait(&g_pepa_core->mutex);
-	if (0 != rc) {
-		slog_fatal_l("Can't wait on semaphore; abort");
-		perror("Can't wait on semaphore; abort");
-		PEPA_TRY_ABORT();
-		abort();
-	}
-
-	return PEPA_ERR_OK;
-}
-
 
 int32_t pepa_if_abort(void)
 {

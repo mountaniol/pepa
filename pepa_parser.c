@@ -220,7 +220,7 @@ int pepa_parse_arguments(int argi, char *argv[])
 		printf("No arguments provided\n");
 		pepa_show_help();
 		pepa_print_version();
-		return -1;
+		return (-PEPA_ERR_INVALID_INPUT);
 
 	}
 	while ((opt = getopt_long(argi, argv, "s:o:i:n:l:f:d:b:r:S:B:m:phavwcu", long_options, &option_index)) != -1) {

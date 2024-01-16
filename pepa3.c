@@ -226,7 +226,7 @@ int pepa_process_exceptions(pepa_core_t *core, struct epoll_event events[], int 
 
 /**
  * @author Sebastian Mountaniol (1/7/24)
- * @brief THis function is called when IN socket should accept a
+ * @brief This function is called when IN socket should accept a
  *  	  new connection. This function calls accept() and adds
  *  	  a new socket into epoll set, and into the array of IN
  *  	  reading sockets
@@ -244,7 +244,7 @@ static int32_t pepa_in_accept_new_connection(pepa_core_t *core)
 							 (struct sockaddr *)&address,
 							 (socklen_t *)&addrlen)) < 0) {
 		slog_error_l("Error on accept: %s", strerror(errno));
-		return -1;
+		return (-PEPA_ERR_SOCKET_CREATION);
 	}
 
 	// pepa_set_tcp_connection_props(core, new_socket);
@@ -560,7 +560,7 @@ int pepa3_close_sockets(pepa_core_t *core)
 
 	rc = epoll_ctl(core->epoll_fd, EPOLL_CTL_DEL, core->sockets.out_write, NULL);
 	if (rc) {
-		slog_warn_l("Could not remove socket OUT Write from epoll set: %fd: %d, %s", core->sockets.out_write, strerror(errno));
+		slog_warn_l("Could not remove socket OUT Write from epoll set: %d:, %s", core->sockets.out_write, strerror(errno));
 	}
 
 	rc = epoll_ctl(core->epoll_fd, EPOLL_CTL_DEL, core->sockets.shva_rw, NULL);
@@ -604,7 +604,7 @@ int pepa3_reset_sockets(pepa_core_t *core)
 
 	rc = epoll_ctl(core->epoll_fd, EPOLL_CTL_DEL, core->sockets.out_write, NULL);
 	if (rc) {
-		slog_warn_l("Could not remove socket OUT Write from epoll set: %fd: %d, %s", core->sockets.out_write, strerror(errno));
+		slog_warn_l("Could not remove socket OUT Write from epoll set: %d, %s", core->sockets.out_write, strerror(errno));
 	}
 
 	rc = epoll_ctl(core->epoll_fd, EPOLL_CTL_DEL, core->sockets.shva_rw, NULL);
@@ -619,6 +619,9 @@ int pepa3_reset_sockets(pepa_core_t *core)
 
 	pepa_socket_close(core->sockets.out_write, "OUT WRITE");
 	core->sockets.out_write = FD_CLOSED;
+
+	/* CLose all IN reading sockets */
+	pepa_in_reading_sockets_close_all(core);
 
 #if 0 /* SEB */
 	rc = pepa_socket_shutdown_and_close(core->sockets.out_listen, "OUT LISTEN");

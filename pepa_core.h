@@ -28,7 +28,6 @@ typedef struct {
  */
 typedef struct {
 	int shva_rw;
-	sem_t shva_rw_mutex;
 	int out_listen;
 	int out_write;
 	int in_listen;
@@ -45,8 +44,8 @@ typedef struct {
 } pepa_stat_t;
 
 typedef struct {
-	int *sockets;
-	int number;
+	int *sockets; /**< Array of IN reading sockets */
+	int number; /**< Number of allocated slots (not number of active sockets!) */
 } pepa_in_read_sockets_t;
 
 /**
@@ -57,8 +56,6 @@ typedef struct {
  * @details 
  */
 typedef struct {
-	sem_t mutex; /**< A semaphor used to sync the core struct between multiple threads */
-
 	/* Logger configs */
 	int slog_flags; /* Keep slog logger verbosity level*/
 	char *slog_file; /* Keep slog output file name; if given, log will be saved there */
@@ -72,10 +69,9 @@ typedef struct {
 	int emu_max_buf; /* Max size of buffer of a buffer send from emulator */
 	int emu_min_buf; /* Min size of buffer of a buffer send from emulator; defailt 1; must be > 0 */
 
+	/* These thread_vars_t used in the Emulator */
 	thread_vars_t shva_thread; /**< Configuration of SHVA thread */
-	// thread_vars_t shva_forwarder; /**< Configuration of SHVA thread */
 	thread_vars_t in_thread; /**< Configuration of IN thread */
-	// thread_vars_t in_forwarder; /**< Configuration of IN thread */
 	thread_vars_t out_thread; /**< Configuration of OUT thread */
 	thread_vars_t monitor_thread; /**< Configuration of OUT thread */
 	int monitor_freq; /* How often (in seconds) print out statistics from the monitor; by default every 5 seconds */
@@ -84,13 +80,11 @@ typedef struct {
 	int32_t abort_flag; /**< Abort flag, if enabled, PEPA file abort on errors; for debug only */
 	pepa_sockets_t sockets;
 	int32_t monitor_timeout; /**< How many microseconds to sleep between tests in microseconds */
-	// pepa_status_t state;
 	pepa_stat_t monitor;
 	int32_t daemon; /* If not 0, start as a daemon */
 	int pid_fd; /* File descriptor of PID file */
 	char *pid_file_name; /* File name of PID file  */
 	void *buffer;
-	//uint32_t buffer_size;
 	int epoll_fd;
 } pepa_core_t;
 
@@ -117,17 +111,6 @@ int32_t pepa_core_init(void);
  */
 __attribute__((hot))
 pepa_core_t *pepa_get_core(void);
-
-/**
- * @author Sebastian Mountaniol (12/6/23)
- * @brief Lock core; anyone else can manipulate locked values
- *  	  until it unlocked
- * @return int32_t 0 on success.
- * @details This function should never show failure.
- *  		It will wait on semaphore until the sem taken.
- * @todo Should it be void?
- */
-int32_t pepa_core_lock(void);
 
 /**
  * @author Sebastian Mountaniol (12/6/23)
