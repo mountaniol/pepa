@@ -9,8 +9,9 @@
 #include "pepa_errors.h"
 #include "pepa_core.h"
 #include "pepa_socket_common.h"
+#include "pepa_state_machine.h"
 
-void pepa_thread_cancel(pthread_t pid, const char *name)
+void pepa_thread_cancel(const pthread_t pid, const char *name)
 {
 	if (PTHREAD_DEAD == pid || pthread_kill(pid, 0) < 0) {
 		slog_error_l("Can not cancel %s thread, it is not alive", name);
@@ -36,7 +37,7 @@ void pepa_thread_cancel(pthread_t pid, const char *name)
 
 }
 
-int32_t pepa_thread_is_monitor_up(pepa_core_t *core)
+static int32_t pepa_thread_is_monitor_up(const pepa_core_t *core)
 {
 	if (PTHREAD_DEAD == core->monitor_thread.thread_id ||
 		pthread_kill(core->monitor_thread.thread_id, 0) < 0) {
@@ -76,7 +77,6 @@ void pepa_thread_start_monitor(pepa_core_t *core)
 void *pepa_monitor_thread(__attribute__((unused))void *arg)
 {
 	const char *my_name          = "MONITOR";
-	int        active_in_readers;
 	int        i;
 
 //	pepa_set_int_signal_handler();
@@ -92,21 +92,22 @@ void *pepa_monitor_thread(__attribute__((unused))void *arg)
 	memcpy(&monitor_prev, &core->monitor, sizeof(monitor_prev));
 
 	do {
+		int        active_in_readers;
 
 		if (core->monitor_divider_str[0] == 0) {
 			slog_debug("### STATUS: /Units: %d bytes/ SHVA [+%lu | %lu/sec] ---> OUT [+%lu | %lu/sec] ### IN [+%lu | %lu/sec] ---> SHVA [+%lu | %lu/sec]  ###",
 					   core->monitor_divider,
-					   (core->monitor.shva_rx - monitor_prev.shva_rx) / core->monitor_divider,
-					   ((core->monitor.shva_rx - monitor_prev.shva_rx) / core->monitor_freq) / core->monitor_divider,
+					   (core->monitor.shva_rx - monitor_prev.shva_rx) / (uint64_t)core->monitor_divider,
+					   ((core->monitor.shva_rx - monitor_prev.shva_rx) / (uint64_t)core->monitor_freq) / (uint64_t)core->monitor_divider,
 
-					   (core->monitor.out_tx - monitor_prev.out_tx) / core->monitor_divider,
-					   ((core->monitor.out_tx - monitor_prev.out_tx) / core->monitor_freq) / core->monitor_divider,
+					   (core->monitor.out_tx - monitor_prev.out_tx) / (uint64_t)core->monitor_divider,
+					   ((core->monitor.out_tx - monitor_prev.out_tx) / (uint64_t)core->monitor_freq) / (uint64_t)core->monitor_divider,
 
-					   (core->monitor.in_rx - monitor_prev.in_rx) / core->monitor_divider,
-					   ((core->monitor.in_rx - monitor_prev.in_rx) / core->monitor_freq) / core->monitor_divider,
+					   (core->monitor.in_rx - monitor_prev.in_rx) / (uint64_t)core->monitor_divider,
+					   ((core->monitor.in_rx - monitor_prev.in_rx) / (uint64_t)core->monitor_freq) / (uint64_t)core->monitor_divider,
 
-					   (core->monitor.shva_tx - monitor_prev.shva_tx) / core->monitor_divider,
-					   ((core->monitor.shva_tx - monitor_prev.shva_tx) / core->monitor_freq) / core->monitor_divider
+					   (core->monitor.shva_tx - monitor_prev.shva_tx) / (uint64_t)core->monitor_divider,
+					   ((core->monitor.shva_tx - monitor_prev.shva_tx) / (uint64_t)core->monitor_freq) / (uint64_t)core->monitor_divider
 					  );
 		} else {
 			char *divider_str = "Unknown";
@@ -118,19 +119,19 @@ void *pepa_monitor_thread(__attribute__((unused))void *arg)
 			if (core->monitor_divider_str[0] == 'M') {
 				divider_str = "Mbytes";
 			}
-			slog_debug("### STATUS: Freq: %d seconds, Units: %s ### SHVA [+%lu | %lu/sec] ---> OUT [+%lu | %lu/sec] ### IN [+%lu | %lu/sec] ---> SHVA [+%lu | %lu/sec]  ###",
+			slog_debug("### STATUS: Freq: %u seconds, Units: %s ### SHVA [+%lu | %lu/sec] ---> OUT [+%lu | %lu/sec] ### IN [+%lu | %lu/sec] ---> SHVA [+%lu | %lu/sec]  ###",
 					   core->monitor_freq, divider_str,
-					   (core->monitor.shva_rx - monitor_prev.shva_rx) / core->monitor_divider,
-					   ((core->monitor.shva_rx - monitor_prev.shva_rx) / core->monitor_freq) / core->monitor_divider,
+					   (core->monitor.shva_rx - monitor_prev.shva_rx) / (uint64_t)core->monitor_divider,
+					   ((core->monitor.shva_rx - monitor_prev.shva_rx) / (uint64_t)core->monitor_freq) / (uint64_t)core->monitor_divider,
 
-					   (core->monitor.out_tx - monitor_prev.out_tx) / core->monitor_divider,
-					   ((core->monitor.out_tx - monitor_prev.out_tx) / core->monitor_freq) / core->monitor_divider,
+					   (core->monitor.out_tx - monitor_prev.out_tx) / (uint64_t)core->monitor_divider,
+					   ((core->monitor.out_tx - monitor_prev.out_tx) / (uint64_t)core->monitor_freq) / (uint64_t)core->monitor_divider,
 
-					   (core->monitor.in_rx - monitor_prev.in_rx) / core->monitor_divider,
-					   ((core->monitor.in_rx - monitor_prev.in_rx) / core->monitor_freq) / core->monitor_divider,
+					   (core->monitor.in_rx - monitor_prev.in_rx) / (uint64_t)core->monitor_divider,
+					   ((core->monitor.in_rx - monitor_prev.in_rx) / (uint64_t)core->monitor_freq) / (uint64_t)core->monitor_divider,
 
-					   (core->monitor.shva_tx - monitor_prev.shva_tx) / core->monitor_divider,
-					   ((core->monitor.shva_tx - monitor_prev.shva_tx) / core->monitor_freq) / core->monitor_divider
+					   (core->monitor.shva_tx - monitor_prev.shva_tx) / (uint64_t)core->monitor_divider,
+					   ((core->monitor.shva_tx - monitor_prev.shva_tx) / (uint64_t)core->monitor_freq) / (uint64_t)core->monitor_divider
 					  );
 		}
 

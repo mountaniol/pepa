@@ -27,7 +27,7 @@
 
 /****************************** TYPES ******************************/
 
-typedef uint32_t ret_t;
+typedef int32_t ret_t;
 
 /* Whidth of the buf type */
 typedef uint8_t buf_t_type_t;
@@ -97,9 +97,6 @@ typedef uint32_t buf_circ_usize_t;
 //typedef uint16_t buf_t_canary_t;
 typedef uint8_t buf_t_canary_t;
 typedef uint8_t buf_t_checksum_t;
-
-/* This function documented later in this header */
-extern int bug_get_abort_flag(void);
 
 /****************************** STRUCTS ******************************/
 

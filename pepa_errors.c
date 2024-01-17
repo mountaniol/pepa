@@ -3,7 +3,7 @@
 
 const char *pepa_error_code_to_str(int32_t code)
 {
-	pepa_error_t enum_code = abs(code);
+	pepa_error_t enum_code = (pepa_error_t) abs(code);
 	switch (enum_code) {
 	case PEPA_ERR_OK: return "OK";
 	case PEPA_ERR_BUF_ALLOCATION: return "PEPA_ERR_BUF_ALLOCATION: Can not allocate buf_t";

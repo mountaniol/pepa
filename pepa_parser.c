@@ -55,6 +55,7 @@ void pepa_show_help(void)
 		   "--emusleep | -S N :   Emulator only: Sleep N microseconds between buffer sending; 0 by default\n"
 		   "--emubuf   | -B N :   Emulator only: Max size of a buffer, N must be, >= 1; It is 1024 by default\n"
 		   "--emubufmin| -M N :   Emulator only: Min size of a buffer, N must be; >= 1; It is 1 by default\n"
+		   "--emuin    | -I N :   Emulator only: How many IN threads it should run, minimum (and default) is 1\n"
 		   "\n"
 		   "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
 		   "--abort    | -a :     Abort on errors for debug\n"
@@ -121,7 +122,7 @@ int pepa_parse_ip_string_get_port(const char *argument)
 		return -PEPA_ERR_ADDRESS_FORMAT;
 	}
 
-	int port = pepa_string_to_int_strict(colon_ptr + 1, &_err);
+	int port = (int)pepa_string_to_int_strict(colon_ptr + 1, &_err);
 
 	if (_err) {
 		slog_fatal_l("Can't convert port value from string to int: %s", colon_ptr);
@@ -178,7 +179,7 @@ buf_t *pepa_parse_ip_string_get_ip(const char *_argument)
 	*colon_ptr = '\0';
 
 	/* Add the IP address string into buf_t buffer */
-	return buf_from_string(argument, argument_len);
+	return buf_from_string(argument, (buf_s64_t)argument_len);
 }
 
 int pepa_parse_arguments(int argi, char *argv[])
@@ -200,6 +201,7 @@ int pepa_parse_arguments(int argi, char *argv[])
 		{"emusleep",         required_argument,      0, 'S'},
 		{"emubuf",           required_argument,      0, 'B'},
 		{"emubufmin",        required_argument,      0, 'M'},
+		{"emuin",            required_argument,      0, 'I'},
 		{"abort",            no_argument,            0, 'a'},
 		{"bsize",            no_argument,            0, 'b'},
 		{"monitor",          required_argument,      0, 'm'},
@@ -223,7 +225,7 @@ int pepa_parse_arguments(int argi, char *argv[])
 		return (-PEPA_ERR_INVALID_INPUT);
 
 	}
-	while ((opt = getopt_long(argi, argv, "s:o:i:n:l:f:d:b:r:S:B:m:phavwcu", long_options, &option_index)) != -1) {
+	while ((opt = getopt_long(argi, argv, "s:o:i:n:l:f:d:b:r:S:B:m:I:phavwcu", long_options, &option_index)) != -1) {
 		switch (opt) {
 		case 's': /* SHVA Server address to connect to */
 			core->shva_thread.ip_string = pepa_parse_ip_string_get_ip(optarg);
@@ -231,7 +233,7 @@ int pepa_parse_arguments(int argi, char *argv[])
 				slog_fatal_l("Could not parse SHVA ip address");
 				abort();
 			}
-			core->shva_thread.port_int = pepa_parse_ip_string_get_port(optarg);
+			core->shva_thread.port_int = (uint16_t)pepa_parse_ip_string_get_port(optarg);
 			slog_info_l("SHVA Addr OK: |%s| : |%d|", core->shva_thread.ip_string->data, core->shva_thread.port_int);
 			break;
 		case 'o': /* Output socket where packets from SHVA should be transfered */
@@ -240,7 +242,7 @@ int pepa_parse_arguments(int argi, char *argv[])
 				slog_fatal_l("Could not parse OUT ip address");
 				abort();
 			}
-			core->out_thread.port_int = pepa_parse_ip_string_get_port(optarg);
+			core->out_thread.port_int = (uint16_t)pepa_parse_ip_string_get_port(optarg);
 			slog_info_l("OUT Addr OK: |%s| : |%d|", core->out_thread.ip_string->data, core->out_thread.port_int);
 			break;
 		case 'i': /* Input socket - read and send to SHVA */
@@ -249,12 +251,12 @@ int pepa_parse_arguments(int argi, char *argv[])
 				slog_fatal_l("Could not parse IN ip address");
 				abort();
 			}
-			core->in_thread.port_int = pepa_parse_ip_string_get_port(optarg);
+			core->in_thread.port_int = (uint16_t)pepa_parse_ip_string_get_port(optarg);
 			slog_info_l("IN Addr OK: |%s| : |%d|", core->in_thread.ip_string->data, core->in_thread.port_int);
 			break;
 		case 'n':
 		{
-			core->in_thread.clients = pepa_string_to_int_strict(optarg, &err);
+			core->in_thread.clients = (uint32_t)pepa_string_to_int_strict(optarg, &err);
 			if (err < 0) {
 				slog_fatal_l("Could not parse number of client: %s", optarg);
 				abort();
@@ -264,7 +266,7 @@ int pepa_parse_arguments(int argi, char *argv[])
 			break;
 		case 'b':
 		{
-			core->internal_buf_size = pepa_string_to_int_strict(optarg, &err);
+			core->internal_buf_size = (uint32_t)pepa_string_to_int_strict(optarg, &err);
 			if (err < 0) {
 				slog_fatal_l("Could not parse internal buffer size: %s", optarg);
 				abort();
@@ -301,7 +303,7 @@ int pepa_parse_arguments(int argi, char *argv[])
 				break;
 			}
 
-			core->monitor_divider = pepa_string_to_int_strict(optarg, &err);
+			core->monitor_divider = (int)pepa_string_to_int_strict(optarg, &err);
 			if (err < 0) {
 				slog_fatal_l("Could not parse internal buffer size: %s", optarg);
 				abort();
@@ -317,66 +319,90 @@ int pepa_parse_arguments(int argi, char *argv[])
 			break;
 		case 'S':
 		{
-			core->emu_timeout = pepa_string_to_int_strict(optarg, &err);
+			long int ret = pepa_string_to_int_strict(optarg, &err);
+
 			if (err < 0) {
 				slog_fatal_l("Could not parse emulator sleep time: %s", optarg);
 				abort();
 			}
 
-			if (core->emu_timeout <= 0) {
+			if (ret <= 0) {
 				slog_fatal_l("Emulator sleep is invalid: %s, it must be >= 1", optarg);
 				abort();
 			}
 
-			slog_info_l("Emulator sleep is set to: %d", core->emu_timeout);
+			core->emu_timeout = (unsigned int)ret;
+			slog_info_l("Emulator sleep is set to: %u", core->emu_timeout);
 		}
 			break;
 		case 'B':
 		{
-			core->emu_max_buf = pepa_string_to_int_strict(optarg, &err);
+			ssize_t ret = (ssize_t)pepa_string_to_int_strict(optarg, &err);
 			if (err < 0) {
 				slog_fatal_l("Could not emulator max buffer size: %s", optarg);
 				abort();
 			}
 
-			if (core->emu_max_buf <= 0) {
+			if (ret <= 0) {
 				slog_fatal_l("Emulator max size is invalid: %s, it must be >= 1", optarg);
 				abort();
 			}
 
-			slog_info_l("Emulator max buffer size is set to: %d", core->emu_max_buf);
+			core->emu_max_buf = (size_t)ret;
+
+			slog_info_l("Emulator max buffer size is set to: %zu", core->emu_max_buf);
 		}
 			break;
 		case 'M':
 		{
-			core->emu_min_buf = pepa_string_to_int_strict(optarg, &err);
+			ssize_t ret = (ssize_t)pepa_string_to_int_strict(optarg, &err);
+
 			if (err < 0) {
 				slog_fatal_l("Could not parse emulator min buffer size: %s", optarg);
 				abort();
 			}
 
-			if (core->emu_min_buf <= 0) {
+			if (ret <= 0) {
 				slog_fatal_l("Emulator min size is invalid: %s, it must be >= 1", optarg);
 				abort();
 			}
 
-			slog_info_l("Emulator max buffer size is set to: %d", core->emu_min_buf);
+			core->emu_min_buf = (size_t)ret;
+			slog_info_l("Emulator max buffer size is set to: %zu", core->emu_min_buf);
+		}
+			break;
+		case 'I':
+		{
+			ssize_t ret = (ssize_t)pepa_string_to_int_strict(optarg, &err);
+
+			if (err < 0) {
+				slog_fatal_l("Could not parse emulator IN threads: %s", optarg);
+				abort();
+			}
+
+			if (ret <= 0) {
+				slog_fatal_l("Emulator IN threads number is invalid: %s, it must be >= 1", optarg);
+				abort();
+			}
+
+			core->emu_in_threads = (uint32_t)ret;
+			slog_info_l("Emulator IN threads is set to: %zu", core->emu_min_buf);
 		}
 			break;
 		case 'm':
 		{
-			core->monitor_freq = pepa_string_to_int_strict(optarg, &err);
+			core->monitor_freq = (unsigned int)pepa_string_to_int_strict(optarg, &err);
 			if (err < 0) {
 				slog_fatal_l("Could not parse monitor frequency: %s", optarg);
 				abort();
 			}
 
-			if (core->monitor_freq <= 0) {
+			if (core->monitor_freq < 1) {
 				slog_fatal_l("Monitor frequency is invalid: %s, it must be >= 1", optarg);
 				abort();
 			}
 			core->monitor.onoff = 1;
-			slog_info_l("Monitor frequency is set to: %d", core->monitor_freq);
+			slog_info_l("Monitor frequency is set to: %u", core->monitor_freq);
 		}
 			break;
 		case 'a':
@@ -400,7 +426,7 @@ int pepa_parse_arguments(int argi, char *argv[])
 			break;
 		case 'l':
 			/* Set log level, 0-7*/
-			log = pepa_string_to_int_strict(optarg, &err);
+			log = (int)pepa_string_to_int_strict(optarg, &err);
 			if (err < 0) {
 				printf("Could not parse log level: %s\n", optarg);
 				abort();
@@ -436,7 +462,12 @@ int pepa_parse_arguments(int argi, char *argv[])
 			case 7:
 				core->slog_flags = SLOG_LEVEL_7;
 				break;
+			default:
+				printf("Could not parse log level: %s\n", optarg);
+				abort();
 			}
+
+			printf("Logger log level is set to: %d\n", log);
 
 			break;
 		case 'h': /* Show help */
@@ -483,7 +514,7 @@ int pepa_parse_arguments(int argi, char *argv[])
 	return PEPA_ERR_OK;
 }
 
-int pepa_config_slogger(pepa_core_t *core)
+void pepa_config_slogger(const pepa_core_t *core)
 {
 	slog_config_t cfg;
 	slog_config_get(&cfg);
@@ -498,7 +529,7 @@ int pepa_config_slogger(pepa_core_t *core)
 		cfg.nFlush = 1;
 		strcpy(cfg.sFileName, core->slog_file);
 	} else {
-		slog_note_l("No log file given");
+		slog_note_l("No log file is given");
 	}
 
 	if (NULL != core->slog_dir) {
@@ -513,16 +544,16 @@ int pepa_config_slogger(pepa_core_t *core)
 		cfg.eColorFormat = SLOG_COLORING_TAG;
 	}
 
+	//slog_config_set(&cfg);
+	//slog_enable(SLOG_TRACE);
+	slog_destroy();
+	slog_init("pepa", 0, 1);
 	slog_config_set(&cfg);
-	slog_enable(SLOG_TRACE);
-	//slog_init("pepa", core->slog_level, 1);
 	slog_disable(SLOG_FLAGS_ALL);
-	slog_config_set(&cfg);
 	slog_enable(core->slog_flags);
-	return PEPA_ERR_OK;
 }
 
-int pepa_config_slogger_daemon(pepa_core_t *core)
+void pepa_config_slogger_daemon(const pepa_core_t *core)
 {
 	slog_config_t cfg;
 	slog_config_get(&cfg);
@@ -549,5 +580,4 @@ int pepa_config_slogger_daemon(pepa_core_t *core)
 	slog_disable(SLOG_FLAGS_ALL);
 	slog_config_set(&cfg);
 	slog_enable(core->slog_flags);
-	return PEPA_ERR_OK;
 }

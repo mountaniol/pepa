@@ -11,8 +11,6 @@
 #include "pepa_errors.h"
 #include "pepa_core.h"
 
-#define RX_TX_PRINT_DIVIDER (50000)
-
 #define handle_error_en(en, msg) \
                do { errno = en; perror(msg); exit(EXIT_FAILURE); } while (0)
 
@@ -66,7 +64,7 @@ void pepa_parse_pthread_create_error(const int32_t rc)
 	}
 }
 
-void pepa_set_tcp_timeout(int sock)
+void pepa_set_tcp_timeout(const int sock)
 {
 	struct timeval time_out;
 	time_out.tv_sec = 1;
@@ -80,9 +78,9 @@ void pepa_set_tcp_timeout(int sock)
 	}
 }
 
-void pepa_set_tcp_recv_size(pepa_core_t *core, int sock)
+void pepa_set_tcp_recv_size(const pepa_core_t *core, const int sock)
 {
-	int32_t buf_size = core->internal_buf_size * 1024;
+	uint32_t buf_size = core->internal_buf_size * 1024;
 
 	/* Set TCP receive window size */
 	if (0 != setsockopt(sock, SOL_SOCKET, SO_RCVBUF, (char *)&buf_size, sizeof(buf_size))) {
@@ -90,29 +88,29 @@ void pepa_set_tcp_recv_size(pepa_core_t *core, int sock)
 	}
 }
 
-void pepa_set_tcp_send_size(pepa_core_t *core, int sock)
+void pepa_set_tcp_send_size(const pepa_core_t *core, const int sock)
 {
-	int32_t buf_size = core->internal_buf_size * 1024;
+	uint32_t buf_size = core->internal_buf_size * 1024;
 	/* Set TCP sent window size */
 	if (0 != setsockopt(sock, SOL_SOCKET, SO_SNDBUF, (char *)&buf_size, sizeof(buf_size))) {
 		slog_debug_l("[from %s] SO_SNDBUF has a problem: %s", "EMU SHVA", strerror(errno));
 	}
 }
 
-int pepa_one_direction_copy3(pepa_core_t *core,
-							 int fd_out, const char *name_out,
-							 int fd_in, const char *name_in,
+int pepa_one_direction_copy3(const pepa_core_t *core,
+							 const int fd_out, const char *name_out,
+							 const int fd_in, const char *name_in,
 							 char *buf, const size_t buf_size,
 							 const int do_debug,
 							 uint64_t *ext_rx, uint64_t *ext_tx,
 							 const int max_iterations)
 {
 	int ret          = PEPA_ERR_OK;
-	int rx           = 0;
-	int tx_total     = 0;
-	int rx_total     = 0;
+	ssize_t rx           = 0;
+	ssize_t tx_total     = 0;
+	ssize_t rx_total     = 0;
 	int iteration    = 0;
-	int buf_size_use = buf_size;
+	size_t buf_size_use = buf_size;
 
 	/* If message dump is enabled, keep 1 character for \0 */
 	if (core->dump_messages) {
@@ -124,8 +122,8 @@ int pepa_one_direction_copy3(pepa_core_t *core,
 	}
 
 	do {
-		int tx         = 0;
-		int tx_current = 0;
+		ssize_t tx         = 0;
+		ssize_t tx_current = 0;
 
 		iteration++;
 		if (do_debug) {
@@ -142,7 +140,7 @@ int pepa_one_direction_copy3(pepa_core_t *core,
 
 		if (rx < 0) {
 			if (do_debug) {
-				slog_error_l("Could not read: from read sock %s [%d]: %s", name_in, fd_in, strerror(errno));
+				slog_warn_l("Could not read: from read sock %s [%d]: %s", name_in, fd_in, strerror(errno));
 			}
 			ret = -PEPA_ERR_BAD_SOCKET_READ;
 			goto endit;
@@ -167,12 +165,12 @@ int pepa_one_direction_copy3(pepa_core_t *core,
 		   we reserved one character for the \0 in the beginning of this function */
 		if (core->dump_messages) {
 			buf[rx] = 0;
-			slog_note("+++ MES: %s [fd:%.2d] -> %s [fd:%.2d], LEN: %d bytes |%s|", name_in, fd_in, name_out, fd_out, rx, buf);
+			slog_note("+++ MES: %s [fd:%.2d] -> %s [fd:%.2d], LEN: %zd bytes |%s|", name_in, fd_in, name_out, fd_out, rx, buf);
 		}
 
 		/* Write until transfer the whole received buffer */
 		do {
-			tx_current  = write(fd_out, buf, (rx - tx));
+			tx_current  = write(fd_out, buf, (size_t)(rx - tx));
 
 			if (tx_current <= 0) {
 				ret = -PEPA_ERR_BAD_SOCKET_WRITE;
@@ -207,19 +205,19 @@ endit:
 	}
 
 	if (rx_total > 0) {
-		*ext_rx += rx_total;
+		*ext_rx += (uint64_t) rx_total;
 
 	}
 
 	if (tx_total > 0) {
-		*ext_tx += tx_total;
+		*ext_tx += (uint64_t)tx_total;
 
 	}
 
 	return ret;
 }
 
-int32_t pepa_test_fd(int32_t fd)
+int32_t pepa_test_fd(const int fd)
 {
 	if ((fcntl(fd, F_GETFL) < 0) && (EBADF == errno)) {
 		return -PEPA_ERR_FILE_DESCRIPTOR;
@@ -227,7 +225,7 @@ int32_t pepa_test_fd(int32_t fd)
 	return PEPA_ERR_OK;
 }
 
-int32_t epoll_ctl_add(int epfd, int fd, uint32_t events)
+int32_t epoll_ctl_add(const int epfd, const int fd, const uint32_t events)
 {
 	struct epoll_event ev;
 
@@ -246,7 +244,7 @@ int32_t epoll_ctl_add(int epfd, int fd, uint32_t events)
 	return PEPA_ERR_OK;
 }
 
-int32_t pepa_socket_shutdown_and_close(int sock, const char *my_name)
+int32_t pepa_socket_shutdown_and_close(const int sock, const char *my_name)
 {
 	if (sock < 0) {
 		slog_warn_l("%s: Looks like the socket is closed: == %d", my_name, sock);
@@ -269,7 +267,7 @@ int32_t pepa_socket_shutdown_and_close(int sock, const char *my_name)
 	return PEPA_ERR_OK;
 }
 
-void pepa_socket_close(int fd, const char *socket_name)
+void pepa_socket_close(const int fd, const char *socket_name)
 {
 	int i;
 	if (fd < 0) {
@@ -288,19 +286,19 @@ void pepa_socket_close(int fd, const char *socket_name)
 	}
 }
 
-void pepa_reading_socket_close(int fd, const char *socket_name)
+void pepa_reading_socket_close(const int fd, const char *socket_name)
 {
 	int  i;
 	char buf[16];
 	int  iterations = 0;
-	int  read_from = 0;
+	ssize_t  read_from = 0;
 
 	if (fd < 0) {
 		slog_error_l("Can not close socket %s, its value is %d", socket_name, fd);
 		return;
 	}
 
-	int rc = close(fd);
+	ssize_t rc = close(fd);
 	if (0 == rc) {
 		slog_note_l("## Closed from the first try socket socket %s, iterations: %d ", socket_name, iterations);
 		return;
@@ -324,7 +322,7 @@ void pepa_reading_socket_close(int fd, const char *socket_name)
 void pepa_socket_close_in_listen(pepa_core_t *core)
 {
 	if (PEPA_ERR_OK != pepa_socket_shutdown_and_close(core->sockets.in_listen, "IN LISTEN")) {
-		slog_debug_l("Close and shutdown of IN LISTEN is failed");
+		slog_warn_l("Close and shutdown of IN LISTEN is failed");
 	}
 	core->sockets.in_listen = FD_CLOSED;
 	slog_note_l("Closed core->sockets.in_listen");
@@ -333,7 +331,7 @@ void pepa_socket_close_in_listen(pepa_core_t *core)
 __attribute__((nonnull(1, 2)))
 int pepa_open_listening_socket(struct sockaddr_in *s_addr,
 							   const buf_t *ip_address,
-							   const int port,
+							   const uint16_t port,
 							   const int num_of_clients,
 							   const char *name)
 {
@@ -397,7 +395,7 @@ int pepa_open_listening_socket(struct sockaddr_in *s_addr,
 	return (sock);
 }
 
-int pepa_open_connection_to_server(const char *address, int port, const char *name)
+int pepa_open_connection_to_server(const char *address, const uint16_t port, const char *name)
 {
 	struct sockaddr_in s_addr;
 	int                sock;
@@ -438,7 +436,7 @@ int pepa_open_connection_to_server(const char *address, int port, const char *na
 	return (sock);
 }
 
-int pepa_find_socket_port(int sock)
+int pepa_find_socket_port(const int sock)
 {
 	struct sockaddr_in sin;
 	socklen_t          len = sizeof(sin);

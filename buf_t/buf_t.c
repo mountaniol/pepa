@@ -550,7 +550,7 @@ static ret_t buf_common_is_valid(/*@temp@*//*@in@*//*@special@*/buf_t *buf)
 	if (buf_get_room_count(buf) > 0 &&
 		(BUFT_YES == buf_is_canary(buf)) &&
 		(BUFT_OK != buf_test_canary(buf))) {
-#ifdef DEBUG1
+#ifdef DE
 		buf_t_canary_t *canary_p = (buf_t_canary_t *)buf->data + buf_get_room_count(buf);
 #endif
 		DE("The buffer was overwritten: canary word is wrong\n");

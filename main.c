@@ -11,7 +11,6 @@
 
 static void pepa_clean_on_exit(void)
 {
-	int rc;
 	pepa_core_t *core = pepa_get_core();
 
 	slog_warn_l("=============================================");
@@ -20,6 +19,7 @@ static void pepa_clean_on_exit(void)
 
 	/* Remove PID file */
 	if (NULL != core->pid_file_name) {
+		int rc;
 		slog_warn_l("Removing PID file %s", core->pid_file_name);
 		rc = unlink(core->pid_file_name);
 		if (0 != rc) {
@@ -112,22 +112,18 @@ int main(int argi, char *argv[])
 		exit(-11);
 	}
 
-	rc = pepa_config_slogger(core);
-	if (PEPA_ERR_OK != rc) {
-		slog_error_l("Could not init slogger");
-		exit(1);
-	}
+	pepa_config_slogger(core);
 
 	slog_note_l("Arguments parsed");
 
 	if (core->daemon) {
 		daemonize(core);
 		/* Set hight limit of opened files */
-		pepa_set_rlimit();
 		/* After demonization we must reinit the logger */
 		//slog_init("pepa", SLOG_FLAGS_ALL, 0);
 		//rc = pepa_config_slogger_daemon(core);
 	}
+	pepa_set_rlimit();
 
 	pepa_set_int_signal_handler();
 

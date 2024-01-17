@@ -382,7 +382,7 @@ static void slog_display_stack(const slog_context_t *pCtx, va_list args)
     slog_display_message(pCtx, sLogInfo, nLength, sMessage);
 }
 
-void slog_display(slog_flag_t eFlag, uint8_t nNewLine, char *pFormat, ...)
+void slog_display(slog_flag_t eFlag, uint8_t nNewLine, const char *pFormat, ...)
 {
     slog_lock(&g_slog);
     slog_config_t *pCfg = &g_slog.config;

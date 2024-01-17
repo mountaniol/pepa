@@ -47,9 +47,8 @@ __attribute__((warn_unused_result))
  */
 int32_t pepa_parse_arguments(int32_t argi, char *argv[]);
 
-__attribute__((warn_unused_result))
-int32_t pepa_config_slogger(pepa_core_t *core);
-int32_t pepa_config_slogger_daemon(pepa_core_t *core);
+void pepa_config_slogger(const pepa_core_t *core);
+void pepa_config_slogger_daemon(const pepa_core_t *core);
 
 void pepa_print_version(void);
 

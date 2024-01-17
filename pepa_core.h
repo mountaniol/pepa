@@ -16,7 +16,7 @@
 typedef struct {
 	pthread_t thread_id; /**< UD of thread */
 	buf_t *ip_string; /**< IP of socket  */
-	int32_t port_int; /**< Port of socket  */
+	uint16_t port_int; /**< Port of socket  */
 	uint32_t clients; /**< Number of clients on this socket */
 } thread_vars_t;
 
@@ -65,16 +65,19 @@ typedef struct {
 	int dump_messages; /* Output on terminal should use color or not (by defailt: no) */
 	int monitor_divider; /* Divide monitor output (vytes) by this diveder */
 	char monitor_divider_str[1]; /* Monitor divider as a string: B for bytess, K for kilobytes, M for megabytes */
-	int emu_timeout; /* Timeout in microseconds between buffer sendings from emulator; defailt is 0 */
-	int emu_max_buf; /* Max size of buffer of a buffer send from emulator */
-	int emu_min_buf; /* Min size of buffer of a buffer send from emulator; defailt 1; must be > 0 */
+	unsigned int emu_timeout; /* Timeout in microseconds between buffer sendings from emulator; defailt is 0 */
+	size_t emu_max_buf; /* Max size of buffer of a buffer send from emulator */
+	size_t emu_min_buf; /* Min size of buffer of a buffer send from emulator; defailt 1; must be > 0 */
+	uint32_t emu_in_threads; /**< How many IN threads the Emulator should start */
 
 	/* These thread_vars_t used in the Emulator */
 	thread_vars_t shva_thread; /**< Configuration of SHVA thread */
 	thread_vars_t in_thread; /**< Configuration of IN thread */
 	thread_vars_t out_thread; /**< Configuration of OUT thread */
 	thread_vars_t monitor_thread; /**< Configuration of OUT thread */
-	int monitor_freq; /* How often (in seconds) print out statistics from the monitor; by default every 5 seconds */
+
+
+	unsigned int monitor_freq; /* How often (in seconds) print out statistics from the monitor; by default every 5 seconds */
 	pepa_in_read_sockets_t in_reading_sockets; /**< Reading sockets opened when accept new connections */
 	uint32_t internal_buf_size; /**< Size of buffer used to pass packages, by defaiult COPY_BUF_SIZE bytes, see pepa_config.h */
 	int32_t abort_flag; /**< Abort flag, if enabled, PEPA file abort on errors; for debug only */

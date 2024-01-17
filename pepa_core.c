@@ -56,6 +56,7 @@ static pepa_core_t *pepa_create_core_t(void)
 	core->monitor_divider = 1;
 	core->emu_max_buf = 1024;
 	core->emu_min_buf = 1;
+	core->emu_in_threads = 1;
 	core->monitor_freq = 5;
 	core->pid_file_name = strdup("/tmp/pepa.pid");
 

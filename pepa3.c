@@ -11,6 +11,7 @@
 #include "pepa_errors.h"
 #include "pepa_core.h"
 #include "pepa_state_machine.h"
+#include "pepa3.h"
 
 /**
  * @author Sebastian Mountaniol (1/9/24)
@@ -93,19 +94,19 @@ static void pepa_in_reading_sockets_free(pepa_core_t *core)
 	slog_note_l("IN-READER: Finished IN reading socket closing and cleaning");
 }
 
-static void pepa_in_reading_sockets_allocate(pepa_core_t *core, int num)
+static void pepa_in_reading_sockets_allocate(pepa_core_t *core, const int num)
 {
 	int i;
 	slog_note_l("IN-READER: Starting IN read sockets array allocation");
 	core->in_reading_sockets.number = num;
-	core->in_reading_sockets.sockets = malloc(sizeof(int) * num);
+	core->in_reading_sockets.sockets = (int *)malloc(sizeof(int) * (size_t)num);
 	for (i = 0; i < num; i++) {
 		core->in_reading_sockets.sockets[i] = EMPTY_SLOT;
 	}
 	slog_note_l("IN-READER: Finished IN read sockets array allocation: allocated %d socket slots", num);
 }
 
-static void pepa_in_reading_sockets_add(pepa_core_t *core, int fd)
+static void pepa_in_reading_sockets_add(pepa_core_t *core, const int fd)
 {
 	int i;
 	slog_note_l("IN-READER: Starting addition of a new IN read socket [%d] to array", fd);
@@ -119,7 +120,7 @@ static void pepa_in_reading_sockets_add(pepa_core_t *core, int fd)
 	slog_error_l("Can not to add of a new IN read socket [%d] to array", fd);
 }
 
-static void pepa_in_reading_sockets_close_rm(pepa_core_t *core, int fd)
+static void pepa_in_reading_sockets_close_rm(pepa_core_t *core, const int fd)
 {
 	int i;
 	for (i = 0; i < core->in_reading_sockets.number; i++) {
@@ -129,15 +130,15 @@ static void pepa_in_reading_sockets_close_rm(pepa_core_t *core, int fd)
 						pepa_find_socket_port(core->in_reading_sockets.sockets[i]));
 
 			pepa_reading_socket_close(core->in_reading_sockets.sockets[i], "IN-FORWARD");
-			slog_debug_l("IN-READER: Closed and remove socket %d", core->in_reading_sockets.sockets[i]);
+			slog_note_l("IN-READER: Closed and remove socket %d", core->in_reading_sockets.sockets[i]);
 			core->in_reading_sockets.sockets[i] = EMPTY_SLOT;
 			return;
 		}
 	}
-	slog_debug_l("IN-READER: Could not close and removed socket %d", fd);
+	slog_note_l("IN-READER: Could not close and removed socket %d", fd);
 }
 
-int pepa_process_exceptions(pepa_core_t *core, struct epoll_event events[], int event_count)
+static int pepa_process_exceptions(pepa_core_t *core, const struct epoll_event events[], const int event_count)
 {
 	int ret       = PEPA_ERR_OK;
 	int rc_remove;
@@ -270,18 +271,7 @@ static int32_t pepa_in_accept_new_connection(pepa_core_t *core)
 	return PEPA_ERR_OK;
 }
 
-/**
- * @author Sebastian Mountaniol (1/7/24)
- * @brief Process waiting signals on all sockets 
- * @param pepa_core_t* core       Core structure 
- * @param struct epoll_event[] events     Events from epoll
- * @param int event_count Number of events
- * @return int Returns PEPA_ERR_OK if all processed and no
- *  	   errors.Else returns a status of state machine which
- *  	   requres to reset all sockets. 
- * @details 
- */
-static int pepa_process_fdx(pepa_core_t *core, struct epoll_event events[], int event_count)
+static int pepa_process_fdx_shva(pepa_core_t *core, const struct epoll_event events[], const int event_count)
 {
 	int32_t  rc             = PEPA_ERR_OK;
 	int32_t  i;
@@ -295,11 +285,97 @@ static int pepa_process_fdx(pepa_core_t *core, struct epoll_event events[], int 
 
 	for (i = 0; i < event_count; i++) {
 
-#if 1 /* SEB */
 		if (!(events[i].events & EPOLLIN)) {
 			continue;
 		}
-#endif
+
+		if (core->sockets.shva_rw != events[i].data.fd) {
+			continue;
+		}
+
+		/* Else, it is a buffer waiting to be forwarded */
+
+		fd_read = events[i].data.fd;
+
+		fd_write = core->sockets.out_write;
+		fd_name_read = "SHVA";
+		fd_name_write = "OUT";
+		read_stat = &core->monitor.shva_rx;
+		write_stat = &core->monitor.out_tx;
+
+		/* Read /write from/to socket */
+
+		/* We must lock SHVA socket since IN can run several instances of this thread */
+		rc = pepa_one_direction_copy3(core,
+									  /* Send to : */fd_write, fd_name_write,
+									  /* From: */ fd_read, fd_name_read,
+									  core->buffer, core->internal_buf_size * 1024,
+									  /*Debug is ON */ 0,
+									  /* RX stat */read_stat,
+									  /* TX stat */write_stat,
+									  /* Max iterations */ 5);
+
+		if (PEPA_ERR_OK == rc) {
+			//slog_warn_l("%s: Sent from socket %d", "IN-FORWARD", events[i].data.fd);
+			return PEPA_ERR_OK;
+		}
+
+		slog_note_l("An error on sending buffers: %s", pepa_error_code_to_str(rc));
+
+		/* Something wrong with the socket, should be removed */
+
+		/* Writing side is off, means: SHVA or OUT socket is invalid */
+		/* Write socket is always SHVA or OUT; if there is an error ont write, we must restare the system */
+		if (-PEPA_ERR_BAD_SOCKET_WRITE == rc) {
+			slog_note_l("Could not write to %s; setting system to FAIL", fd_name_write);
+		}
+
+		if (-PEPA_ERR_BAD_SOCKET_READ == rc) {
+			/* Here are two cases: the read can be IN or SHVA. IN case of SHVA we must restart all sockets */
+			slog_note_l("Could not write to %s; setting system to FAIL", fd_name_write);
+		}
+
+		return TE_RESTART;
+	}
+	return PEPA_ERR_OK;
+}
+
+/**
+ * @author Sebastian Mountaniol (1/7/24)
+ * @brief Process waiting signals on all sockets 
+ * @param pepa_core_t* core       Core structure 
+ * @param struct epoll_event[] events     Events from epoll
+ * @param int event_count Number of events
+ * @return int Returns PEPA_ERR_OK if all processed and no
+ *  	   errors.Else returns a status of state machine which
+ *  	   requres to reset all sockets. 
+ * @details 
+ */
+static int pepa_process_fdx(pepa_core_t *core, const struct epoll_event events[], const int event_count)
+{
+	int32_t  rc             = PEPA_ERR_OK;
+	int32_t  i;
+
+	int      fd_read        = FD_CLOSED;
+	int      fd_write       = FD_CLOSED;
+	char     *fd_name_read  = NULL;
+	char     *fd_name_write = NULL;
+	uint64_t *read_stat;
+	uint64_t *write_stat;
+
+	rc = pepa_process_fdx_shva(core, events, event_count);
+	if (PEPA_ERR_OK != rc) {
+		return rc;
+	}
+
+	for (i = 0; i < event_count; i++) {
+		if (!(events[i].events & EPOLLIN)) {
+			continue;
+		}
+
+		if (core->sockets.shva_rw == events[i].data.fd) {
+			continue;
+		}
 
 		/* The IN socket: listening, if there is an event, we should to open a new connection */
 		if (core->sockets.in_listen == events[i].data.fd) {
@@ -338,7 +414,7 @@ static int pepa_process_fdx(pepa_core_t *core, struct epoll_event events[], int 
 									  /* Send to : */fd_write, fd_name_write,
 									  /* From: */ fd_read, fd_name_read,
 									  core->buffer, core->internal_buf_size * 1024,
-									  /*Debug is ON */ 1,
+									  /*Debug is ON */ 0,
 									  /* RX stat */read_stat,
 									  /* TX stat */write_stat,
 									  /* Max iterations */ 1);
@@ -383,7 +459,7 @@ static int pepa_process_fdx(pepa_core_t *core, struct epoll_event events[], int 
 	return PEPA_ERR_OK;
 }
 
-int pepa3_transfer_loop(pepa_core_t *core)
+static int         pepa3_transfer_loop(pepa_core_t *core)
 {
 	int                next_state         = PST_TRANSFER_LOOP;
 	int                rc;
@@ -401,6 +477,8 @@ int pepa3_transfer_loop(pepa_core_t *core)
 		rc = pepa_process_exceptions(core, events, event_count);
 
 		switch (rc) {
+		case PEPA_ERR_OK:
+			break;
 		case TE_RESTART:
 			/* An error on SHVA or OUT listening sockets occured, all sockets should be restarted */
 			next_state = PST_CLOSE_SOCKETS;
@@ -415,6 +493,9 @@ int pepa3_transfer_loop(pepa_core_t *core)
 			   start a new iteration and pn the new iteration the removed socket will not appear in the set */
 			//continue;
 			break;
+		default:
+			slog_error_l("You should never be here: got status %d", rc);
+			abort();
 		}
 
 		/* If there is an error, we must restart all sockets */
@@ -434,11 +515,9 @@ int pepa3_transfer_loop(pepa_core_t *core)
 	return next_state;
 }
 
-static void pepa_out_thread_open_listening_socket(pepa_core_t *core)
+static void        pepa_out_thread_open_listening_socket(pepa_core_t *core)
 {
 	struct sockaddr_in s_addr;
-	int32_t            waiting_time = 0;
-	int32_t            timeout      = 5;
 
 	if (core->sockets.out_listen >= 0) {
 		slog_note_l("Trying to open a listening socket while it is already opened");
@@ -448,18 +527,17 @@ static void pepa_out_thread_open_listening_socket(pepa_core_t *core)
 		core->sockets.out_listen = pepa_open_listening_socket(&s_addr,
 															  core->out_thread.ip_string,
 															  core->out_thread.port_int,
-															  core->out_thread.clients,
+															  (int)core->out_thread.clients,
 															  __func__);
 		if (core->sockets.out_listen < 0) {
 			core->sockets.out_listen = FD_CLOSED;
 			//slog_warn_l("Can not open listening socket: %s", strerror(errno));
-			waiting_time += timeout;
 			usleep(1000000);
 		}
 	} while (core->sockets.out_listen < 0);
 }
 
-static int32_t pepa_out_wait_connection(pepa_core_t *core, int32_t fd_listen)
+static int32_t     pepa_out_wait_connection(const pepa_core_t *core, const int32_t fd_listen)
 {
 	struct sockaddr_in s_addr;
 	socklen_t          addrlen = sizeof(struct sockaddr);
@@ -477,7 +555,7 @@ static int32_t pepa_out_wait_connection(pepa_core_t *core, int32_t fd_listen)
 
 static void pepa_out_thread_accept(pepa_core_t *core)
 {
-	int32_t fd_read = pepa_out_wait_connection(core, core->sockets.out_listen);
+	int32_t     fd_read                = pepa_out_wait_connection(core, core->sockets.out_listen);
 	core->sockets.out_write = fd_read;
 }
 
@@ -487,7 +565,7 @@ static void pepa_shva_thread_open_connection(pepa_core_t *core)
 	do {
 		core->sockets.shva_rw = pepa_open_connection_to_server(core->shva_thread.ip_string->data, core->shva_thread.port_int, __func__);
 
-		if ((core->sockets.shva_rw < 0) && 
+		if ((core->sockets.shva_rw < 0) &&
 			(FD_CLOSED != core->sockets.shva_rw)) {
 			core->sockets.shva_rw = FD_CLOSED;
 			usleep(100000);
@@ -498,7 +576,7 @@ static void pepa_shva_thread_open_connection(pepa_core_t *core)
 	slog_note_l("Opened connection to SHVA");
 }
 
-static void pepa_in_thread_listen_socket(pepa_core_t *core)
+static void        pepa_in_thread_listen_socket(pepa_core_t *core)
 {
 	struct sockaddr_in s_addr;
 	while (1) {
@@ -507,7 +585,7 @@ static void pepa_in_thread_listen_socket(pepa_core_t *core)
 		core->sockets.in_listen = pepa_open_listening_socket(&s_addr,
 															 core->in_thread.ip_string,
 															 core->in_thread.port_int,
-															 core->in_thread.clients,
+															 (int)core->in_thread.clients,
 															 __func__);
 		if (core->sockets.in_listen >= 0) {
 			return;
@@ -522,7 +600,7 @@ static void pepa_in_thread_listen_socket(pepa_core_t *core)
 /*********************************/
 
 
-int pepa3_start(pepa_core_t *core)
+static int pepa3_start(pepa_core_t *core)
 {
 	core->buffer = calloc(core->internal_buf_size * 1024, 1);
 
@@ -539,7 +617,7 @@ int pepa3_start(pepa_core_t *core)
 	}
 
 	/* TODO: Instead of 1024 make it configurable */
-	pepa_in_reading_sockets_allocate(core, 1024);
+	pepa_in_reading_sockets_allocate(core, PEPA_IN_SOCKETS);
 
 	slog_note_l("Finished 'start' phase");
 	return PST_WAIT_OUT;
@@ -548,7 +626,7 @@ int pepa3_start(pepa_core_t *core)
 int pepa3_close_sockets(pepa_core_t *core)
 {
 	/* IN listening socket: remove from the epoll and close */
-	int rc = epoll_ctl(core->epoll_fd, EPOLL_CTL_DEL, core->sockets.in_listen, NULL);
+	int rc                  = epoll_ctl(core->epoll_fd, EPOLL_CTL_DEL, core->sockets.in_listen, NULL);
 	if (rc) {
 		slog_warn_l("Could not remove socket IN Listen from epoll set: fd: %d, %s", core->sockets.in_listen, strerror(errno));
 	}
@@ -592,9 +670,9 @@ int pepa3_close_sockets(pepa_core_t *core)
 	return PST_WAIT_OUT;
 }
 
-int pepa3_reset_sockets(pepa_core_t *core)
+static int pepa3_reset_sockets(pepa_core_t *core)
 {
-	int rc;
+	int        rc;
 #if 0 /* SEB */
 	int rc = epoll_ctl(core->epoll_fd, EPOLL_CTL_DEL, core->sockets.out_listen, NULL);
 	if (rc) {
@@ -636,7 +714,7 @@ int pepa3_reset_sockets(pepa_core_t *core)
 	return PST_WAIT_OUT;
 }
 
-int pepa3_wait_out(pepa_core_t *core)
+static int pepa3_wait_out(pepa_core_t *core)
 {
 	/* Both these functions are blocking and when they returned, both OUT sockets are opened */
 	if (core->sockets.out_listen < 0) {
@@ -657,7 +735,7 @@ int pepa3_wait_out(pepa_core_t *core)
 	return PST_OPEN_SHVA;
 }
 
-int pepa3_open_shva(pepa_core_t *core)
+static int pepa3_open_shva(pepa_core_t *core)
 {
 	/* This is an blocking function, returns only when SHVA is opened */
 	pepa_shva_thread_open_connection(core);
@@ -670,7 +748,7 @@ int pepa3_open_shva(pepa_core_t *core)
 	return PST_START_IN;
 }
 
-int pepa3_start_in(pepa_core_t *core)
+static int pepa3_start_in(pepa_core_t *core)
 {
 	/* This is a blocking function */
 	if (core->sockets.in_listen >= 0) return PST_TRANSFER_LOOP;
@@ -686,9 +764,9 @@ int pepa3_start_in(pepa_core_t *core)
 }
 
 /* Remove all IN related sockets and start IN over */
-int pepa3_restart_in(pepa_core_t *core)
+static int pepa3_restart_in(pepa_core_t *core)
 {
-	int rc = epoll_ctl(core->epoll_fd, EPOLL_CTL_DEL, core->sockets.in_listen, NULL);
+	int        rc               = epoll_ctl(core->epoll_fd, EPOLL_CTL_DEL, core->sockets.in_listen, NULL);
 	if (rc) {
 		slog_warn_l("Could not remove socket IN Listen from epoll set: fd: %d, %s", core->sockets.in_listen, strerror(errno));
 	}
@@ -702,7 +780,7 @@ int pepa3_restart_in(pepa_core_t *core)
 	return pepa3_start_in(core);
 }
 
-int pepa3_end(pepa_core_t *core)
+static int pepa3_end(pepa_core_t *core)
 {
 	pepa3_close_sockets(core);
 	pepa_in_reading_sockets_free(core);
@@ -742,6 +820,9 @@ int pepa_go(pepa_core_t *core)
 			break;
 		case PST_END:
 			return pepa3_end(core);
+		default:
+			slog_error_l("You should never be here");
+			abort();
 		}
 	} while (1);
 

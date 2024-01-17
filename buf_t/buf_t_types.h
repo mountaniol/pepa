@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-typedef uint32_t ret_t;
+typedef int32_t ret_t;
 
 /* Whidth of the buf type */
 typedef uint8_t buf_t_type_t;

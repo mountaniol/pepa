@@ -17,6 +17,7 @@
 #include "slog/src/slog.h"
 #include "pepa_parser.h"
 #include "pepa_core.h"
+#include "pepa_server.h"
 
 void pepa_set_rlimit(void)
 {
@@ -41,7 +42,7 @@ void daemonize(pepa_core_t *core)
 {
 	pid_t   pid = 0;
 	int32_t fd;
-	int32_t rc;
+	ssize_t rc;
 
 	/* Fork off the parent process */
 	pid = fork();
@@ -93,7 +94,7 @@ void daemonize(pepa_core_t *core)
 	}
 
 	/* Close all open file descriptors */
-	for (fd = sysconf(_SC_OPEN_MAX); fd > 0; fd--) {
+	for (fd = (int)sysconf(_SC_OPEN_MAX); fd > 0; fd--) {
 		close(fd);
 	}
 
@@ -103,7 +104,7 @@ void daemonize(pepa_core_t *core)
 	stderr = fopen("/dev/null", "w+");
 
 	//slog_init("pepa", SLOG_FLAGS_ALL, 0);
-	rc = pepa_config_slogger_daemon(core);
+	pepa_config_slogger_daemon(core);
 
 	/* Try to write PID of daemon to lockfile */
 	if (core->pid_file_name != NULL) {
