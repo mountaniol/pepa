@@ -2,7 +2,7 @@
 #define _PEPA_VERSION_H__
 
 #define PEPA_VERSION_MAJOR (3)
-#define PEPA_VERSION_MINOR (2)
+#define PEPA_VERSION_MINOR (3)
 #define PEPA_VERSION_PATCH (1)
 
 #ifndef PEPA_VERSION_GIT
