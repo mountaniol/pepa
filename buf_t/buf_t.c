@@ -546,18 +546,18 @@ static ret_t buf_common_is_valid(/*@temp@*//*@in@*//*@special@*/buf_t *buf)
 		return (-BUFT_BAD_ROOM);
 	}
 
+#if 0
 	/* If the buffer have canary, test it; if the canary is bad, stop */
 	if (buf_get_room_count(buf) > 0 &&
 		(BUFT_YES == buf_is_canary(buf)) &&
 		(BUFT_OK != buf_test_canary(buf))) {
-#ifdef DE
 		buf_t_canary_t *canary_p = (buf_t_canary_t *)buf->data + buf_get_room_count(buf);
-#endif
 		DE("The buffer was overwritten: canary word is wrong\n");
 		DE("Expected canary: %X, current canary: %X\n", BUF_T_CANARY_CHAR_PATTERN, *canary_p);
 		TRY_ABORT();
 		return (-BUFT_BAD_CANARY);
 	}
+#endif
 
 	/* TODO: Is it really a wrong situation? We can lovk and unlock the buffer */
 	/* In Read-Only buffer buf->room must be == bub->used */

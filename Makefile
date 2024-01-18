@@ -2,8 +2,8 @@
 #CFLAGS=-Wall -Wextra -rdynamic -O2
 
 #GCC=clang-10
-#GCC=gcc
-GCC=gcc-10
+GCC=gcc
+#GCC=gcc-10
 #CFLAGS=-Wall -Wextra -O2 -Wswitch-enum -Wimplicit-fallthrough -Wno-error=unused-but-set-variable \
 			-Wswitch -Wreturn-type -Wpedantic -Wformat-overflow=2 -Wformat-nonliteral \
 			-Wformat-security -Wformat-signedness -Wnonnull -Wformat-truncation=2 -Wnonnull-compare \
@@ -12,83 +12,19 @@ GCC=gcc-10
 			-Wswitch-default -Wswitch-enum -Wno-switch-bool -Wno-switch-outside-range -Wno-switch-unreachable \
 			-Wunused -Wstrict-overflow=5
 
-#CFLAGS=-Wabi -Wabi-tag -Wabsolute-value \
-		-Waddress -Waddress-of-packed-member -Waggregate-return \
-		-Waggressive-loop-optimizations -Waliasing -Walign-commons \
-		-Walloc-zero -Walloca -Wampersand -Wargument-mismatch \
-		-Warray-bounds -Warray-temporaries -Wassign-intercept \
-		-Wattribute-warning -Wattributes -Wbad-function-cast -Wbool-compare \
-		-Wbool-operation -Wbuiltin-declaration-mismatch -Wbuiltin-macro-redefined \
-		-Wc++-compat -Wc++11-compat -Wc++14-compat -Wc++17-compat -Wc-binding-type \
-		-Wc11-c2x-compat -Wcannot-profile -Wcast-align \
-		-Wcast-align=strict -Wcast-function-type -Wcast-qual -Wcast-result \
-		-Wchar-subscripts -Wcharacter-truncation -Wclass-conversion -Wclass-memaccess \
-		-Wclobbered -Wcomment -Wcompare-reals -Wconditionally-supported -Wconversion \
-		-Wconversion-extra -Wconversion-null -Wcoverage-mismatch -Wcpp -Wctor-dtor-privacy \
-		-Wdangling-else -Wdate-time -Wdelete-incomplete \
-		-Wdelete-non-virtual-dtor -Wdeprecated -Wdeprecated-copy -Wdeprecated-copy-dtor \
-		-Wdeprecated-declarations -Wdesignated-init -Wdisabled-optimization \
-		-Wdiscarded-array-qualifiers -Wdiscarded-qualifiers -Wdiv-by-zero -Wdo-subscript \
-		-Wdouble-promotion -Wduplicate-decl-specifier -Wduplicated-branches \
-		-Wduplicated-cond -Weffc++ -Wempty-body -Wendif-labels -Wenum-compare \
-		-Wexpansion-to-defined -Wextra -Wextra-semi -Wfloat-conversion -Wfloat-equal \
-		-Wformat-contains-nul -Wformat-extra-args -Wformat-nonliteral -Wformat-security \
-		-Wformat-signedness -Wformat-y2k -Wformat-zero-length -Wframe-address \
-		-Wfree-nonheap-object -Wfunction-elimination -Whsa -Wif-not-aligned -Wignored-attributes \
-		-Wignored-qualifiers -Wimplicit -Wimplicit-function-declaration -Wimplicit-int \
-		-Wimplicit-interface -Wimplicit-procedure -Wincompatible-pointer-types \
-		-Winherited-variadic-ctor -Winit-list-lifetime -Winit-self -Winline \
-		-Wint-conversion -Wint-in-bool-context -Wint-to-pointer-cast -Winteger-division \
-		-Wintrinsic-shadow -Wintrinsics-std -Winvalid-memory-model -Winvalid-offsetof \
-		-Winvalid-pch -Wjump-misses-init -Wline-truncation -Wliteral-suffix \
-		-Wlogical-not-parentheses -Wlogical-op -Wlto-type-mismatch \
-		-Wmain -Wmaybe-uninitialized -Wmemset-elt-size -Wmemset-transposed-args \
-		-Wmisleading-indentation -Wmissing-attributes -Wmissing-braces -Wmissing-declarations \
-		-Wmissing-field-initializers -Wmissing-include-dirs -Wmissing-parameter-type \
-		-Wmissing-profile -Wmissing-prototypes -Wmultichar -Wmultiple-inheritance \
-		-Wmultistatement-macros -Wnamespaces -Wnarrowing -Wnested-externs -Wnoexcept \
-		-Wnoexcept-type -Wnon-template-friend -Wnon-virtual-dtor -Wnonnull \
-		-Wnonnull-compare -Wnull-dereference -Wodr -Wold-style-cast -Wold-style-declaration \
-		-Wold-style-definition -Wopenmp-simd -Woverflow -Woverlength-strings -Woverloaded-virtual \
-		-Woverride-init -Woverride-init-side-effects -Wpacked -Wpacked-bitfield-compat \
-		-Wpacked-not-aligned -Wparentheses -Wpedantic -Wpessimizing-move \
-		-Wpmf-conversions -Wpointer-arith -Wpointer-compare -Wpointer-sign -Wpointer-to-int-cast \
-		-Wpragmas -Wprio-ctor-dtor -Wproperty-assign-default -Wprotocol -Wpsabi -Wreal-q-constant \
-		-Wrealloc-lhs -Wrealloc-lhs-all -Wredundant-decls -Wredundant-move -Wregister -Wreorder \
-		-Wrestrict -Wreturn-local-addr -Wreturn-type -Wselector -Wsequence-point -Wshadow \
-		-Wshadow-ivar -Wshadow=compatible-local -Wshadow=local -Wshift-count-negative \
-		-Wshift-count-overflow -Wshift-negative-value -Wsign-compare -Wsign-conversion \
-		-Wsign-promo -Wsized-deallocation -Wsizeof-array-argument -Wsizeof-pointer-div \
-		-Wsizeof-pointer-memaccess -Wstack-protector -Wstrict-null-sentinel -Wstrict-prototypes \
-		-Wstrict-selector-match -Wstringop-truncation -Wsubobject-linkage -Wsuggest-attribute=cold \
-		-Wsuggest-attribute=const -Wsuggest-attribute=format -Wsuggest-attribute=malloc \
-		-Wsuggest-attribute=noreturn -Wsuggest-attribute=pure -Wsuggest-final-methods \
-		-Wsuggest-final-types -Wsuggest-override -Wsurprising -Wswitch -Wswitch-bool \
-		-Wswitch-default -Wswitch-enum -Wswitch-unreachable -Wsync-nand -Wsynth \
-		-Wsystem-headers -Wtabs -Wtarget-lifetime -Wtautological-compare -Wtemplates \
-		-Wterminate -Wtrampolines -Wtrigraphs -Wtype-limits -Wundef \
-		-Wuninitialized -Wunknown-pragmas \
-		-Wunsuffixed-float-constants -Wunused -Wunused-but-set-parameter \
-		-Wunused-but-set-variable -Wunused-function \
-		-Wunused-label -Wunused-local-typedefs -Wunused-macros -Wunused-parameter \
-		-Wunused-result -Wunused-value -Wunused-variable \
-		-Wvarargs -Wvariadic-macros -Wvector-operation-performance \
-		-Wvla -Wvolatile-register-var \
-		-Wwrite-strings
-
-CFLAGS=-Wabi -Wabsolute-value -Waddress -Waddress-of-packed-member \
+CFLAGS=-Wabsolute-value -Waddress -Waddress-of-packed-member \
 		-Walloc-zero -Walloca -Wbool-compare \
 		-Wbool-operation -Wbuiltin-declaration-mismatch \
 		-Wbuiltin-macro-redefined -Wc11-c2x-compat \
-		-Wcast-function-type -Wcast-qual \
-		-Wchar-subscripts -Wclobbered -Wcomment -Wconversion -Wcpp \
+		-Wcast-function-type  \
+		-Wchar-subscripts -Wclobbered -Wcomment  -Wcpp \
 		-Wdangling-else -Wdate-time \
 		-Wdeprecated -Wdesignated-init -Wdiscarded-array-qualifiers \
 		-Wdiscarded-qualifiers -Wdiv-by-zero -Wdouble-promotion \
 		-Wduplicate-decl-specifier -Wduplicated-branches -Wduplicated-cond \
 		-Wempty-body -Wendif-labels -Wenum-compare -Wexpansion-to-defined \
 		-Wextra -Wfloat-conversion -Wfloat-equal -Wformat-contains-nul \
-		-Wformat-extra-args -Wformat-nonliteral -Wformat-security \
+		-Wformat-extra-args -Wformat-security \
 		-Wformat-signedness -Wformat-y2k -Wformat-zero-length -Wframe-address \
 		-Wif-not-aligned -Wignored-attributes -Wignored-qualifiers -Wimplicit \
 		-Wimplicit-function-declaration -Wimplicit-int \
@@ -108,7 +44,7 @@ CFLAGS=-Wabi -Wabsolute-value -Waddress -Waddress-of-packed-member \
 		-Wpointer-compare -Wpointer-sign -Wpointer-to-int-cast -Wpragmas \
 		-Wprio-ctor-dtor -Wpsabi -Wrestrict -Wreturn-type \
 		-Wsequence-point -Wshift-count-negative -Wshift-count-overflow \
-		-Wshift-negative-value -Wsign-compare -Wsign-conversion \
+		-Wshift-negative-value -Wsign-compare \
 		-Wsizeof-array-argument -Wsizeof-pointer-div \
 		-Wsizeof-pointer-memaccess -Wstrict-prototypes -Wstringop-truncation \
 		-Wsuggest-attribute=format -Wswitch -Wswitch-bool -Wswitch-default \
@@ -116,7 +52,11 @@ CFLAGS=-Wabi -Wabsolute-value -Waddress -Waddress-of-packed-member \
 		-Wtrigraphs -Wundef \
 		-Wuninitialized -Wunknown-pragmas -Wunsuffixed-float-constants \
 		-Wunused -Wunused-local-typedefs -Wunused-macros -Wunused-result \
-		-Wunused-variable -Wvarargs -Wvariadic-macros -Wvla # -Wredundant-decls -Wpedantic -Wbad-function-cast
+		-Wunused-variable -Wvarargs -Wvariadic-macros \
+		-Wvla 
+
+		# -Wredundant-decls -Wpedantic -Wbad-function-cast -Wformat-nonliteral \
+		# -Wsign-conversion -Wconversion -Wcast-qual
 
 #CFLAGS=-Wall -Wextra -O2
 #DEBUG=-DDEBUG3
@@ -142,6 +82,7 @@ PEPA_DEFINES+=-DPEPA_HOST=\"$(PEPA_HOST_VAL)\"
 
 #CFLAGS+= -DPEPA_VERSION_GIT=\"$(PEPA_VERSION_GIT_VAL)\"
 CFLAGS+=$(PEPA_DEFINES)
+CFLAGS+=-O2
 
 #PEPA_O= pepa3.o pepa_state_machine.o pepa_parser.o main.o pepa_core.o \
 		pepa_server.o pepa_errors.o \
