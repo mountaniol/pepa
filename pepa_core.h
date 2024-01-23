@@ -8,6 +8,9 @@
 
 #include "buf_t/buf_t.h"
 
+/* Just a default mask */
+#define CORE_VALIDITY_MASK ((uint32_t) 0xC04E0707)
+
 /**
 * @author Sebastian Mountaniol (12/12/23)
 * @brief Per-thread variables
@@ -56,6 +59,7 @@ typedef struct {
  * @details 
  */
 typedef struct {
+	uint32_t validity; /**< Should be inited with a VALIDITY mask */
 	/* Logger configs */
 	int slog_flags; /* Keep slog logger verbosity level*/
 	char *slog_file; /* Keep slog output file name; if given, log will be saved there */
@@ -103,6 +107,8 @@ typedef struct {
  */
 int32_t pepa_core_init(void);
 
+int pepa_core_release(pepa_core_t *core);
+
 /* Get pointer to codre */
 /**
  * @author Sebastian Mountaniol (12/6/23)
@@ -133,5 +139,7 @@ int32_t pepa_core_unlock(void);
  * @details 
  */
 int32_t pepa_if_abort(void);
+
+int pepa_core_is_valid(pepa_core_t *core);
 
 #endif /* _PEPA_CORE_H_ */

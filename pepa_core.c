@@ -6,6 +6,7 @@
 #include "pepa_errors.h"
 #include "pepa_debug.h"
 #include "pepa_socket_common.h"
+#include "pepa_in_reading_sockets.h"
 
 pepa_core_t *g_pepa_core = NULL;
 
@@ -62,8 +63,52 @@ static pepa_core_t *pepa_create_core_t(void)
 
 	core->epoll_fd = FD_CLOSED;
 	core->pid_fd = FD_CLOSED;
+	core->validity = CORE_VALIDITY_MASK;
 
 	return core;
+}
+
+static int pepa_release_core_t(pepa_core_t *core)
+{
+	TESTP(core, -1);
+	if (!pepa_core_is_valid(core)) {
+		slog_fatal("Core is invalid, can not release it");
+		return -1;
+	}
+
+	if (core->slog_file) {
+		free(core->slog_file);
+	}
+
+	if (core->slog_dir) {
+		free(core->slog_dir);
+	}
+
+	if (core->in_reading_sockets.number > 0) {
+		pepa_in_reading_sockets_free(core);
+	}
+
+	if (core->buffer) {
+		free(core->buffer);
+	}
+
+	if (FD_CLOSED != core->epoll_fd) {
+		close(core->epoll_fd);
+		core->epoll_fd = FD_CLOSED;
+	}
+
+	free(core);
+	g_pepa_core = NULL;
+
+	return 0;
+}
+
+int pepa_core_is_valid(pepa_core_t *core)
+{
+	if (core->validity == CORE_VALIDITY_MASK) {
+		return 1;
+	}
+	return 0;
 }
 
 /****** API FUNCTIONS *******/
@@ -77,6 +122,11 @@ int32_t pepa_core_init(void)
 		return (-PEPA_ERR_CORE_CREATE);
 	}
 	return PEPA_ERR_OK;
+}
+
+int pepa_core_release(pepa_core_t *core)
+{
+	return pepa_release_core_t(core);
 }
 
 __attribute__((hot))
