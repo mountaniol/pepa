@@ -17,7 +17,7 @@ void pepa_set_tcp_timeout(const int32_t sock);
 void pepa_set_tcp_recv_size(const pepa_core_t *core, const int32_t sock);
 void pepa_set_tcp_send_size(const pepa_core_t *core, const int32_t sock);
 
-int pepa_one_direction_copy3(const pepa_core_t *core,
+int pepa_one_direction_copy3(pepa_core_t *core,
 							 const int fd_out, const char *name_out,
 							 const int fd_in, const char *name_in,
 							 char *buf, const size_t buf_size,

@@ -97,8 +97,74 @@ void pepa_set_tcp_send_size(const pepa_core_t *core, const int sock)
 	}
 }
 
+/* Find the next occurence of the character 'c' in the buffer 'buf' which len is 'len'; start search from the offset 'offset' */
+/**
+ * @author Sebastian Mountaniol (1/28/24)
+ * @brief Find the next occurence of the character 'c' in the buffer 'buf' which len is 'len'; start search from the offset 'offset'
+ * @param char* buf Buffer to search in  
+ * @param int len   Len of the buffer
+ * @param int offset Start search from this offset
+ * @param char c     Search for this character
+ * @return int Return the offset of found character; if not found, the size of the buffer returned
+ * @details 
+ */
+static int find_next(char *buf, int len, int offset, char c)
+{
+	int now = offset;
+	do {
+		if (buf[now] == c) {
+			break;
+		}
+		now++;
+	} while (now < len);
+
+	return now;
+}
+
+/* Print message */
+static void pbuf(pepa_core_t *core, char *buf, const ssize_t rx,
+				 const int fd_out, const char *name_out,
+				 const int fd_in, const char *name_in)
+{
+	// static char *print_buf = NULL;
+	//char   print_buf[1024];
+	ssize_t     offset     = 0;
+	int         prc        = 0; /** < Status from snprintf */
+	int         mes_num    = 1; /**< Offset inside of the received buffer */
+
+	if (NULL == core->print_buf) {
+		core->print_buf = calloc((core->internal_buf_size * 1024), 1);
+		slog_warn_l("Allocated printing buffer");
+	}
+
+	do {
+		//memset(core->print_buf, 0, core->internal_buf_size * 1024);
+		size_t current_len = strlen(buf + offset);
+
+		prc = snprintf(core->print_buf, 1024, "+++ MES[%d]: %s [fd:%.2d] -> %s [fd:%.2d], LEN:%zu, OFFSET:%zd, TOTAL:%zd, |%s|",
+					   /* mes num */ mes_num,
+					   name_in, fd_in,
+					   name_out, fd_out,
+					   current_len, offset, rx,
+					   buf + offset);
+		if (prc < 1) {
+			break;
+		}
+
+		core->print_buf[prc] = '\0';
+
+		slog_note("%s", core->print_buf);
+
+		if (offset + 1 < rx) {
+			offset = find_next(buf, rx, offset + 1, 0);
+		}
+		offset++;
+		mes_num++;
+	} while (offset < rx);
+}
+
 __attribute__((hot))
-int pepa_one_direction_copy3(const pepa_core_t *core,
+int pepa_one_direction_copy3(pepa_core_t *core,
 							 const int fd_out, const char *name_out,
 							 const int fd_in, const char *name_in,
 							 char *buf, const size_t buf_size,
@@ -106,12 +172,14 @@ int pepa_one_direction_copy3(const pepa_core_t *core,
 							 uint64_t *ext_rx, uint64_t *ext_tx,
 							 const int max_iterations)
 {
-	int ret          = PEPA_ERR_OK;
+	//static char *print_buf   = calloc(core->internal_buf_size + 1, 1);
+
+	int     ret          = PEPA_ERR_OK;
 	ssize_t rx           = 0;
 	ssize_t tx_total     = 0;
 	ssize_t rx_total     = 0;
-	int iteration    = 0;
-	size_t buf_size_use = buf_size;
+	int     iteration    = 0;
+	size_t  buf_size_use = buf_size;
 
 	/* If message dump is enabled, keep 1 character for \0 */
 	if (core->dump_messages) {
@@ -162,11 +230,12 @@ int pepa_one_direction_copy3(const pepa_core_t *core,
 			goto endit;
 		}
 
-		/* If messuge dump is enabled, forcely add \0 terminator;
-		   we reserved one character for the \0 in the beginning of this function */
+		/* It is possible we recevived several messages;
+		 * the messages are divided by null terminator.
+		   We must print until the whole buffer is printed */
+
 		if (core->dump_messages) {
-			buf[rx] = 0;
-			slog_note("+++ MES: %s [fd:%.2d] -> %s [fd:%.2d], LEN: %zd bytes |%s|", name_in, fd_in, name_out, fd_out, rx, buf);
+			pbuf(core, buf, rx, fd_out, name_out, fd_in, name_in);
 		}
 
 		/* Write until transfer the whole received buffer */
@@ -206,7 +275,7 @@ endit:
 	}
 
 	if (rx_total > 0) {
-		*ext_rx += (uint64_t) rx_total;
+		*ext_rx += (uint64_t)rx_total;
 
 	}
 
@@ -226,19 +295,19 @@ int32_t pepa_test_fd(const int fd)
 	return PEPA_ERR_OK;
 }
 
-int32_t epoll_ctl_add(const int epfd, const int fd, const uint32_t events)
+int32_t epoll_ctl_add(const int epfd, const int sock, const uint32_t events)
 {
 	struct epoll_event ev;
 
-	if (fd < 0) {
-		slog_fatal_l("Tryed to add fd < 0: %d", fd);
+	if (sock < 0) {
+		slog_fatal_l("Tryed to add fd < 0: %d", sock);
 		return -PEPA_ERR_FILE_DESCRIPTOR;
 	}
 
 	ev.events = events;
-	ev.data.fd = fd;
-	if (epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev) == -1) {
-		slog_fatal_l("Can not add fd %d to epoll: %s", fd, strerror(errno));
+	ev.data.fd = sock;
+	if (epoll_ctl(epfd, EPOLL_CTL_ADD, sock, &ev) == -1) {
+		slog_fatal_l("Can not add fd %d to epoll: %s", sock, strerror(errno));
 		return -PEPA_ERR_EPOLL_CANNOT_ADD;
 	}
 
@@ -268,18 +337,25 @@ int32_t pepa_socket_shutdown_and_close(const int sock, const char *my_name)
 	return PEPA_ERR_OK;
 }
 
-void pepa_socket_close(const int fd, const char *socket_name)
+void pepa_socket_close(const int socket, const char *socket_name)
 {
+	int rc;
 	int i;
-	if (fd < 0) {
-		slog_error_l("Can not close socket %s, its value is %d", socket_name, fd);
+	if (socket < 0) {
+		slog_note_l("Can not close socket %s, its value is %d: probaly it is closed", socket_name, socket);
 		return;
 	}
 
+	/* Try to shutdown the socket before it closed */
+	rc = shutdown(socket, SHUT_RDWR);
+	if (rc < 0) {
+		slog_note_l("%s: Could not shutdown the socket: fd: %d, %s", socket_name, socket, strerror(errno));
+	}
+
 	for (i = 0; i < 256; i++) {
-		int rc = close(fd);
+		rc = close(socket);
 		if (0 == rc) {
-			slog_note_l("## Closed socket socket %s : %d, iterations: %d", socket_name, fd, i);
+			slog_note_l("## Closed socket socket %s : %d, iterations: %d", socket_name, socket, i);
 			return;
 		}
 		usleep(100);
@@ -287,19 +363,19 @@ void pepa_socket_close(const int fd, const char *socket_name)
 	}
 }
 
-void pepa_reading_socket_close(const int fd, const char *socket_name)
+void pepa_reading_socket_close(const int socket, const char *socket_name)
 {
-	int  i;
-	char buf[16];
-	int  iterations = 0;
-	ssize_t  read_from = 0;
+	int     i;
+	char    buf[16];
+	int     iterations = 0;
+	ssize_t read_from  = 0;
 
-	if (fd < 0) {
-		slog_error_l("Can not close socket %s, its value is %d", socket_name, fd);
+	if (socket < 0) {
+		slog_note_l("Tried to close socket %s, its value is %d: probably is closed", socket_name, socket);
 		return;
 	}
 
-	ssize_t rc = close(fd);
+	ssize_t rc = close(socket);
 	if (0 == rc) {
 		slog_note_l("## Closed from the first try socket socket %s, iterations: %d ", socket_name, iterations);
 		return;
@@ -307,8 +383,8 @@ void pepa_reading_socket_close(const int fd, const char *socket_name)
 
 	/* Try to read from socket everything before it closed */
 	for (i = 0; i < 2048; i++) {
-		rc = read(fd, buf, 16);
-		if (read(fd, buf, 16) < 0) {
+		rc = read(socket, buf, 16);
+		if (read(socket, buf, 16) < 0) {
 			i = 2048;
 			continue;
 		}
@@ -316,7 +392,7 @@ void pepa_reading_socket_close(const int fd, const char *socket_name)
 		iterations++;
 	}
 
-	pepa_socket_close(fd, socket_name);
+	pepa_socket_close(socket, socket_name);
 	slog_note_l("## Closed socket socket %s, iterations: %d ", socket_name, iterations);
 }
 

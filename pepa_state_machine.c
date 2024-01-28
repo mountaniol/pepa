@@ -48,6 +48,7 @@ static int32_t pepa_thread_is_monitor_up(const pepa_core_t *core)
 
 void pepa_thread_kill_monitor(pepa_core_t *core)
 {
+	TESTP_VOID(core);
 	pepa_thread_cancel(core->monitor_thread.thread_id, "IN");
 	core->monitor_thread.thread_id = PTHREAD_DEAD;
 	slog_debug("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");

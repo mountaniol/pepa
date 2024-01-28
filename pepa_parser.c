@@ -276,6 +276,10 @@ int pepa_parse_arguments(int argi, char *argv[])
 			break;
 		case 'P':
 		{
+			if (NULL != core->pid_file_name) {
+				free(core->pid_file_name);
+			}
+
 			core->pid_file_name = strdup(optarg);
 			slog_info_l("PID file is set to: %s", core->pid_file_name);
 		}
@@ -416,6 +420,9 @@ int pepa_parse_arguments(int argi, char *argv[])
 			break;
 		case 'd':
 			/* Log file directory name */
+			if (NULL != core->slog_dir) {
+				free(core->slog_dir);
+			}
 			core->slog_dir = strndup(optarg, 1024);
 			slog_info_l("Log file name is set to: %s", core->slog_dir);
 			break;

@@ -14,7 +14,8 @@
 /**
 * @author Sebastian Mountaniol (12/12/23)
 * @brief Per-thread variables
-* @details 
+* @details These structure used both in Emulator and in pepa3;
+*   	   in Emulator it really a thread, so we keep this name
 */
 typedef struct {
 	pthread_t thread_id; /**< UD of thread */
@@ -92,6 +93,7 @@ typedef struct {
 	int pid_fd; /* File descriptor of PID file */
 	char *pid_file_name; /* File name of PID file  */
 	void *buffer;
+	char *print_buf; /**< THis buffer used in case message dump is on, to print out messages */
 	int epoll_fd;
 } pepa_core_t;
 

@@ -1,5 +1,6 @@
 #include <unistd.h>
 #include <sys/param.h>
+#include <errno.h>
 
 #include "slog/src/slog.h"
 #include "pepa_core.h"
@@ -23,12 +24,12 @@ static void pepa_clean_on_exit(void)
 		slog_warn_l("Removing PID file %s", core->pid_file_name);
 		rc = unlink(core->pid_file_name);
 		if (0 != rc) {
-			slog_error_l("Can not remove PID file: %s", core->pid_file_name);
+			slog_error_l("Can not remove PID file: %s: %s", core->pid_file_name, strerror(errno));
 		} else {
 			slog_warn_l("Removed PID file: %s", core->pid_file_name);
 		}
 
-		free(core->pid_file_name);
+		//free(core->pid_file_name);
 	}
 
 	/* Terminate monithor thread */
@@ -41,11 +42,13 @@ static void pepa_clean_on_exit(void)
 	slog_warn_l("Closing all sockets");
 	pepa3_close_sockets(core);
 
+	pepa_core_release(core);
+
 	/* Free buffers */
-	slog_warn_l("Freeing all buffers");
-	if (NULL != core->buffer) {
-		free(core->buffer);
-	}
+	//slog_warn_l("Freeing all buffers");
+	//if (NULL != core->buffer) {
+	//	free(core->buffer);
+	//}
 
 	/* Close slogger */
 	slog_warn_l("Destroying the logger");
@@ -139,13 +142,12 @@ int main(int argi, char *argv[])
 		exit(-11);
 	}
 
-	slog_note_l("Threads are started");
-
 	while (1) {
 		sleep(60);
 	}
 	//pepa_kill_all_threads(core);
 	//sleep(1);
+	pepa_core_release(core);
 	slog_note_l("PEPA Exit");
 	return (0);
 }

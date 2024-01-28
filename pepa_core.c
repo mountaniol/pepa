@@ -76,12 +76,42 @@ static int pepa_release_core_t(pepa_core_t *core)
 		return -1;
 	}
 
-	if (core->slog_file) {
+	if (NULL != core->in_thread.ip_string) {
+		int rc = buf_free(core->in_thread.ip_string);
+		if (BUFT_OK != rc) {
+			slog_note_l("Can not free the buf_t: %s", buf_error_code_to_string(rc));
+		}
+		core->in_thread.ip_string = NULL;
+	}
+
+	if (NULL != core->out_thread.ip_string) {
+		int rc = buf_free(core->out_thread.ip_string);
+		if (BUFT_OK != rc) {
+			slog_note_l("Can not free the buf_t: %s", buf_error_code_to_string(rc));
+		}
+		core->out_thread.ip_string = NULL;
+	}
+
+	if (NULL != core->shva_thread.ip_string) {
+		int rc = buf_free(core->shva_thread.ip_string);
+		if (BUFT_OK != rc) {
+			slog_note_l("Can not free the buf_t: %s", buf_error_code_to_string(rc));
+		}
+		core->shva_thread.ip_string = NULL;
+	}
+
+	if (NULL != core->print_buf) {
+		free(core->print_buf);
+		core->print_buf = NULL;
+	}
+
+	if (NULL != core->slog_file) {
 		free(core->slog_file);
 	}
 
-	if (core->slog_dir) {
+	if (NULL != core->slog_dir) {
 		free(core->slog_dir);
+		core->slog_dir = NULL;
 	}
 
 	if (core->in_reading_sockets.number > 0) {
@@ -90,11 +120,17 @@ static int pepa_release_core_t(pepa_core_t *core)
 
 	if (core->buffer) {
 		free(core->buffer);
+		core->buffer = NULL;
 	}
 
 	if (FD_CLOSED != core->epoll_fd) {
 		close(core->epoll_fd);
 		core->epoll_fd = FD_CLOSED;
+	}
+
+	if (NULL != core->pid_file_name) {
+		free(core->pid_file_name);
+		core->pid_file_name = NULL;
 	}
 
 	free(core);

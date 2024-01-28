@@ -23,7 +23,7 @@ enum pepa3_go_states {
 	PST_START = 1000, /**< Start state, executed  once  */
 	PST_CLOSE_SOCKETS, /**< All sockets must be closed */
 	PST_RESET_SOCKETS, /**< Only reading sockets should be closed, listeners stay */
-	PST_WAIT_OUT, /**< Wit OUT thread connection */
+	PST_WAIT_OUT, /**< Wit OUT connection */
 	PST_OPEN_SHVA, /**< Connect to SHVA server */
 	PST_START_IN, /**< Start IN listening socket */
 	PST_RESTART_IN, /**< IN listening socket reuires full restart */
@@ -81,7 +81,7 @@ static int pepa_process_exceptions(pepa_core_t *core, const struct epoll_event e
 
 		/*** The remote side is disconnected ***/
 
-		/* If one of the read/write sockets is diconnected, exit the thread */
+		/* If one of the read/write sockets is diconnected, stop */
 		if (events[i].events & (EPOLLRDHUP)) {
 
 			/* SHVA reading socket is disconnected */
@@ -231,7 +231,6 @@ static int pepa_process_fdx_shva(pepa_core_t *core, const struct epoll_event eve
 
 		/* Read /write from/to socket */
 
-		/* We must lock SHVA socket since IN can run several instances of this thread */
 		rc = pepa_one_direction_copy3(core,
 									  /* Send to : */core->sockets.out_write, "OUT",
 									  /* From: */ core->sockets.shva_rw, "SHVA",
@@ -309,7 +308,6 @@ static int pepa_process_fdx(pepa_core_t *core, const struct epoll_event events[]
 
 		/* Read /write from/to socket */
 
-		/* We must lock SHVA socket since IN can run several instances of this thread */
 		rc = pepa_one_direction_copy3(core,
 									  /* Send to : */core->sockets.shva_rw, "SHVA",
 									  /* From: */ events[i].data.fd, "IN",
@@ -435,7 +433,7 @@ static int         pepa3_transfer_loop(pepa_core_t *core)
  *  		the OUT listening socket is created.
 
  */
-static void        pepa_out_thread_open_listening_socket(pepa_core_t *core)
+static void        pepa_out_open_listening_socket(pepa_core_t *core)
 {
 	struct sockaddr_in s_addr;
 
@@ -490,7 +488,7 @@ static int32_t     pepa_out_wait_connection(const pepa_core_t *core, const int32
  * @details This is a blocking function. When it finished,
  *  		the OUT writing socket is valid adn ready.
  */
-static void pepa_out_thread_accept(pepa_core_t *core)
+static void pepa_thread_accept(pepa_core_t *core)
 {
 	int32_t     fd_read                = pepa_out_wait_connection(core, core->sockets.out_listen);
 	core->sockets.out_write = fd_read;
@@ -503,7 +501,7 @@ static void pepa_out_thread_accept(pepa_core_t *core)
  * @details This is a blocking function. When it finished,
  *  		the SHVA socket is opened and valid.
  */
-static void pepa_shva_thread_open_connection(pepa_core_t *core)
+static void pepa_shva_open_connection(pepa_core_t *core)
 {
 	/* Open connnection to the SHVA server */
 	do {
@@ -527,7 +525,7 @@ static void pepa_shva_thread_open_connection(pepa_core_t *core)
  * @details This is a blocking function. When it finished,
  *  		the IN listening socket is opened.
  */
-static void        pepa_in_thread_listen_socket(pepa_core_t *core)
+static void        pepa_in_open_listen_socket(pepa_core_t *core)
 {
 	struct sockaddr_in s_addr;
 	while (1) {
@@ -647,6 +645,7 @@ int pepa3_close_sockets(pepa_core_t *core)
 static int pepa3_reset_sockets(pepa_core_t *core)
 {
 	int        rc;
+	slog_note_l("Starting socket restart");
 #if 0 /* SEB */
 	int rc = epoll_ctl(core->epoll_fd, EPOLL_CTL_DEL, core->sockets.out_listen, NULL);
 	if (rc) {
@@ -664,16 +663,24 @@ static int pepa3_reset_sockets(pepa_core_t *core)
 		slog_warn_l("Could not remove socket SHVA from epoll set: fd: %d, %s", core->sockets.shva_rw, strerror(errno));
 	}
 
+	slog_note_l("Removed out_write and shwa_rw from epoll");
+
 	// pepa_in_reading_sockets_close_all(core);
 
 	pepa_reading_socket_close(core->sockets.shva_rw, "SHVA");
 	core->sockets.shva_rw = FD_CLOSED;
 
+	slog_note_l("Closed shva_rw");
+
 	pepa_socket_close(core->sockets.out_write, "OUT WRITE");
 	core->sockets.out_write = FD_CLOSED;
 
+	slog_note_l("Closed out_write");
+
 	/* CLose all IN reading sockets */
 	pepa_in_reading_sockets_close_all(core);
+
+	slog_note_l("Closed all IN readers");
 
 #if 0 /* SEB */
 	rc = pepa_socket_shutdown_and_close(core->sockets.out_listen, "OUT LISTEN");
@@ -700,14 +707,14 @@ static int pepa3_wait_out(pepa_core_t *core)
 {
 	/* Both these functions are blocking and when they returned, both OUT sockets are opened */
 	if (core->sockets.out_listen < 0) {
-		pepa_out_thread_open_listening_socket(core);
+		pepa_out_open_listening_socket(core);
 		if (0 != epoll_ctl_add(core->epoll_fd, core->sockets.out_listen, EPOLLIN | EPOLLRDHUP | EPOLLHUP)) {
 			slog_error_l("Can not add OUT Listen socket to epoll set: %s", strerror(errno));
 			return PST_CLOSE_SOCKETS;
 		}
 	}
 
-	pepa_out_thread_accept(core);
+	pepa_thread_accept(core);
 
 	if (0 != epoll_ctl_add(core->epoll_fd, core->sockets.out_write, EPOLLIN | EPOLLRDHUP | EPOLLHUP)) {
 		slog_error_l("Can not add OUT Write socket to epoll set: %s", strerror(errno));
@@ -727,7 +734,7 @@ static int pepa3_wait_out(pepa_core_t *core)
 static int pepa3_open_shva(pepa_core_t *core)
 {
 	/* This is an blocking function, returns only when SHVA is opened */
-	pepa_shva_thread_open_connection(core);
+	pepa_shva_open_connection(core);
 	if (0 != epoll_ctl_add(core->epoll_fd, core->sockets.shva_rw, EPOLLIN | EPOLLRDHUP | EPOLLHUP)) {
 		slog_error_l("Can not add SHVA socket to epoll set: %s", strerror(errno));
 		return PST_CLOSE_SOCKETS;
@@ -749,7 +756,7 @@ static int pepa3_start_in(pepa_core_t *core)
 	/* This is a blocking function */
 	if (core->sockets.in_listen >= 0) return PST_TRANSFER_LOOP;
 
-	pepa_in_thread_listen_socket(core);
+	pepa_in_open_listen_socket(core);
 
 	if (0 != epoll_ctl_add(core->epoll_fd, core->sockets.in_listen, EPOLLIN | EPOLLRDHUP | EPOLLHUP)) {
 		slog_error_l("Can not add IN Listen socket to epoll set: %s", strerror(errno));

@@ -2,7 +2,7 @@
 #define _PEPA_CONFIG_H_
 
 
-/* The copying buffer is set to  512 Kb */
+/* The copying buffer is set to 64 Kb */
 #define COPY_BUF_SIZE_KB (64)
 
 /* Predefined number of IN clients */

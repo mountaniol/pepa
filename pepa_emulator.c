@@ -18,10 +18,10 @@
 /* Sleep time between sending a buffer */
 
 #define SHUTDOWN_DIVIDER (100003573)
-
 #define SHVA_SHUTDOWN_DIVIDER (10000357)
 #define SHOULD_EMULATE_DISCONNECT() (0 == (rand() % SHUTDOWN_DIVIDER))
 #define SHVA_SHOULD_EMULATE_DISCONNECT() (0 == (rand() % SHVA_SHUTDOWN_DIVIDER))
+
 #define RX_TX_PRINT_DIVIDER (1000000)
 
 #define PEPA_MIN(a,b) ((a<b) ? a : b )
@@ -48,6 +48,9 @@ void pepa_emulator_out_thread_cleanup(__attribute__((unused))void *arg);
 int32_t pepa_emulator_generate_buffer_buf(buf_t *buf, size_t buffer_size);
 void pepa_emulator_disconnect_mes(const char *name);
 void emu_set_int_signal_handler(void);
+
+char *several_messages="one\0two\0three\0";
+size_t several_messages_len = 14;
 
 static void pthread_block_signals(const char *name)
 {
@@ -423,6 +426,7 @@ void *pepa_emulator_shva_writer_thread(__attribute__((unused))void *arg)
 {
 	pepa_core_t *core  = pepa_get_core();
 	uint64_t    writes = 0;
+	int send_several = 1;
 
 	pthread_block_signals("SHVA-WRITE");
 
@@ -441,7 +445,12 @@ void *pepa_emulator_shva_writer_thread(__attribute__((unused))void *arg)
 		}
 
 // slog_note_l("SHVA WRITE: : Trying to write");
-		rc = write(core->sockets.shva_rw, lorem_ipsum_buf->data, buf_size);
+		if (send_several > 0) {
+			rc = write(core->sockets.shva_rw, several_messages, several_messages_len);
+			send_several = 0;
+		} else {
+			rc = write(core->sockets.shva_rw, lorem_ipsum_buf->data, buf_size);
+		}
 		writes++;
 
 		if (rc < 0) {
@@ -461,6 +470,7 @@ void *pepa_emulator_shva_writer_thread(__attribute__((unused))void *arg)
 
 		if (0 == (writes % RX_TX_PRINT_DIVIDER)) {
 			slog_debug_l("SHVA WRITE: %-7lu reads, bytes: %-7lu, Kb: %-7lu", writes, rx, (rx / 1024));
+			send_several = 1;
 		}
 
 		if (core->emu_timeout > 0) {

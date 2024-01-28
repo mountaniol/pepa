@@ -26,10 +26,24 @@
 void pepa_in_reading_sockets_close_all(pepa_core_t *core)
 {
 	int i;
-	TESTP_VOID(core);
-	TESTP_VOID(core->in_reading_sockets.sockets);
+
+	if(NULL == core) {
+		slog_error_l("Core is NULL");
+		return;
+	}
+
+	if (0 == pepa_core_is_valid(core)) {
+		slog_error_l("Core structure is invalid");
+		return;
+	}
+
+	if(NULL == core->in_reading_sockets.sockets) {
+		slog_error_l("core->in_reading_sockets.sockets is NULL");
+		return;
+	}
 
 	slog_note_l("IN-READER: Starting closing and removing sockets: %d slots", core->in_reading_sockets.number);
+
 	for (i = 0; i < core->in_reading_sockets.number; i++) {
 		if (EMPTY_SLOT != core->in_reading_sockets.sockets[i]) {
 
@@ -69,6 +83,10 @@ void pepa_in_reading_sockets_free(pepa_core_t *core)
 {
 	slog_note_l("IN-READER: Starting IN read sockets closing and cleaning");
 	TESTP_VOID(core);
+	if (!pepa_core_is_valid(core)) {
+		slog_error_l("Core structure is invalid");
+		return;
+	}
 	TESTP_VOID(core->in_reading_sockets.sockets);
 
 	pepa_in_reading_sockets_close_all(core);
@@ -90,8 +108,12 @@ void pepa_in_reading_sockets_allocate(pepa_core_t *core, const int num)
 	int i;
 	slog_note_l("IN-READER: Starting IN read sockets array allocation");
 	TESTP_VOID(core);
-	TESTP_VOID(core->in_reading_sockets.sockets);
 
+	if (0 == pepa_core_is_valid(core)) {
+		slog_error_l("Core structure is invalid");
+		return;
+	}
+	
 	core->in_reading_sockets.number = num;
 	core->in_reading_sockets.sockets = (int *)malloc(sizeof(int) * (size_t)num);
 	for (i = 0; i < num; i++) {
@@ -116,7 +138,15 @@ void pepa_in_reading_sockets_add(pepa_core_t *core, const int fd)
 	int i;
 	slog_note_l("IN-READER: Starting addition of a new IN read socket [%d] to array", fd);
 	TESTP_VOID(core);
-	TESTP_VOID(core->in_reading_sockets.sockets);
+	if (!pepa_core_is_valid(core)) {
+		slog_error_l("Core structure is invalid");
+		return;
+	}
+
+	if(NULL == core->in_reading_sockets.sockets) {
+		slog_error_l("core->in_reading_sockets.sockets == NULL");
+		return;
+	}
 
 	for (i = 0; i < core->in_reading_sockets.number; i++) {
 		if (EMPTY_SLOT == core->in_reading_sockets.sockets[i]) {
@@ -144,6 +174,10 @@ void pepa_in_reading_sockets_close_rm(pepa_core_t *core, const int fd)
 {
 	int i;
 	TESTP_VOID(core);
+	if (!pepa_core_is_valid(core)) {
+		slog_error_l("Core structure is invalid");
+		return;
+	}
 	TESTP_VOID(core->in_reading_sockets.sockets);
 	for (i = 0; i < core->in_reading_sockets.number; i++) {
 		if (fd == core->in_reading_sockets.sockets[i]) {

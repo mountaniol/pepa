@@ -8,6 +8,10 @@ ifneq ($(compiler),)
 	GCC=$(compiler)
 endif
 
+ifneq ($(linker),)
+	LD=$(linker)
+endif
+
 #GCC=gcc-10
 #CFLAGS=-Wall -Wextra -O2 -Wswitch-enum -Wimplicit-fallthrough -Wno-error=unused-but-set-variable \
 			-Wswitch -Wreturn-type -Wpedantic -Wformat-overflow=2 -Wformat-nonliteral \
@@ -109,7 +113,7 @@ ARS=$(BUFT_AR) $(SLOG_AR)
 	pepa_socket_out.o pepa_socket_shva.o 
 EMU_O=pepa_emulator.o pepa_state_machine.o pepa_parser.o \
 	pepa_core.o pepa_server.o pepa_errors.o \
-	pepa_socket_common.o 
+	pepa_socket_common.o pepa_in_reading_sockets.o
 
 EMU_T=emu
 
@@ -201,7 +205,7 @@ AFL_T=pepa_afl.out
 _fuzzer: slog buf_t $(AFL_O) #$(AFL_PATH)/afl-gcc
 	@echo Compiling target $@
 	@echo ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-	$(GCC) $(CFLAGS) $(FUZZER_DEBUG) $(AFL_O) $(BUFT_AR) $(SLOG_AR) -lpthread -o $(AFL_T)
+	$(AFL_PATH)/afl-clang-fast $(CFLAGS) $(FUZZER_DEBUG) $(AFL_O) $(BUFT_AR) $(SLOG_AR) -lpthread -o $(AFL_T)
 
 
 #.PHONY:$(AFL_PATH)/afl-gcc
@@ -209,7 +213,8 @@ fuzzer: $(AFL_PATH)/afl-gcc
 	@echo Executing target $@
 	@echo ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	#compiler=afl-clang-fast linker=afl-clang-fast AFL_HARDEN=1 make _fuzzer
-	compiler=$(AFL_PATH)/afl-gcc linker=$(AFL_PATH)/afl-clang-fast AFL_HARDEN=1 make _fuzzer
+	#compiler=$(AFL_PATH)/afl-gcc linker=$(AFL_PATH)/afl-gcc AFL_HARDEN=1 make _fuzzer
+	compiler=$(AFL_PATH)/afl-clang-fast linker=$(AFL_PATH)/afl-clang-fast AFL_HARDEN=1 make _fuzzer
 	rm -fr ./fuzzer_output
 	AFL_MAP_SIZE=10000000 $(AFL_PATH)/afl-fuzz -t 10000 -i fuzzer_input -o ./fuzzer_output ./$(AFL_T)
 
