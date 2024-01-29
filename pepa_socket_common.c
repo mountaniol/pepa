@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <sys/epoll.h>
+#include <ctype.h>
 
 #include "slog/src/slog.h"
 #include "pepa_config.h"
@@ -108,8 +109,8 @@ void pepa_set_tcp_send_size(const pepa_core_t *core, const int sock)
  * @return int Return the offset of found character; if not found, the size of the buffer returned
  * @details 
  */
-static int find_next(char *buf, int len, int offset, char c)
-{
+#if 0 /* SEB */
+static int find_next(char *buf, int len, int offset, char c){
 	int now = offset;
 	do {
 		if (buf[now] == c) {
@@ -120,6 +121,7 @@ static int find_next(char *buf, int len, int offset, char c)
 
 	return now;
 }
+#endif
 
 #if 0 /* SEB */
 static int find_unprintable_next(char *buf, int len, int offset){
@@ -180,10 +182,10 @@ static void pepa_print_buffer(pepa_core_t *core, char *buf, const ssize_t rx,
 #endif
 
 /* Print message */
-static void pepa_print_buffer(pepa_core_t *core, char *buf, const ssize_t rx,
-							  const int fd_out, const char *name_out,
-							  const int fd_in, const char *name_in)
-{
+#if 0 /* SEB */
+static void pepa_print_buffer_old(pepa_core_t *core, char *buf, const ssize_t rx,
+								  const int fd_out, const char *name_out,
+								  const int fd_in, const char *name_in){
 	ssize_t offset  = 0;
 	int     prc     = 0; /** < return value of snprintf */
 	int     mes_num = 1; /**< Message number inside the buffer */
@@ -225,6 +227,55 @@ static void pepa_print_buffer(pepa_core_t *core, char *buf, const ssize_t rx,
 		offset++;
 		mes_num++;
 	} while (offset < rx);
+}
+#endif
+
+/* Print message */
+static void pepa_print_buffer(pepa_core_t *core, char *buf, const ssize_t rx,
+								  const int fd_out, const char *name_out,
+								  const int fd_in, const char *name_in)
+{
+	ssize_t offset  = 0;
+	int     prc     = 0; /** < return value of snprintf */
+
+	/* On the first message we allocate a buffer for printing */
+	if (NULL == core->print_buf) {
+		core->print_buf = calloc(core->print_buf_len, 1);
+	}
+
+	if (NULL == core->print_buf) {
+		slog_error_l("Can not allocate printing buffer, asked size is: %u; message was not printed", core->print_buf_len);
+		return;
+	} else {
+		slog_warn_l("Allocated printing buffer of size %u", core->print_buf_len);
+	}
+
+	/* Print header */
+	offset = snprintf(core->print_buf, core->print_buf_len, "+++ MES: %s [fd:%.2d] -> %s [fd:%.2d], LEN:%zd |",
+					  /* mes num */ name_in, fd_in, name_out, fd_out, rx);
+
+	for (int index = 0; index < rx; index++) {
+		if (isprint(buf[index])) {
+			core->print_buf[offset] = buf[index];
+			offset++;
+
+		} else {
+			prc = snprintf(core->print_buf + offset, core->print_buf_len - offset, "<0X%X>", (unsigned int) buf[index]);
+			if (prc < 1) {
+				slog_error_l("Can not print non-printable character from, offset of the character: %d; stopped printing", index);
+				return;
+			}
+
+			offset += prc;
+		}
+	}
+
+	core->print_buf[offset] = '|';
+	offset++;
+	core->print_buf[offset] = '\0';
+
+	/* Print */
+	slog_debug("%s", core->print_buf);
 }
 
 __attribute__((hot))
