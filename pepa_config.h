@@ -2,8 +2,11 @@
 #define _PEPA_CONFIG_H_
 
 
-/* The copying buffer is set to 64 Kb */
-#define COPY_BUF_SIZE_KB (64)
+/* The copying buffer default size */
+#define COPY_BUF_SIZE_BYTES (64 * 1024)
+
+/* The printing buffer default size */
+#define PRINT_BUF_SIZE_BYTES (COPY_BUF_SIZE_BYTES + 1024)
 
 /* Predefined number of IN clients */
 #define PEPA_IN_SOCKETS 4096
@@ -18,12 +21,16 @@
 	#define PEPA_MAX(a,b) ( a > b ? a : b)
 #endif
 
+/* A default value of an incactive pthread descriptor */
 #define PTHREAD_DEAD ((pthread_t)0xBEEFDEAD)
 
 /* Assign this value to closed file descriptor */
 #define FD_CLOSED (-1)
 
+/* Default time of monithor thread activity frequency */
 #define MONITOR_TIMEOUT_USEC (500000)
+
+/* SLOG flags; here we define accumuulative log levels */
 
 #define SLOG_LEVEL_FATAL (SLOG_FATAL)
 #define SLOG_LEVEL_TRACE (SLOG_TRACE | SLOG_LEVEL_FATAL)

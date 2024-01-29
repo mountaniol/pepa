@@ -26,12 +26,12 @@ void pepa_set_rlimit(void)
 	limit.rlim_cur = 65535;
 	limit.rlim_max = 65535;
 	if (setrlimit(RLIMIT_NOFILE, &limit) != 0) {
-		slog_debug_l("setrlimit() failed with errno=%d\n", errno);
+		slog_debug_l("setrlimit() failed with errno=%d, <%s>\n", errno, strerror(errno));
 	}
 
 	/* Get max number of files. */
 	if (getrlimit(RLIMIT_NOFILE, &limit) != 0) {
-		slog_debug_l("getrlimit() failed with errno=%d\n", errno);
+		slog_debug_l("getrlimit() failed with errno=%d, <%s>\n", errno, strerror(errno));
 	}
 
 	slog_debug_l("The soft limit is %lu\n", limit.rlim_cur);

@@ -271,7 +271,17 @@ int pepa_parse_arguments(int argi, char *argv[])
 				slog_fatal_l("Could not parse internal buffer size: %s", optarg);
 				abort();
 			}
-			slog_info_l("Internal buffer size is set to: %u", core->internal_buf_size);
+
+			/* Transform the size from Kb to bytes */
+			core->internal_buf_size *= 1024;
+			core->print_buf_len = core->internal_buf_size  + 1024;
+			slog_info_l("Internal buffer size is set to: %u (%u Kb)",
+						core->internal_buf_size,
+						(core->internal_buf_size / 1024));
+			slog_info_l("Printing buffer size is set to: %u (%u Kb)",
+						core->print_buf_len,
+						(core->print_buf_len / 1024));
+
 		}
 			break;
 		case 'P':

@@ -93,7 +93,8 @@ typedef struct {
 	int pid_fd; /* File descriptor of PID file */
 	char *pid_file_name; /* File name of PID file  */
 	void *buffer;
-	char *print_buf; /**< THis buffer used in case message dump is on, to print out messages */
+	char *print_buf; /**< This buffer used in case message dump is on, to print out messages */
+	uint32_t print_buf_len;
 	int epoll_fd;
 } pepa_core_t;
 

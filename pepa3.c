@@ -234,7 +234,7 @@ static int pepa_process_fdx_shva(pepa_core_t *core, const struct epoll_event eve
 		rc = pepa_one_direction_copy3(core,
 									  /* Send to : */core->sockets.out_write, "OUT",
 									  /* From: */ core->sockets.shva_rw, "SHVA",
-									  core->buffer, core->internal_buf_size * 1024,
+									  core->buffer, core->internal_buf_size,
 									  /*Debug is ON */ 0,
 									  /* RX stat */&core->monitor.shva_rx,
 									  /* TX stat */&core->monitor.out_tx,
@@ -311,7 +311,7 @@ static int pepa_process_fdx(pepa_core_t *core, const struct epoll_event events[]
 		rc = pepa_one_direction_copy3(core,
 									  /* Send to : */core->sockets.shva_rw, "SHVA",
 									  /* From: */ events[i].data.fd, "IN",
-									  core->buffer, core->internal_buf_size * 1024,
+									  core->buffer, core->internal_buf_size,
 									  /*Debug is ON */ 0,
 									  /* RX stat */&core->monitor.in_rx,
 									  /* TX stat */&core->monitor.shva_tx,
@@ -558,7 +558,7 @@ static void        pepa_in_open_listen_socket(pepa_core_t *core)
  */
 static int pepa3_start(pepa_core_t *core)
 {
-	core->buffer = calloc(core->internal_buf_size * 1024, 1);
+	core->buffer = calloc(core->internal_buf_size, 1);
 
 	if (NULL == core->buffer) {
 		slog_error_l("Can not allocate a transfering buffer, stopped");

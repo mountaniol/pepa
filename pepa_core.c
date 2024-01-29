@@ -37,7 +37,8 @@ static pepa_core_t *pepa_create_core_t(void)
 	core->monitor_thread.thread_id = PTHREAD_DEAD;
 
 	/*** Init initial buffer size  ***/
-	core->internal_buf_size = COPY_BUF_SIZE_KB;
+	core->internal_buf_size = COPY_BUF_SIZE_BYTES;
+	core->print_buf_len = PRINT_BUF_SIZE_BYTES;
 
 	/*** Init embedded values of number of allowed sockets ***/
 

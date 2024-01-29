@@ -80,7 +80,7 @@ void pepa_set_tcp_timeout(const int sock)
 
 void pepa_set_tcp_recv_size(const pepa_core_t *core, const int sock)
 {
-	uint32_t buf_size = core->internal_buf_size * 1024;
+	uint32_t buf_size = core->internal_buf_size;
 
 	/* Set TCP receive window size */
 	if (0 != setsockopt(sock, SOL_SOCKET, SO_RCVBUF, (char *)&buf_size, sizeof(buf_size))) {
@@ -90,7 +90,7 @@ void pepa_set_tcp_recv_size(const pepa_core_t *core, const int sock)
 
 void pepa_set_tcp_send_size(const pepa_core_t *core, const int sock)
 {
-	uint32_t buf_size = core->internal_buf_size * 1024;
+	uint32_t buf_size = core->internal_buf_size;
 	/* Set TCP sent window size */
 	if (0 != setsockopt(sock, SOL_SOCKET, SO_SNDBUF, (char *)&buf_size, sizeof(buf_size))) {
 		slog_debug_l("[from %s] SO_SNDBUF has a problem: %s", "EMU SHVA", strerror(errno));
@@ -121,19 +121,34 @@ static int find_next(char *buf, int len, int offset, char c)
 	return now;
 }
 
+#if 0 /* SEB */
+static int find_unprintable_next(char *buf, int len, int offset){
+	int now = offset;
+	do {
+		if (buf[now] == c) {
+			break;
+		}
+		now++;
+	} while (now < len);
+
+	return now;
+}
+#endif
+
 /* Print message */
-static void pbuf(pepa_core_t *core, char *buf, const ssize_t rx,
-				 const int fd_out, const char *name_out,
-				 const int fd_in, const char *name_in)
-{
+#if 0 /* SEB */
+static void pepa_print_buffer(pepa_core_t *core, char *buf, const ssize_t rx,
+							  const int fd_out, const char *name_out,
+							  const int fd_in, const char *name_in){
 	// static char *print_buf = NULL;
 	//char   print_buf[1024];
-	ssize_t     offset     = 0;
-	int         prc        = 0; /** < Status from snprintf */
-	int         mes_num    = 1; /**< Offset inside of the received buffer */
+	ssize_t offset  = 0;
+	int     prc     = 0; /** < Status from snprintf */
+	int     mes_num = 1; /**< Offset inside of the received buffer */
 
 	if (NULL == core->print_buf) {
-		core->print_buf = calloc((core->internal_buf_size * 1024), 1);
+		/* We need a bigger buffer since we can add more information into debug print */
+		core->print_buf = calloc(core->print_buf_len, 1);
 		slog_warn_l("Allocated printing buffer");
 	}
 
@@ -154,6 +169,55 @@ static void pbuf(pepa_core_t *core, char *buf, const ssize_t rx,
 		core->print_buf[prc] = '\0';
 
 		slog_note("%s", core->print_buf);
+
+		if (offset + 1 < rx) {
+			offset = find_next(buf, rx, offset + 1, 0);
+		}
+		offset++;
+		mes_num++;
+	} while (offset < rx);
+}
+#endif
+
+/* Print message */
+static void pepa_print_buffer(pepa_core_t *core, char *buf, const ssize_t rx,
+							  const int fd_out, const char *name_out,
+							  const int fd_in, const char *name_in)
+{
+	ssize_t offset  = 0;
+	int     prc     = 0; /** < return value of snprintf */
+	int     mes_num = 1; /**< Message number inside the buffer */
+
+	/* On the first message we allocate a buffer for printing */
+	if (NULL == core->print_buf) {
+		core->print_buf = calloc(core->print_buf_len, 1);
+	}
+
+	if (NULL == core->print_buf) {
+		slog_error_l("Can not allocate printing buffer, asked size is: %u; message was not printed", core->print_buf_len);
+		return;
+	} else {
+		slog_warn_l("Allocated printing buffer of size %u", core->print_buf_len);
+	}
+
+	do {
+		size_t current_len = strlen(buf + offset);
+		prc = snprintf(core->print_buf, core->print_buf_len, "+++ MES[%d]: %s [fd:%.2d] -> %s [fd:%.2d], LEN:%zu, OFFSET:%zd, TOTAL:%zd, |%s|",
+					   /* mes num */ mes_num,
+					   name_in, fd_in,
+					   name_out, fd_out,
+					   current_len, offset, rx,
+					   buf + offset);
+
+		if (prc < 1) {
+			break;
+		}
+
+		/* Add the 0 terminator at the end */
+		core->print_buf[prc] = '\0';
+
+		/* Print */
+		slog_debug("%s", core->print_buf);
 
 		if (offset + 1 < rx) {
 			offset = find_next(buf, rx, offset + 1, 0);
@@ -235,7 +299,7 @@ int pepa_one_direction_copy3(pepa_core_t *core,
 		   We must print until the whole buffer is printed */
 
 		if (core->dump_messages) {
-			pbuf(core, buf, rx, fd_out, name_out, fd_in, name_in);
+			pepa_print_buffer(core, buf, rx, fd_out, name_out, fd_in, name_in);
 		}
 
 		/* Write until transfer the whole received buffer */

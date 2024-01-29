@@ -22,8 +22,6 @@
 #include "pepa3.h"
 #include "pepa_in_reading_sockets.h"
 
-__AFL_FUZZ_INIT(void);
-
 #define MAX_ITERATIONS (1000000)
 
 #define INPUTSIZE (sizeof(pepa_core_t) * 2)
@@ -214,25 +212,11 @@ int test_12(char *input, __attribute__((unused))
 
 #define NUMBER_OF_TESTS (12)
 
-//#ifdef __AFL_HAVE_MANUAL_CONTROL
-//__AFL_INIT(void);
-//#endif
-
-
 int fuzzer(void)
 {
-	int           rc;
 	// We use here build-int card type file */
 	int           len;
 	char          input[INPUTSIZE] = {0};
-	//ssize_t       buf_len;
-	//unsigned char buf[1024000];
-#define __AFL_FUZZ_TESTCASE_LEN buf_len
-#define __AFL_FUZZ_TESTCASE_BUF buf
-
-	__AFL_INIT();
-
-	unsigned char  *buf              = __AFL_FUZZ_TESTCASE_BUF;
 
 	len = read(STDIN_FILENO, input, INPUTSIZE);
 
@@ -240,98 +224,43 @@ int fuzzer(void)
 		return 1;
 	}
 
-	while (__AFL_LOOP(UINT_MAX)) {
-		switch (input[0] % NUMBER_OF_TESTS) {
-		case 0:
-			rc = test_0(buf, len);
-			if (rc) {
-				return rc;
-			}
+	switch (input[0] % NUMBER_OF_TESTS) {
+	case 0:
+		return test_0(input, len);
+		// return 0;
+	case 1:
+		return test_1(input, len);
+		// return 0;
+	case 2:
+		return test_2(input, len);
+		// return 0;
+	case 3:
+		return test_3(input, len);
+		//return 0;
+	case 4:
+		return test_4(input, len);
+	case 5:
+		return test_5(input, len);
+	case 6:
+		return test_6(input, len);
+	case 7:
+		return test_7(input, len);
+	case 8:
+		return test_8(input, len);
+	case 9:
+		return test_9(input, len);
+	case 10:
+		return test_10(input, len);
+	//case 11:
+	//	return test_11(input, len);
+		//case 12:
+		//return test_12(input, len);
 
-			break;
-			// return 0;
-		case 1:
-			rc = test_1(buf, len);
-			if (rc) {
-				return rc;
-			}
-			break;
-			// return 0;
-		case 2:
-			rc = test_2(buf, len);
-			if (rc) {
-				return rc;
-			}
-
-			break;
-			// return 0;
-		case 3:
-			rc = test_3(buf, len);
-			if (rc) {
-				return rc;
-			}
-
-			break;
-			//return 0;
-		case 4:
-			rc = test_4(buf, len);
-			if (rc) {
-				return rc;
-			}
-
-			break;
-		case 5:
-			rc = test_5(buf, len);
-			if (rc) {
-				return rc;
-			}
-
-			break;
-		case 6:
-			rc = test_6(buf, len);
-			if (rc) {
-				return rc;
-			}
-
-			break;
-		case 7:
-			rc = test_7(buf, len);
-			if (rc) {
-				return rc;
-			}
-
-			break;
-		case 8:
-			rc = test_8(buf, len);
-			if (rc) {
-				return rc;
-			}
-
-			break;
-		case 9:
-			rc = test_9(buf, len);
-			if (rc) {
-				return rc;
-			}
-
-			break;
-		case 10:
-			rc = test_10(buf, len);
-			if (rc) {
-				return rc;
-			}
-
-			break;
-			//case 11:
-			//return test_11(input, len);
-			//case 12:
-			//return test_12(input, len);
-
-			//return 0;
-		default:
-			break;
-		}
+		//return 0;
+	default:
+		return 0;
 	}
+
 	return 0;
 }
 
