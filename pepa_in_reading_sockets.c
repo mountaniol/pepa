@@ -115,6 +115,7 @@ void pepa_in_reading_sockets_allocate(pepa_core_t *core, const int num)
 	}
 	
 	core->in_reading_sockets.number = num;
+	core->in_reading_sockets.active = 0;
 	core->in_reading_sockets.sockets = (int *)malloc(sizeof(int) * (size_t)num);
 	for (i = 0; i < num; i++) {
 		core->in_reading_sockets.sockets[i] = EMPTY_SLOT;
@@ -152,7 +153,8 @@ void pepa_in_reading_sockets_add(pepa_core_t *core, const int fd)
 		if (EMPTY_SLOT == core->in_reading_sockets.sockets[i]) {
 			core->in_reading_sockets.sockets[i] = fd;
 			slog_note_l("IN-READER: Added socket %d to slot %d", core->in_reading_sockets.sockets[i], i);
-			return;
+            core->in_reading_sockets.active++;
+            return;
 		}
 	}
 	slog_error_l("Can not to add of a new IN read socket [%d] to array", fd);
@@ -188,6 +190,7 @@ void pepa_in_reading_sockets_close_rm(pepa_core_t *core, const int fd)
 			pepa_reading_socket_close(core->in_reading_sockets.sockets[i], "IN-FORWARD");
 			slog_note_l("IN-READER: Closed and remove socket %d", core->in_reading_sockets.sockets[i]);
 			core->in_reading_sockets.sockets[i] = EMPTY_SLOT;
+			core->in_reading_sockets.active--;
 			return;
 		}
 	}

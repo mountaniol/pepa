@@ -47,9 +47,26 @@ typedef struct {
 	uint64_t in_tx;
 } pepa_stat_t;
 
+/**
+ * @struct
+ * @details We keep active listening IN sockets in the array.
+ *  		When a new connection is detected, the connection is
+ *  		accepted, a file descriptor is opened, and the file
+ *  		descriptor is added into this array.
+ *  		Now, what is the difference between 'number' of
+ *  		sockets and 'active sockets'? The number of sockets
+ *  		is the size of the '->sockets' array. However, if we
+ *  		allocated 4 members, and one of the sockets is
+ *  		closed, we are still having 4 elements, but one of
+ *  		them doesn't keep any active socket. The 'active'
+ *  		variable keeps number of really active sockets.
+ * 
+ * @author se (9/16/24)
+ */
 typedef struct {
 	int *sockets; /**< Array of IN reading sockets */
 	int number; /**< Number of allocated slots (not number of active sockets!) */
+	size_t active; /**< This variable counts how many IN sockets are active */
 } pepa_in_read_sockets_t;
 
 /**
@@ -61,6 +78,7 @@ typedef struct {
  */
 typedef struct {
 	uint32_t validity; /**< Should be inited with a VALIDITY mask */
+
 	/* Logger configs */
 	int slog_flags; /* Keep slog logger verbosity level*/
 	char *slog_file; /* Keep slog output file name; if given, log will be saved there */
@@ -81,7 +99,6 @@ typedef struct {
 	thread_vars_t out_thread; /**< Configuration of OUT thread */
 	thread_vars_t monitor_thread; /**< Configuration of OUT thread */
 
-
 	unsigned int monitor_freq; /* How often (in seconds) print out statistics from the monitor; by default every 5 seconds */
 	pepa_in_read_sockets_t in_reading_sockets; /**< Reading sockets opened when accept new connections */
 	uint32_t internal_buf_size; /**< Size of buffer used to pass packages, by defaiult COPY_BUF_SIZE bytes, see pepa_config.h */
@@ -96,6 +113,10 @@ typedef struct {
 	char *print_buf; /**< This buffer used in case message dump is on, to print out messages */
 	uint32_t print_buf_len;
 	int epoll_fd;
+
+	/* Configuration from the Config file */
+	long int readers_preopen; /**< How many reader connections should by opened before connection to SHVA is opened */
+	long int writers_preopen; /**< How many writer connections should by opened before connection to SHVA is opened */
 } pepa_core_t;
 
 /**

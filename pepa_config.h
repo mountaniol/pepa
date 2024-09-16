@@ -1,6 +1,7 @@
 #ifndef _PEPA_CONFIG_H_
 #define _PEPA_CONFIG_H_
 
+#include "pepa_core.h"
 
 /* The copying buffer default size */
 #define COPY_BUF_SIZE_BYTES (64 * 1024)
@@ -18,7 +19,7 @@
 #define PEPA_SHVA_SOCKETS (12)
 
 #ifndef PPEPA_MAX
-	#define PEPA_MAX(a,b) ( a > b ? a : b)
+    #define PEPA_MAX(a,b) ( a > b ? a : b)
 #endif
 
 /* A default value of an incactive pthread descriptor */
@@ -47,5 +48,7 @@
 #define SLOG_LEVEL_5 SLOG_LEVEL_WARN
 #define SLOG_LEVEL_6 SLOG_LEVEL_INFO
 #define SLOG_LEVEL_7 SLOG_LEVEL_NOTE
+
+int pepa_read_config(const char *filename, pepa_core_t *core);
 
 #endif /* _PEPA_CONFIG_H_ */

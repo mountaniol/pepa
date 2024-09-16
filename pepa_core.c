@@ -66,6 +66,10 @@ static pepa_core_t *pepa_create_core_t(void)
 	core->pid_fd = FD_CLOSED;
 	core->validity = CORE_VALIDITY_MASK;
 
+	/* Init values that should be read from config file */
+	core->writers_preopen = -1;
+	core->readers_preopen = -1;
+
 	return core;
 }
 
@@ -157,6 +161,12 @@ int32_t pepa_core_init(void)
 		slog_fatal_l("Can not create core");
 		PEPA_TRY_ABORT();
 		return (-PEPA_ERR_CORE_CREATE);
+	}
+
+	int rc = pepa_read_config("/home/se/src/me/pepa/pepa.config", g_pepa_core);
+	if (0 != rc) {
+		slog_error_l("Can not read or parse config file");
+
 	}
 	return PEPA_ERR_OK;
 }

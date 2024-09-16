@@ -93,16 +93,22 @@ PEPA_DEFINES+=-DPEPA_HOST=\"$(PEPA_HOST_VAL)\"
 CFLAGS+=$(PEPA_DEFINES)
 CFLAGS+=-O2
 
+INC=-I./libconfuse/src/
+
+LIBCONFUSE_A=./libconfuse/src/.libs/libconfuse.a
+
 #PEPA_O= pepa3.o pepa_state_machine.o pepa_parser.o main.o pepa_core.o \
 		pepa_server.o pepa_errors.o \
 		pepa_socket_common.o pepa_socket_in.o \
 		pepa_socket_out.o pepa_socket_shva.o
 
-PEPA_O= pepa3.o pepa_state_machine.o pepa_parser.o main.o pepa_core.o \
+PEPA_O= pepa_config.o pepa3.o pepa_state_machine.o pepa_parser.o main.o pepa_core.o \
 		pepa_server.o pepa_errors.o \
 		pepa_socket_common.o pepa_in_reading_sockets.o
-		
 PEPA_T=pepa-ng
+
+
+LIBS=-lpthread $(LIBCONFUSE_A)
 
 AFL_O=pepa_afl.o pepa3.o pepa_state_machine.o pepa_parser.o pepa_core.o \
 		pepa_server.o pepa_errors.o pepa_socket_common.o pepa_in_reading_sockets.o
@@ -119,7 +125,7 @@ ARS=$(BUFT_AR) $(SLOG_AR)
 	pepa_socket_out.o pepa_socket_shva.o 
 EMU_O=pepa_emulator.o pepa_state_machine.o pepa_parser.o \
 	pepa_core.o pepa_server.o pepa_errors.o \
-	pepa_socket_common.o pepa_in_reading_sockets.o
+	pepa_socket_common.o pepa_in_reading_sockets.o pepa_config.o
 
 EMU_T=emu
 
@@ -128,10 +134,10 @@ all: clean static
 ca: clean pepa emu
 
 pepa: slog buf_t $(PEPA_O)
-	$(GCC) $(CFLAGS) $(DEBUG) $(PEPA_O) $(ARS) -o $(PEPA_T) -lpthread
+	$(GCC) $(CFLAGS) $(INC) $(DEBUG) $(PEPA_O) $(ARS) -o $(PEPA_T) $(LIBS)
 
 static: slog buf_t $(PEPA_O)
-	$(GCC) $(CFLAGS) -static $(DEBUG) $(PEPA_O) $(ARS) -o $(PEPA_T) -lpthread
+	$(GCC) $(CFLAGS) $(INC) -static $(DEBUG) $(PEPA_O) $(ARS) -o $(PEPA_T) $(LIBS)
 	
 
 .PHONY:buf_t
@@ -140,7 +146,14 @@ buf_t:
 
 .PHONY:emu
 emu: buf_t slog $(EMU_O)
-	$(GCC) $(CFLAGS) $(DEBUG) $(EMU_O) $(ARS) -o $(EMU_T) -lpthread
+	$(GCC) $(CFLAGS) $(DEBUG) $(EMU_O) $(ARS) -o $(EMU_T) $(LIBS)
+
+#.PHONY:emu
+.SECONDARY:$(LIBCONFUSE_A)
+$(LIBCONFUSE_A):
+	cd libconfuse ; ./autogen.sh ; ./configure ; make clean all ; cd -
+
+
 
 .PHONY:slog
 slog:
@@ -222,6 +235,6 @@ fuzzer: $(AFL_PATH)/afl-gcc
 
 %.o:%.c
 	@echo "|>" $@...
-	@$(GCC) -g $(INCLUDE) $(CFLAGS) $(DEBUG) -c -o $@ $<
+	@$(GCC) -g $(INC) $(CFLAGS) $(DEBUG) -c -o $@ $<
 
 

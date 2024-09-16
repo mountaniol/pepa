@@ -533,7 +533,8 @@ void *pepa_emulator_shva_thread(__attribute__((unused))void *arg)
 			sock_listen = pepa_open_listening_socket(&s_addr, core->shva_thread.ip_string, core->shva_thread.port_int, 1, __func__);
 			if (sock_listen < 0) {
 				slog_note_l("Emu SHVA: Could not open listening socket, waiting...");
-				usleep(1000);
+				//usleep(1000);
+                sleep(1);
 			}
 		} while (sock_listen < 0); /* Opening listening soket */
 

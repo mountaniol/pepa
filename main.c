@@ -91,6 +91,8 @@ static void pepa_set_int_signal_handler(void)
 
 int pepa_go(pepa_core_t *core);
 
+
+
 int main(int argi, char *argv[])
 {
 	int rc;
@@ -130,12 +132,13 @@ int main(int argi, char *argv[])
 
 	pepa_set_int_signal_handler();
 
-	slog_note_l("Going to start threads");
 	//rc = pepa_start_threads(core);
 	if (core->monitor.onoff) {
 		slog_debug_l("Going to start MONITOR");
 		pepa_thread_start_monitor(core);
 	}
+
+	slog_note_l("Going to start transfer loop");
 	rc = pepa_go(core);
 	if (rc < 0) {
 		slog_fatal_l("Could not start threads");

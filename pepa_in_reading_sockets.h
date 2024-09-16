@@ -1,6 +1,9 @@
 #ifndef _IN_READING_SOCKETS_H__
 #define _IN_READING_SOCKETS_H__
 
+/* Used internally in IN reading sockets array */
+#define EMPTY_SLOT (-1)
+
 void pepa_in_reading_sockets_close_all(pepa_core_t *core);
 void pepa_in_reading_sockets_free(pepa_core_t *core);
 void pepa_in_reading_sockets_allocate(pepa_core_t *core, const int num);

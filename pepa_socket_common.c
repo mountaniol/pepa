@@ -513,7 +513,11 @@ void pepa_reading_socket_close(const int socket, const char *socket_name)
 
 void pepa_socket_close_in_listen(pepa_core_t *core)
 {
-	if (PEPA_ERR_OK != pepa_socket_shutdown_and_close(core->sockets.in_listen, "IN LISTEN")) {
+    if (FD_CLOSED == core->sockets.in_listen) {
+        return;
+    }
+
+    if (PEPA_ERR_OK != pepa_socket_shutdown_and_close(core->sockets.in_listen, "IN LISTEN")) {
 		slog_warn_l("Close and shutdown of IN LISTEN is failed");
 	}
 	core->sockets.in_listen = FD_CLOSED;
