@@ -49,6 +49,6 @@
 #define SLOG_LEVEL_6 SLOG_LEVEL_INFO
 #define SLOG_LEVEL_7 SLOG_LEVEL_NOTE
 
-int pepa_read_config(const char *filename, pepa_core_t *core);
+int pepa_read_config(pepa_core_t *core);
 
 #endif /* _PEPA_CONFIG_H_ */

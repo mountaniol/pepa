@@ -80,6 +80,7 @@ typedef struct {
 	uint32_t validity; /**< Should be inited with a VALIDITY mask */
 
 	/* Logger configs */
+    char *config; /* Path to configuration file */
 	int slog_flags; /* Keep slog logger verbosity level*/
 	char *slog_file; /* Keep slog output file name; if given, log will be saved there */
 	char *slog_dir; /* Keep slog output file in this directory */
@@ -116,7 +117,9 @@ typedef struct {
 
 	/* Configuration from the Config file */
 	long int readers_preopen; /**< How many reader connections should by opened before connection to SHVA is opened */
-	long int writers_preopen; /**< How many writer connections should by opened before connection to SHVA is opened */
+    int id_val; /**< How many reader connections should by opened before connection to SHVA is opened */
+	int use_id; /**< Should PEPA add to every buffer a unique ID identifying this buffer passed through PEPA? 0 = no, 1 = yes */
+	int use_ticket; /**< Should PEPA add to every buffer a unique "ticket" this buffer? 0 = no, 1 = yes */
 } pepa_core_t;
 
 /**

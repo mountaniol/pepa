@@ -4,6 +4,7 @@
 
 #include "slog/src/slog.h"
 #include "pepa_core.h"
+#include "pepa_config.h"
 #include "pepa3.h"
 #include "pepa_errors.h"
 #include "pepa_parser.h"
@@ -116,6 +117,10 @@ int main(int argi, char *argv[])
 		slog_fatal_l("Could not parse arguments: %s", pepa_error_code_to_str(rc));
 		exit(-11);
 	}
+
+    if (NULL != core->config) {
+        rc = pepa_read_config(core);
+    }
 
 	pepa_config_slogger(core);
 
