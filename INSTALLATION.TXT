@@ -7,7 +7,7 @@ How to install
 # git switch pepa-ng
 
 3. Update submodules:
-# git submodule update
+# git submodule update --init
 
 4. Install dependencies (if you work on a Debian based Linux, like Debian, Ubuntu):
 # scripts/install_dependencies.sh

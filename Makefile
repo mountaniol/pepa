@@ -133,10 +133,10 @@ EMU_T=emu
 all: clean static
 ca: clean pepa emu
 
-pepa: slog buf_t $(PEPA_O)
+pepa: slog buf_t $(PEPA_O) $(LIBCONFUSE_A)
 	$(GCC) $(CFLAGS) $(INC) $(DEBUG) $(PEPA_O) $(ARS) -o $(PEPA_T) $(LIBS)
 
-static: slog buf_t $(PEPA_O)
+static: slog buf_t $(PEPA_O) $(LIBCONFUSE_A)
 	$(GCC) $(CFLAGS) $(INC) -static $(DEBUG) $(PEPA_O) $(ARS) -o $(PEPA_T) $(LIBS)
 	
 
@@ -145,11 +145,11 @@ buf_t:
 	make -C buf_t
 
 .PHONY:emu
-emu: buf_t slog $(EMU_O)
+emu: buf_t slog $(EMU_O) $(LIBCONFUSE_A)
 	$(GCC) $(CFLAGS) $(DEBUG) $(EMU_O) $(ARS) -o $(EMU_T) $(LIBS)
 
 #.PHONY:emu
-.SECONDARY:$(LIBCONFUSE_A)
+# .SECONDARY:$(LIBCONFUSE_A)
 $(LIBCONFUSE_A):
 	cd libconfuse ; ./autogen.sh ; ./configure ; make clean all ; cd -
 
@@ -158,10 +158,10 @@ slog:
 	make -C slog
 
 clean:
-	rm -f $(PEPA_T) $(PEPA_O) $(EMU_T) $(EMU_O) $(AFL_T)
+	rm -f $(PEPA_T) $(PEPA_O) $(EMU_T) $(EMU_O) $(AFL_T) $(LIBCONFUSE_A)
 	make -C buf_t clean
 	make -C slog clean
-	make -C libconfuse clean
+	# make -C libconfuse clean
 
 .PHONY:check
 check:
