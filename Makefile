@@ -161,6 +161,7 @@ clean:
 	rm -f $(PEPA_T) $(PEPA_O) $(EMU_T) $(EMU_O) $(AFL_T)
 	make -C buf_t clean
 	make -C slog clean
+	make -C libconfuse clean
 
 .PHONY:check
 check:

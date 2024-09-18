@@ -9,7 +9,12 @@ How to install
 3. Update submodules:
 # git submodule update
 
-4. RUn one the targets:
+4. Install dependencies (if you work on a Debian based Linux, like Debian, Ubuntu):
+# scripts/install_dependencies.sh
+
+If you run RedHat or other not-DEB based machine, open this script and install listed dependencies using another package manager.
+
+5. Run one the targets:
 # make all
 
 or
