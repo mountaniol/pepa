@@ -1,0 +1,9 @@
+libconfuse
+._*
+*/.~*
+afl_dir/
+fuzzer_output/
+GPATH
+GRTAGS
+GTAGS
+
