@@ -282,15 +282,6 @@ size_t pepa_add_id_and_ticket(pepa_core_t *core, char *buf, const size_t buf_siz
     size_t offset = 0;
     static unsigned int ticket;
 
-    if (core->use_id) {
-        if (buf_size < offset + sizeof(unsigned int)) {
-            return offset;
-        }
-
-        memcpy(buf + offset, &core->id_val, sizeof(int));
-        offset += sizeof(int);
-    }
-
     if (core->use_ticket) {
         if (buf_size < offset + sizeof(unsigned int)) {
             return offset;
@@ -300,6 +291,16 @@ size_t pepa_add_id_and_ticket(pepa_core_t *core, char *buf, const size_t buf_siz
         memcpy(buf + offset, &ticket, sizeof(unsigned int));
         offset += sizeof(unsigned int);
     }
+
+    if (core->use_id) {
+        if (buf_size < offset + sizeof(unsigned int)) {
+            return offset;
+        }
+
+        memcpy(buf + offset, &core->id_val, sizeof(int));
+        offset += sizeof(int);
+    }
+
     return offset;
 }
 

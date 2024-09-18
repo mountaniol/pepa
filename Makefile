@@ -153,8 +153,6 @@ emu: buf_t slog $(EMU_O)
 $(LIBCONFUSE_A):
 	cd libconfuse ; ./autogen.sh ; ./configure ; make clean all ; cd -
 
-
-
 .PHONY:slog
 slog:
 	make -C slog

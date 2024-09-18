@@ -1,0 +1,21 @@
+How to install
+
+1. Clone this project:
+# git clone --recursive  git@github.com:mountaniol/pepa.git
+
+2. Switch to the proper branch, today (18/09/2024) it is "pepa-ng":
+# git switch pepa-ng
+
+3. Update submodules:
+# git submodule update
+
+4. RUn one the targets:
+# make all
+
+or
+
+# make pepa emu
+
+or, to compile a static version of the PEPA:
+
+# make static
