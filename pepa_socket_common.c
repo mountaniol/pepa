@@ -13,7 +13,7 @@
 #include "pepa_core.h"
 
 unsigned int pepa_gen_ticket(unsigned int seed);
-size_t pepa_add_id_and_ticket(pepa_core_t *core, char *buf, const size_t buf_size);
+static size_t pepa_add_id_and_ticket(pepa_core_t *core, char *buf, const size_t buf_size);
 
 #define handle_error_en(en, msg) \
                do { errno = en; perror(msg); exit(EXIT_FAILURE); } while (0)
@@ -274,15 +274,40 @@ static void pepa_print_buffer(pepa_core_t *core, char *buf, const ssize_t rx,
     slog_debug("%s", core->print_buf);
 }
 
-unsigned int pepa_gen_ticket(unsigned int seed) {
+/**
+ * @author se (9/24/24)
+ * @brief This function generate a pseudorandom number.
+ *        This number is not really random but we do not need
+ *        real randomness. We need to generate a unique number
+ *        for every next buffer. This function is a very fast
+ *        and efficient one instead.
+ * @param seed   A previous value of the pseudorandom number
+ * @return unsigned int The next pseudorandom number
+ */
+static unsigned int pepa_gen_ticket(unsigned int seed) {
     return (214013 * seed + 2531011);
 }
 
-size_t pepa_add_id_and_ticket(pepa_core_t *core, char *buf, const size_t buf_size) {
+/**
+ * 
+ * @author se (9/24/24)
+ * @brief This function adds a ticket and PEPA ID to the buffer
+ *        beginning, if they are enabled
+ * @param core     Core structure
+ * @param buf      Buffer allocated for sending
+ * @param buf_size Size of the buffer
+ * @return size_t If a ticket and/or PEPA ID were added,
+ *         the offset returned is the length of written ticket
+ *         and/or PEPA ID. If they both are disabled, 0 will be
+ *         returned.
+ */
+__attribute__((hot))
+static size_t pepa_add_id_and_ticket(pepa_core_t *core, char *buf, const size_t buf_size) {
     size_t offset = 0;
     static unsigned int ticket;
 
     if (core->use_ticket) {
+        /* If the buffer is too short, we return 0 and do nothing */
         if (buf_size < offset + sizeof(unsigned int)) {
             return offset;
         }
@@ -293,6 +318,7 @@ size_t pepa_add_id_and_ticket(pepa_core_t *core, char *buf, const size_t buf_siz
     }
 
     if (core->use_id) {
+        /* If the buffer is too short, we return the offset and do nothing */
         if (buf_size < offset + sizeof(unsigned int)) {
             return offset;
         }
@@ -301,6 +327,7 @@ size_t pepa_add_id_and_ticket(pepa_core_t *core, char *buf, const size_t buf_siz
         offset += sizeof(int);
     }
 
+    /* Return the offset, means, how many bytes we used in the buffer beginning */
     return offset;
 }
 
@@ -315,13 +342,15 @@ int pepa_one_direction_copy3(pepa_core_t *core,
     //static char *print_buf   = calloc(core->internal_buf_size + 1, 1);
 
     int     ret          = PEPA_ERR_OK;
-    ssize_t rx           = 0;
+    ssize_t rx_bytes           = 0;
     ssize_t tx_total     = 0;
     ssize_t rx_total     = 0;
     int     iteration    = 0;
+
     /* buf_size_use - how many bytes available in the buffer after we reserved and added service information */
     size_t  buf_size_use = buf_size;
     size_t  offset = 0;
+
     /* If message dump is enabled, keep 1 character for \0 */
     if (core->dump_messages) {
         buf_size_use--;
@@ -332,7 +361,7 @@ int pepa_one_direction_copy3(pepa_core_t *core,
     }
 
     do {
-        ssize_t tx         = 0;
+        ssize_t tx_bytes         = 0;
         ssize_t tx_current = 0;
 
         iteration++;
@@ -340,17 +369,17 @@ int pepa_one_direction_copy3(pepa_core_t *core,
             // slog_note_l("Iteration: %d", iteration);
         }
 
-        offset = pepa_add_id_and_ticket(core,buf,buf_size);
+        offset = pepa_add_id_and_ticket(core, buf, buf_size);
 
         /* Read one time, then we will transfer it possibly in pieces */
-        rx = read(fd_in, buf + offset, buf_size_use - offset);
+        rx_bytes = read(fd_in, buf + offset, buf_size_use - offset);
 
         if (do_debug) {
             // slog_note_l("Iteration: %d, finised read(), there is %d bytes", iteration, rx);
         }
 
 
-        if (rx < 0) {
+        if (rx_bytes < 0) {
             if (do_debug) {
                 slog_warn_l("Could not read: from read sock %s [%d]: %s", name_in, fd_in, strerror(errno));
             }
@@ -359,7 +388,7 @@ int pepa_one_direction_copy3(pepa_core_t *core,
         }
 
         /* nothing to read on the furst iteraion; it means, this socket is invalid */
-        if ((0 == rx) && (1 == iteration)) {
+        if ((0 == rx_bytes) && (1 == iteration)) {
             /* If we can not read on the first iteration, it probably means the fd was closed */
             ret = -PEPA_ERR_BAD_SOCKET_READ;
 
@@ -378,12 +407,12 @@ int pepa_one_direction_copy3(pepa_core_t *core,
            We must print until the whole buffer is printed */
 
         if (core->dump_messages) {
-            pepa_print_buffer(core, buf, rx, fd_out, name_out, fd_in, name_in);
+            pepa_print_buffer(core, buf, rx_bytes + offset, fd_out, name_out, fd_in, name_in);
         }
 
-        /* Write until transfer the whole received buffer */
+        /* Write until the whole received buffer was transferred */
         do {
-            tx_current  = write(fd_out, buf, (size_t)(rx - tx));
+            tx_current  = write(fd_out, buf, (size_t)(rx_bytes + offset - tx_bytes));
 
             if (tx_current <= 0) {
                 ret = -PEPA_ERR_BAD_SOCKET_WRITE;
@@ -393,23 +422,23 @@ int pepa_one_direction_copy3(pepa_core_t *core,
                 goto endit;
             }
 
-            tx += tx_current;
+            tx_bytes += tx_current;
 
             /* If we still not transfered everything, give the TX socket some time to rest and finish the transfer */
-            if (tx < rx) {
+            if (tx_bytes < (rx_bytes + offset)) {
                 usleep(10);
             }
 
-        } while (tx < rx);
+        } while (tx_bytes < rx_bytes + offset);
 
-        rx_total += rx;
-        tx_total += tx;
+        rx_total += rx_bytes;
+        tx_total += tx_bytes;
         if (do_debug) {
             // slog_note_l("Iteration %d done: rx = %d, tx = %d", iteration, rx, tx);
         }
 
         /* Run this loop as long as we have data on read socket, but no more that max_iterations */
-    } while (((int32_t)buf_size_use == rx) && (iteration <= max_iterations));
+    } while (((int32_t)buf_size_use == (rx_bytes + offset)) && (iteration <= max_iterations));
 
     ret = PEPA_ERR_OK;
 endit:
