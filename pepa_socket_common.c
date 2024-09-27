@@ -12,7 +12,7 @@
 #include "pepa_errors.h"
 #include "pepa_core.h"
 
-unsigned int pepa_gen_ticket(unsigned int seed);
+static unsigned int pepa_gen_ticket(unsigned int seed);
 static size_t pepa_add_id_and_ticket(pepa_core_t *core, char *buf, const size_t buf_size);
 
 #define handle_error_en(en, msg) \
@@ -349,7 +349,7 @@ int pepa_one_direction_copy3(pepa_core_t *core,
 
     /* buf_size_use - how many bytes available in the buffer after we reserved and added service information */
     size_t  buf_size_use = buf_size;
-    size_t  offset = 0;
+    ssize_t  offset = 0;
 
     /* If message dump is enabled, keep 1 character for \0 */
     if (core->dump_messages) {
