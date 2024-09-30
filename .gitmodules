@@ -1,3 +1,6 @@
 [submodule "libconfuse"]
 	path = libconfuse
 	url = https://github.com/libconfuse/libconfuse.git
+[submodule "libhl"]
+	path = libhl
+	url = https://github.com/xant/libhl.git

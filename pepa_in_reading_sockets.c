@@ -5,6 +5,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 
+#include "logger.h"
 #include "slog/src/slog.h"
 #include "pepa_config.h"
 #include "pepa_socket_common.h"
@@ -28,42 +29,42 @@ void pepa_in_reading_sockets_close_all(pepa_core_t *core)
 	int i;
 
 	if(NULL == core) {
-		slog_error_l("Core is NULL");
+		llog_e("Core is NULL");
 		return;
 	}
 
 	if (0 == pepa_core_is_valid(core)) {
-		slog_error_l("Core structure is invalid");
+		llog_e("Core structure is invalid");
 		return;
 	}
 
 	if(NULL == core->in_reading_sockets.sockets) {
-		slog_error_l("core->in_reading_sockets.sockets is NULL");
+		llog_e("core->in_reading_sockets.sockets is NULL");
 		return;
 	}
 
-	slog_note_l("IN-READER: Starting closing and removing sockets: %d slots", core->in_reading_sockets.number);
+	llog_n("IN-READER: Starting closing and removing sockets: %d slots", core->in_reading_sockets.number);
 
 	for (i = 0; i < core->in_reading_sockets.number; i++) {
 		if (EMPTY_SLOT != core->in_reading_sockets.sockets[i]) {
 
 			//close(core->in_reading_sockets.sockets[i]);
-			slog_note_l("IN-READER: Going to close in reading socket %d port %d",
+			llog_n("IN-READER: Going to close in reading socket %d port %d",
 						core->in_reading_sockets.sockets[i],
 						pepa_find_socket_port(core->in_reading_sockets.sockets[i]));
 
 			int rc_remove = epoll_ctl(core->epoll_fd, EPOLL_CTL_DEL, core->in_reading_sockets.sockets[i], NULL);
 
 			if (rc_remove) {
-				slog_warn_l("IN-READER: Could not remove socket %d from epoll set", core->in_reading_sockets.sockets[i]);
+				llog_w("IN-READER: Could not remove socket %d from epoll set", core->in_reading_sockets.sockets[i]);
 			}
 
 			pepa_reading_socket_close(core->in_reading_sockets.sockets[i], "IN FORWARD READ");
-			slog_note_l("IN-READER: Closed socket %d in slot %d", core->in_reading_sockets.sockets[i], i);
+			llog_n("IN-READER: Closed socket %d in slot %d", core->in_reading_sockets.sockets[i], i);
 			core->in_reading_sockets.sockets[i] = EMPTY_SLOT;
 		}
 	}
-	slog_note_l("IN-READER: Finished closing and removing sockets: %d slots", core->in_reading_sockets.number);
+	llog_n("IN-READER: Finished closing and removing sockets: %d slots", core->in_reading_sockets.number);
 }
 
 /**
@@ -81,10 +82,10 @@ void pepa_in_reading_sockets_close_all(pepa_core_t *core)
  */
 void pepa_in_reading_sockets_free(pepa_core_t *core)
 {
-	slog_note_l("IN-READER: Starting IN read sockets closing and cleaning");
+	llog_n("IN-READER: Starting IN read sockets closing and cleaning");
 	TESTP_VOID(core);
 	if (!pepa_core_is_valid(core)) {
-		slog_error_l("Core structure is invalid");
+		llog_e("Core structure is invalid");
 		return;
 	}
 	TESTP_VOID(core->in_reading_sockets.sockets);
@@ -92,7 +93,7 @@ void pepa_in_reading_sockets_free(pepa_core_t *core)
 	pepa_in_reading_sockets_close_all(core);
 	free(core->in_reading_sockets.sockets);
 	core->in_reading_sockets.sockets = NULL;
-	slog_note_l("IN-READER: Finished IN reading socket closing and cleaning");
+	llog_n("IN-READER: Finished IN reading socket closing and cleaning");
 }
 
 /**
@@ -106,11 +107,11 @@ void pepa_in_reading_sockets_free(pepa_core_t *core)
 void pepa_in_reading_sockets_allocate(pepa_core_t *core, const int num)
 {
 	int i;
-	slog_note_l("IN-READER: Starting IN read sockets array allocation");
+	llog_n("IN-READER: Starting IN read sockets array allocation");
 	TESTP_VOID(core);
 
 	if (0 == pepa_core_is_valid(core)) {
-		slog_error_l("Core structure is invalid");
+		llog_e("Core structure is invalid");
 		return;
 	}
 	
@@ -120,7 +121,7 @@ void pepa_in_reading_sockets_allocate(pepa_core_t *core, const int num)
 	for (i = 0; i < num; i++) {
 		core->in_reading_sockets.sockets[i] = EMPTY_SLOT;
 	}
-	slog_note_l("IN-READER: Finished IN read sockets array allocation: allocated %d socket slots", num);
+	llog_n("IN-READER: Finished IN read sockets array allocation: allocated %d socket slots", num);
 }
 
 /**
@@ -137,27 +138,27 @@ void pepa_in_reading_sockets_allocate(pepa_core_t *core, const int num)
 void pepa_in_reading_sockets_add(pepa_core_t *core, const int fd)
 {
 	int i;
-	slog_note_l("IN-READER: Starting addition of a new IN read socket [%d] to array", fd);
+	llog_n("IN-READER: Starting addition of a new IN read socket [%d] to array", fd);
 	TESTP_VOID(core);
 	if (!pepa_core_is_valid(core)) {
-		slog_error_l("Core structure is invalid");
+		llog_e("Core structure is invalid");
 		return;
 	}
 
 	if(NULL == core->in_reading_sockets.sockets) {
-		slog_error_l("core->in_reading_sockets.sockets == NULL");
+		llog_e("core->in_reading_sockets.sockets == NULL");
 		return;
 	}
 
 	for (i = 0; i < core->in_reading_sockets.number; i++) {
 		if (EMPTY_SLOT == core->in_reading_sockets.sockets[i]) {
 			core->in_reading_sockets.sockets[i] = fd;
-			slog_note_l("IN-READER: Added socket %d to slot %d", core->in_reading_sockets.sockets[i], i);
+			llog_n("IN-READER: Added socket %d to slot %d", core->in_reading_sockets.sockets[i], i);
             core->in_reading_sockets.active++;
             return;
 		}
 	}
-	slog_error_l("Can not to add of a new IN read socket [%d] to array", fd);
+	llog_e("Can not to add of a new IN read socket [%d] to array", fd);
 }
 
 /**
@@ -177,23 +178,23 @@ void pepa_in_reading_sockets_close_rm(pepa_core_t *core, const int fd)
 	int i;
 	TESTP_VOID(core);
 	if (!pepa_core_is_valid(core)) {
-		slog_error_l("Core structure is invalid");
+		llog_e("Core structure is invalid");
 		return;
 	}
 	TESTP_VOID(core->in_reading_sockets.sockets);
 	for (i = 0; i < core->in_reading_sockets.number; i++) {
 		if (fd == core->in_reading_sockets.sockets[i]) {
-			slog_note_l("IN-READER: Going to close in reading socket %d port %d",
+			llog_n("IN-READER: Going to close in reading socket %d port %d",
 						core->in_reading_sockets.sockets[i],
 						pepa_find_socket_port(core->in_reading_sockets.sockets[i]));
 
 			pepa_reading_socket_close(core->in_reading_sockets.sockets[i], "IN-FORWARD");
-			slog_note_l("IN-READER: Closed and remove socket %d", core->in_reading_sockets.sockets[i]);
+			llog_n("IN-READER: Closed and remove socket %d", core->in_reading_sockets.sockets[i]);
 			core->in_reading_sockets.sockets[i] = EMPTY_SLOT;
 			core->in_reading_sockets.active--;
 			return;
 		}
 	}
-	slog_note_l("IN-READER: Could not close and removed socket %d", fd);
+	llog_n("IN-READER: Could not close and removed socket %d", fd);
 }
 

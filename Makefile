@@ -96,6 +96,7 @@ CFLAGS+=-O2
 INC=-I./libconfuse/src/
 
 LIBCONFUSE_A=./libconfuse/src/.libs/libconfuse.a
+LIBHL=./libhl/libhl.a
 
 #PEPA_O= pepa3.o pepa_state_machine.o pepa_parser.o main.o pepa_core.o \
 		pepa_server.o pepa_errors.o \
@@ -104,14 +105,14 @@ LIBCONFUSE_A=./libconfuse/src/.libs/libconfuse.a
 
 PEPA_O= pepa_config.o pepa3.o pepa_state_machine.o pepa_parser.o main.o pepa_core.o \
 		pepa_server.o pepa_errors.o \
-		pepa_socket_common.o pepa_in_reading_sockets.o
+		pepa_socket_common.o pepa_in_reading_sockets.o logger.o
 PEPA_T=pepa-ng
 
 
-LIBS=-lpthread $(LIBCONFUSE_A)
+LIBS=-lpthread $(LIBCONFUSE_A) $(LIBHL)
 
 AFL_O=pepa_afl.o pepa3.o pepa_state_machine.o pepa_parser.o pepa_core.o \
-		pepa_server.o pepa_errors.o pepa_socket_common.o pepa_in_reading_sockets.o
+		pepa_server.o pepa_errors.o pepa_socket_common.o pepa_in_reading_sockets.o logger.o
 
 AFL_T=pepa_afl.out
 
@@ -125,7 +126,7 @@ ARS=$(BUFT_AR) $(SLOG_AR)
 	pepa_socket_out.o pepa_socket_shva.o 
 EMU_O=pepa_emulator.o pepa_state_machine.o pepa_parser.o \
 	pepa_core.o pepa_server.o pepa_errors.o \
-	pepa_socket_common.o pepa_in_reading_sockets.o pepa_config.o
+	pepa_socket_common.o pepa_in_reading_sockets.o pepa_config.o logger.o
 
 EMU_T=emu
 
@@ -133,10 +134,10 @@ EMU_T=emu
 all: clean static
 ca: clean pepa emu
 
-pepa: slog buf_t $(PEPA_O) $(LIBCONFUSE_A)
+pepa: slog buf_t $(PEPA_O)
 	$(GCC) $(CFLAGS) $(INC) $(DEBUG) $(PEPA_O) $(ARS) -o $(PEPA_T) $(LIBS)
 
-static: slog buf_t $(PEPA_O) $(LIBCONFUSE_A)
+static: slog buf_t $(PEPA_O) 
 	$(GCC) $(CFLAGS) $(INC) -static $(DEBUG) $(PEPA_O) $(ARS) -o $(PEPA_T) $(LIBS)
 	
 
@@ -153,15 +154,17 @@ emu: buf_t slog $(EMU_O) $(LIBCONFUSE_A)
 $(LIBCONFUSE_A):
 	cd libconfuse ; ./autogen.sh ; ./configure ; make clean all ; cd -
 
+libhl:
+	cd libhl ; autoconf ; ./configure ; make clean all ; cd -
+
 .PHONY:slog
 slog:
 	make -C slog
 
 clean:
-	rm -f $(PEPA_T) $(PEPA_O) $(EMU_T) $(EMU_O) $(AFL_T) $(LIBCONFUSE_A)
+	rm -f $(PEPA_T) $(PEPA_O) $(EMU_T) $(EMU_O) $(AFL_T)
 	make -C buf_t clean
 	make -C slog clean
-	# make -C libconfuse clean
 
 .PHONY:check
 check:

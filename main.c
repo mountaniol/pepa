@@ -10,6 +10,7 @@
 #include "pepa_parser.h"
 #include "pepa_server.h"
 #include "pepa_state_machine.h"
+#include "logger.h"
 
 static void pepa_clean_on_exit(void)
 {
@@ -98,6 +99,12 @@ int main(int argi, char *argv[])
 {
 	int rc;
 
+	rc = logger_start();
+	if (rc) {
+		printf("Could not start PEPA logger\n");
+		return -1;
+	}
+
 	slog_init("pepa", SLOG_FLAGS_ALL, 0);
 	pepa_print_version();
 
@@ -111,7 +118,6 @@ int main(int argi, char *argv[])
 
 	pepa_core_t *core = pepa_get_core();
 
-	slog_note_l("Going to parse arguments");
 	rc = pepa_parse_arguments(argi, argv);
 	if (rc < 0) {
 		slog_fatal_l("Could not parse arguments: %s", pepa_error_code_to_str(rc));

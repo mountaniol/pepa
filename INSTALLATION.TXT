@@ -1,26 +1,24 @@
-How to install
+How to deploy
 
 1. Clone this project:
 # git clone --recursive  git@github.com:mountaniol/pepa.git
 
-2. Switch to the proper branch, today (18/09/2024) it is "pepa-ng":
-# git switch pepa-ng
+2. Run 'deploy' script:
+# ./scripts/deploy.sh
 
-3. Update submodules:
-# git submodule update --init
+Note: You should run 'deploy.sh' only once.
+This script prepares the project: installs dependencies then brings git submodules and compiles them.
+Every following compilation, even after 'git pull,' does not require the deploy script to run.
 
-4. Install dependencies (if you work on a Debian based Linux, like Debian, Ubuntu):
-# scripts/install_dependencies.sh
-
-If you run RedHat or other not-DEB based machine, open this script and install listed dependencies using another package manager.
-
-5. Run one the targets:
-# make all
-
+3. Run one of the targets:
+# make
 or
-
+# make all
+or
 # make pepa emu
-
-or, to compile a static version of the PEPA:
-
+or to compile a static version of the PEPA explicitly:
 # make static
+
+NOTE: If you run 'make' or 'make all' target, it will:
+a. Run 'clean' 
+b. Compile a static version of PEPA

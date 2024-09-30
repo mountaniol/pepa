@@ -5,6 +5,7 @@
 #include <sys/epoll.h>
 #include <errno.h>
 
+#include "logger.h"
 #include "buf_t/buf_t.h"
 #include "pepa_config.h"
 #include "pepa_core.h"
@@ -779,11 +780,20 @@ void *pepa_emulator_in_thread(__attribute__((unused))void *arg)
 
 int main(int argi, char *argv[])
 {
+
+	int32_t rc = logger_start();
+	if (rc) {
+		printf("Could not start PEPA logger\n");
+		return -1;
+	}
+
+	llog_r("PEPA Logger: %s int: %d",  "test", 22);
+
 	slog_init("EMU", SLOG_FLAGS_ALL, 0);
 	pepa_core_init();
 	pepa_core_t *core = pepa_get_core();
 
-	int32_t     rc    = pepa_parse_arguments(argi, argv);
+	rc    = pepa_parse_arguments(argi, argv);
 	if (rc < 0) {
 		slog_fatal_l("Could not parse");
 		return rc;

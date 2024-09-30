@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <stdio.h>
 
+#include "logger.h"
 #include "slog/src/slog.h"
 #include "pepa_config.h"
 #include "pepa_errors.h"
@@ -14,16 +15,16 @@
 void pepa_thread_cancel(const pthread_t pid, const char *name)
 {
 	if (PTHREAD_DEAD == pid || pthread_kill(pid, 0) < 0) {
-		slog_error_l("Can not cancel %s thread, it is not alive", name);
+		llog_e("Can not cancel %s thread, it is not alive", name);
 		return;
 	}
 
 	int rc = pthread_cancel(pid);
 
 	if (0 != rc) {
-		slog_fatal_l("Can not cancel <%s> thread", name);
+		llog_f("Can not cancel <%s> thread", name);
 	} else {
-		slog_note_l("## Canceled <%s> thread", name);
+		llog_n("## Canceled <%s> thread", name);
 	}
 
 	/* Blocking wait until the pthread is really dead */
@@ -51,18 +52,18 @@ void pepa_thread_kill_monitor(pepa_core_t *core)
 	TESTP_VOID(core);
 	pepa_thread_cancel(core->monitor_thread.thread_id, "IN");
 	core->monitor_thread.thread_id = PTHREAD_DEAD;
-	slog_debug("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
-	slog_debug("@@       THREAD <MONITOR> IS KILLED        @@");
-	slog_debug("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
+	llog_d("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
+	llog_d("@@       THREAD <MONITOR> IS KILLED        @@");
+	llog_d("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
 }
 
 void *pepa_monitor_thread(__attribute__((unused))void *arg);
 
 void pepa_thread_start_monitor(pepa_core_t *core)
 {
-	slog_note_l("Starting MONITOR thread");
+	llog_n("Starting MONITOR thread");
 	if (PEPA_ERR_OK == pepa_thread_is_monitor_up(core)) {
-		slog_warn_l("Thread MONITOR is UP already, finishing");
+		llog_w("Thread MONITOR is UP already, finishing");
 		return;
 	}
 	int rc = pthread_create(&core->monitor_thread.thread_id, NULL, pepa_monitor_thread, NULL);
@@ -70,9 +71,9 @@ void pepa_thread_start_monitor(pepa_core_t *core)
 		pepa_parse_pthread_create_error(rc);
 		abort();
 	}
-	slog_debug("#############################################");
-	slog_debug("##       THREAD <MONITOR> IS STARTED       ##");
-	slog_debug("#############################################");
+	llog_d("#############################################");
+	llog_d("##       THREAD <MONITOR> IS STARTED       ##");
+	llog_d("#############################################");
 }
 
 void *pepa_monitor_thread(__attribute__((unused))void *arg)
@@ -84,7 +85,7 @@ void *pepa_monitor_thread(__attribute__((unused))void *arg)
 
 	int32_t    rc                = pepa_pthread_init_phase(my_name);
 	if (rc < 0) {
-		slog_fatal_l("%s: Could not init the thread", my_name);
+		llog_f("%s: Could not init the thread", my_name);
 		pthread_exit(NULL);
 	}
 
@@ -96,7 +97,7 @@ void *pepa_monitor_thread(__attribute__((unused))void *arg)
 		int        active_in_readers;
 
 		if (core->monitor_divider_str[0] == 0) {
-			slog_debug("### STATUS: /Units: %d bytes/ SHVA [+%lu | %lu/sec] ---> OUT [+%lu | %lu/sec] ### IN [+%lu | %lu/sec] ---> SHVA [+%lu | %lu/sec]  ###",
+			slogn("### STATUS: /Units: %d bytes/ SHVA [+%lu | %lu/sec] ---> OUT [+%lu | %lu/sec] ### IN [+%lu | %lu/sec] ---> SHVA [+%lu | %lu/sec]  ###",
 					   core->monitor_divider,
 					   (core->monitor.shva_rx - monitor_prev.shva_rx) / (uint64_t)core->monitor_divider,
 					   ((core->monitor.shva_rx - monitor_prev.shva_rx) / (uint64_t)core->monitor_freq) / (uint64_t)core->monitor_divider,
@@ -120,7 +121,7 @@ void *pepa_monitor_thread(__attribute__((unused))void *arg)
 			if (core->monitor_divider_str[0] == 'M') {
 				divider_str = "Mbytes";
 			}
-			slog_debug("### STATUS: Freq: %u seconds, Units: %s ### SHVA [+%lu | %lu/sec] ---> OUT [+%lu | %lu/sec] ### IN [+%lu | %lu/sec] ---> SHVA [+%lu | %lu/sec]  ###",
+			slogn("### STATUS: Freq: %u seconds, Units: %s ### SHVA [+%lu | %lu/sec] ---> OUT [+%lu | %lu/sec] ### IN [+%lu | %lu/sec] ---> SHVA [+%lu | %lu/sec]  ###",
 					   core->monitor_freq, divider_str,
 					   (core->monitor.shva_rx - monitor_prev.shva_rx) / (uint64_t)core->monitor_divider,
 					   ((core->monitor.shva_rx - monitor_prev.shva_rx) / (uint64_t)core->monitor_freq) / (uint64_t)core->monitor_divider,
@@ -145,7 +146,7 @@ void *pepa_monitor_thread(__attribute__((unused))void *arg)
 			}
 		}
 
-		slog_debug("### STATUS: Sockets: OUT LISTEN FD[%d]: %d | OUT WRITE FD[%d]: %d | SHVA FD[%d]: %d | IN LISTEN FD[%d]: %d | IN ACCEPTORS[%d] ###",
+		slogn("### STATUS: Sockets: OUT LISTEN FD[%d]: %d | OUT WRITE FD[%d]: %d | SHVA FD[%d]: %d | IN LISTEN FD[%d]: %d | IN ACCEPTORS[%d] ###",
 				   (core->sockets.out_listen >= 0) ? 1 : 0,
 				   core->sockets.out_listen,
 
@@ -159,7 +160,7 @@ void *pepa_monitor_thread(__attribute__((unused))void *arg)
 				   core->sockets.in_listen,
 
 				   active_in_readers);
-		slog_debug("### STATUS:  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
+		slogn("### STATUS:  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
 
 		fflush(stdout);
 

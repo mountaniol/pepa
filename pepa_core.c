@@ -1,5 +1,6 @@
 #include <unistd.h>
 
+#include "logger.h"
 #include "slog/src/slog.h"
 #include "pepa_core.h"
 #include "pepa_config.h"
@@ -78,14 +79,14 @@ static int pepa_release_core_t(pepa_core_t *core)
 {
 	TESTP(core, -1);
 	if (!pepa_core_is_valid(core)) {
-		slog_fatal("Core is invalid, can not release it");
+		llog_f("Core is invalid, can not release it");
 		return -1;
 	}
 
 	if (NULL != core->in_thread.ip_string) {
 		int rc = buf_free(core->in_thread.ip_string);
 		if (BUFT_OK != rc) {
-			slog_note_l("Can not free the buf_t: %s", buf_error_code_to_string(rc));
+			llog_n("Can not free the buf_t: %s", buf_error_code_to_string(rc));
 		}
 		core->in_thread.ip_string = NULL;
 	}
@@ -93,7 +94,7 @@ static int pepa_release_core_t(pepa_core_t *core)
 	if (NULL != core->out_thread.ip_string) {
 		int rc = buf_free(core->out_thread.ip_string);
 		if (BUFT_OK != rc) {
-			slog_note_l("Can not free the buf_t: %s", buf_error_code_to_string(rc));
+			llog_n("Can not free the buf_t: %s", buf_error_code_to_string(rc));
 		}
 		core->out_thread.ip_string = NULL;
 	}
@@ -101,7 +102,7 @@ static int pepa_release_core_t(pepa_core_t *core)
 	if (NULL != core->shva_thread.ip_string) {
 		int rc = buf_free(core->shva_thread.ip_string);
 		if (BUFT_OK != rc) {
-			slog_note_l("Can not free the buf_t: %s", buf_error_code_to_string(rc));
+			llog_n("Can not free the buf_t: %s", buf_error_code_to_string(rc));
 		}
 		core->shva_thread.ip_string = NULL;
 	}
@@ -159,7 +160,7 @@ int32_t pepa_core_init(void)
 {
 	g_pepa_core = pepa_create_core_t();
 	if (NULL == g_pepa_core) {
-		slog_fatal_l("Can not create core");
+		llog_f("Can not create core");
 		PEPA_TRY_ABORT();
 		return (-PEPA_ERR_CORE_CREATE);
 	}

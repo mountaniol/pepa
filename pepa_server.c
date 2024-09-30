@@ -13,7 +13,7 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 
-
+#include "logger.h"
 #include "slog/src/slog.h"
 #include "pepa_parser.h"
 #include "pepa_core.h"
@@ -26,16 +26,16 @@ void pepa_set_rlimit(void)
 	limit.rlim_cur = 65535;
 	limit.rlim_max = 65535;
 	if (setrlimit(RLIMIT_NOFILE, &limit) != 0) {
-		slog_debug_l("setrlimit() failed with errno=%d, <%s>\n", errno, strerror(errno));
+		llog_d("setrlimit() failed with errno=%d, <%s>\n", errno, strerror(errno));
 	}
 
 	/* Get max number of files. */
 	if (getrlimit(RLIMIT_NOFILE, &limit) != 0) {
-		slog_debug_l("getrlimit() failed with errno=%d, <%s>\n", errno, strerror(errno));
+		llog_d("getrlimit() failed with errno=%d, <%s>\n", errno, strerror(errno));
 	}
 
-	slog_debug_l("The soft limit is %lu\n", limit.rlim_cur);
-	slog_debug_l("The hard limit is %lu\n", limit.rlim_max);
+	llog_d("The soft limit is %lu\n", limit.rlim_cur);
+	llog_d("The hard limit is %lu\n", limit.rlim_max);
 }
 
 void daemonize(pepa_core_t *core)
@@ -49,7 +49,7 @@ void daemonize(pepa_core_t *core)
 
 	/* An error occurred */
 	if (pid < 0) {
-		slog_fatal_l("A fork error: %s", strerror(errno));
+		llog_f("A fork error: %s", strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 
@@ -60,7 +60,7 @@ void daemonize(pepa_core_t *core)
 
 	/* On success: The child process becomes session leader */
 	if (setsid() < 0) {
-		slog_fatal_l("A setsid error: %s", strerror(errno));
+		llog_f("A setsid error: %s", strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 
@@ -72,7 +72,7 @@ void daemonize(pepa_core_t *core)
 
 	/* An error occurred */
 	if (pid < 0) {
-		slog_fatal_l("A fork error");
+		llog_f("A fork error");
 		exit(EXIT_FAILURE);
 	}
 
@@ -89,7 +89,7 @@ void daemonize(pepa_core_t *core)
 	/* or another appropriated directory */
 	rc = chdir("/tmp/");
 	if (0 != rc) {
-		slog_fatal_l("Can not change dir: %s", strerror(errno));
+		llog_f("Can not change dir: %s", strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 
@@ -108,22 +108,22 @@ void daemonize(pepa_core_t *core)
 
 	/* Try to write PID of daemon to lockfile */
 	if (core->pid_file_name != NULL) {
-		slog_note_l("Going to create PEPA PID file: %s", core->pid_file_name);
+		llog_n("Going to create PEPA PID file: %s", core->pid_file_name);
 		char str[256];
 		core->pid_fd = open(core->pid_file_name, O_RDWR | O_CREAT, 0640);
 		if (core->pid_fd < 0) {
 			/* Can't open lockfile */
-			slog_fatal_l("Can not open lock file: %s", strerror(errno));
+			llog_f("Can not open lock file: %s", strerror(errno));
 			exit(EXIT_FAILURE);
 		} else {
 			int err = errno;
-			slog_error_l("Can not create PEPA PID file: %s, %s", core->pid_file_name, strerror(err));
+			llog_e("Can not create PEPA PID file: %s, %s", core->pid_file_name, strerror(err));
 			return;
 		}
 
 		if (lockf(core->pid_fd, F_TLOCK, 0) < 0) {
 			/* Can't lock file */
-			slog_fatal_l("Can not lock PID file: %s", strerror(errno));
+			llog_f("Can not lock PID file: %s", strerror(errno));
 			exit(EXIT_FAILURE);
 		}
 		/* Get current PID */
@@ -131,11 +131,11 @@ void daemonize(pepa_core_t *core)
 		/* Write PID to lockfile */
 		rc = write(core->pid_fd, str, strlen(str));
 		if (rc != (int32_t)strlen(str)) {
-			slog_fatal_l("Can not write PID into PID file: %s", strerror(errno));
+			llog_f("Can not write PID into PID file: %s", strerror(errno));
 			exit(EXIT_FAILURE);
 		}
 		
-		slog_note_l("Created PEPA PID file: %s, the PID is %s", core->pid_file_name, str);
+		llog_n("Created PEPA PID file: %s, the PID is %s", core->pid_file_name, str);
 		// close(core->pid_fd);
 	}
 }
