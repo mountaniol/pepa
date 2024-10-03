@@ -96,7 +96,7 @@ CFLAGS+=-O2
 INC=-I./libconfuse/src/
 
 LIBCONFUSE_A=./libconfuse/src/.libs/libconfuse.a
-LIBHL=./libhl/libhl.a
+LIBHL=./queue/libhl.a
 
 #PEPA_O= pepa3.o pepa_state_machine.o pepa_parser.o main.o pepa_core.o \
 		pepa_server.o pepa_errors.o \
@@ -134,7 +134,7 @@ EMU_T=emu
 all: clean static
 ca: clean pepa emu
 
-pepa: slog buf_t $(PEPA_O)
+pepa: $(queue) slog buf_t $(PEPA_O)
 	$(GCC) $(CFLAGS) $(INC) $(DEBUG) $(PEPA_O) $(ARS) -o $(PEPA_T) $(LIBS)
 
 static: slog buf_t $(PEPA_O) 
@@ -144,6 +144,9 @@ static: slog buf_t $(PEPA_O)
 .PHONY:buf_t
 buf_t:
 	make -C buf_t
+
+queue:
+	make -C queue
 
 .PHONY:emu
 emu: buf_t slog $(EMU_O) $(LIBCONFUSE_A)
@@ -165,6 +168,7 @@ clean:
 	rm -f $(PEPA_T) $(PEPA_O) $(EMU_T) $(EMU_O) $(AFL_T)
 	make -C buf_t clean
 	make -C slog clean
+	make -C queue clean
 
 .PHONY:check
 check:

@@ -1,4 +1,4 @@
 #!/bin/bash
 
-sudo apt install autoconf automake libtool gettext autopoint flex
+sudo apt install autogen autoconf automake libtool gettext autopoint flex
 

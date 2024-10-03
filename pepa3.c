@@ -318,7 +318,7 @@ static int pepa_process_fdx(pepa_core_t *core, const struct epoll_event events[]
             continue;
         }
 
-        llog_wn("An error on sending buffers: %s", pepa_error_code_to_str(rc));
+        llog_w("An error on sending buffers: %s", pepa_error_code_to_str(rc));
 
         /* Something wrong with the socket, should be removed */
 
