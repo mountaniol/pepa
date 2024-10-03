@@ -5,7 +5,7 @@
 #include <stdarg.h>
 
 #include "slog/src/slog.h"
-#include "libhl/src/queue.h"
+#include "queue.h"
 #include "debug.h"
 #include "logger.h"
 

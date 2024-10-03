@@ -93,7 +93,7 @@ PEPA_DEFINES+=-DPEPA_HOST=\"$(PEPA_HOST_VAL)\"
 CFLAGS+=$(PEPA_DEFINES)
 CFLAGS+=-O2
 
-INC=-I./libconfuse/src/
+INC=-I./libconfuse/src/ -I./queue/
 
 LIBCONFUSE_A=./libconfuse/src/.libs/libconfuse.a
 LIBHL=./queue/libhl.a
