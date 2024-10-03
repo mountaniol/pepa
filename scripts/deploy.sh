@@ -18,5 +18,5 @@ git submodule update --init
 cd -
 ${RD}/install_dependencies.sh
 cd libconfuse ; ./autogen.sh ; ./configure ; make clean all ; cd -
-echo "done" > ${DEP_ST}
+# echo "done" > ${DEP_ST}
 
