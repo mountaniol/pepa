@@ -10,7 +10,7 @@ RD=$(dirname ${RP})
 DEP_ST="${RD}/deploy.status"
 
 # If the deployment status file exists, we do not need to run it again
-[[ -e ${DEP_ST} && $(cat ${DEP_ST}) = "done" ]] && exit 0 
+# [[ -e ${DEP_ST} && $(cat ${DEP_ST}) = "done" ]] && exit 0 
 
 cd ${RD}/../
 git switch pepa-ng
