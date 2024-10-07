@@ -196,7 +196,7 @@ int logger_stop(void)
     return pthread_cancel(puller_thread);
 }
 
-__attribute__((format(printf, 4, 0)))
+__attribute__((format(printf, 4, 5)))
 int llog(int level, char *file, size_t line, const char *format, ...)
 {
     va_list args;

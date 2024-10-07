@@ -13,8 +13,10 @@
 #include "pepa_errors.h"
 #include "pepa_core.h"
 
+//static ssize_t pepa_socket_write(const int fd_out, char *buf, const size_t buf_size,
+//                                const int do_debug, const char *name_out);
 static unsigned int pepa_gen_ticket(unsigned int seed);
-static size_t pepa_add_id_and_ticket(pepa_core_t *core, char *buf, const size_t buf_size);
+static void pepa_add_id_and_ticket(pepa_core_t *core, char *buf, const size_t buf_size);
 
 #define handle_error_en(en, msg) \
                do { errno = en; perror(msg); exit(EXIT_FAILURE); } while (0)
@@ -239,9 +241,9 @@ static void pepa_print_buffer(pepa_core_t *core, char *buf, const ssize_t rx,
                               const int fd_out, const char *name_out,
                               const int fd_in, const char *name_in)
 {
-    char pre_buffer[64];
+    //char    pre_buffer[64];
     ssize_t offset = 0;
-    ssize_t header_offset = 0;
+    // ssize_t header_offset  = 0;
 
     int     prc    = 0; /** < return value of snprintf */
 
@@ -255,12 +257,12 @@ static void pepa_print_buffer(pepa_core_t *core, char *buf, const ssize_t rx,
     if (NULL == core->print_buf) {
         llog_e("Can not allocate printing buffer, asked size is: %u; message was not printed", core->print_buf_len);
         return;
-    } 
+    }
 #if 0 /* SEB */ /* 30.09.2024 */
 else {
         llog_w("Allocated printing buffer of size %u", core->print_buf_len);
     }
-#endif /* SEB */ /* 30.09.2024 */ 
+#endif /* SEB */ /* 30.09.2024 */
 
     /* Print header */
     offset = snprintf(core->print_buf, core->print_buf_len, "+++ MES: %s [fd:%.2d] -> %s [fd:%.2d], LEN:%zd |",
@@ -326,7 +328,7 @@ static unsigned int pepa_gen_ticket(unsigned int seed)
  *         returned.
  */
 __attribute__((hot))
-static size_t pepa_add_id_and_ticket(pepa_core_t *core, char *buf, const size_t buf_size)
+static void pepa_add_id_and_ticket(pepa_core_t *core, char *buf, const size_t buf_size)
 {
     size_t              offset = 0;
     static unsigned int ticket;
@@ -334,7 +336,10 @@ static size_t pepa_add_id_and_ticket(pepa_core_t *core, char *buf, const size_t 
     if (core->use_ticket) {
         /* If the buffer is too short, we return 0 and do nothing */
         if (buf_size < offset + sizeof(unsigned int)) {
-            return offset;
+            printf("A wrong buf size: buf_size (%lu) < offset (%lu) + sizeof(unsigned int) (%lu)\n",
+                   buf_size, offset, sizeof(unsigned int));
+            sleep(1);
+            abort();
         }
 
         ticket = pepa_gen_ticket(ticket);
@@ -345,15 +350,124 @@ static size_t pepa_add_id_and_ticket(pepa_core_t *core, char *buf, const size_t 
     if (core->use_id) {
         /* If the buffer is too short, we return the offset and do nothing */
         if (buf_size < offset + sizeof(unsigned int)) {
-            return offset;
+            printf("A wrong buf size: buf_size (%lu) < offset (%lu) + sizeof(unsigned int) (%lu)\n",
+                   buf_size, offset, sizeof(unsigned int));
+            sleep(1);
+            abort();
         }
 
         memcpy(buf + offset, &core->id_val, sizeof(int));
         offset += sizeof(int);
     }
+}
 
-    /* Return the offset, means, how many bytes we used in the buffer beginning */
-    return offset;
+static ssize_t pepa_socket_read(pepa_core_t *core, int iteration, const int fd_in, const int fd_out,
+                                char *buf, const size_t buf_size, int pepa_id,
+                                const int do_debug, const char *name_in, const char *name_out)
+{
+    size_t offset        = 0;
+    size_t buf_size_used = buf_size;
+
+    if (core->dump_messages) {
+        buf_size_used--;
+    }
+
+    if (pepa_id && core->use_ticket) {
+        offset += sizeof(unsigned int);
+        buf_size_used -= sizeof(unsigned int);
+    }
+
+    if (pepa_id && core->use_id) {
+        offset += sizeof(unsigned int);
+        buf_size_used -= sizeof(unsigned int);
+    }
+
+    /* Read one time, then we will transfer it possibly in pieces */
+    ssize_t rx_bytes = read(fd_in, buf + offset, buf_size_used);
+
+    if (do_debug) {
+        // llog_n("Iteration: %d, finised read(), there is %d bytes", iteration, rx);
+    }
+
+
+    if (rx_bytes < 0) {
+        if (do_debug) {
+            llog_w("Could not read: from read sock %s [%d]: %s", name_in, fd_in, strerror(errno));
+        }
+        return -PEPA_ERR_BAD_SOCKET_READ;
+    }
+
+    /* nothing to read on the furst iteraion; it means, this socket is invalid */
+    if ((0 == rx_bytes) && (1 == iteration)) {
+        /* If we can not read on the first iteration, it probably means the fd was closed */
+
+        if (do_debug) {
+            llog_e("Could not read on the first iteration: from read sock %s [%d] out socket %s [%d}: %s",
+                   name_in, fd_in, name_out, fd_out, strerror(errno));
+        }
+        return -PEPA_ERR_BAD_SOCKET_READ;
+    }
+
+    return rx_bytes;
+}
+
+__attribute__((hot))
+static ssize_t pepa_socket_write(pepa_core_t *core, const int fd_out, char *buf, const size_t rx_bytes,
+                                 const int do_debug, const char *name_out)
+{
+    size_t buf_size_used = rx_bytes;
+
+    if (core->dump_messages) {
+        buf_size_used--;
+    }
+
+    ssize_t tx_bytes = 0;
+    /* Write until the whole received buffer was transferred */
+    do {
+        ssize_t tx_current  = write(fd_out, buf + tx_bytes, buf_size_used - tx_bytes);
+
+        if (tx_current <= 0) {
+            if (do_debug) {
+                llog_w("Could not write to write to sock %s [%d]: returned < 0: %s", name_out, fd_out, strerror(errno));
+            }
+            return -PEPA_ERR_BAD_SOCKET_WRITE;
+        }
+
+        tx_bytes += tx_current;
+
+        /* If we still not transfered everything, give the TX socket some time to rest and finish the transfer */
+        /* NOTE: The conversion of tx_byte to unsigned is safe here since we tested abive that returning status > 0 */
+        if ((size_t)tx_bytes < buf_size_used) {
+            usleep(10);
+        }
+
+    } while ((size_t)tx_bytes < buf_size_used);
+    return tx_bytes;
+}
+
+__attribute__((hot))
+static int pepa_is_all_transfered(pepa_core_t *core, const int pepa_id, size_t rx_bytes, size_t tx_bytes)
+{
+    size_t expected = rx_bytes;
+
+    if (pepa_id && core->use_ticket) {
+        expected += sizeof(unsigned int);
+    }
+
+    if (pepa_id && core->use_id) {
+        expected += sizeof(unsigned int);
+    }
+
+    if (tx_bytes > expected) {
+        printf("Transfered more bytes than expected: %lu > %lu\n", tx_bytes, expected);
+        abort();
+    }
+
+    if (expected == tx_bytes) {
+        return 0;
+    }
+
+    return 1;
 }
 
 __attribute__((hot))
@@ -362,11 +476,13 @@ int pepa_one_direction_copy3(pepa_core_t *core,
                              const int fd_in, const char *name_in,
                              char *buf, const size_t buf_size,
                              const int do_debug,
+                             const int pepa_id,
                              uint64_t *ext_rx, uint64_t *ext_tx,
                              const int max_iterations)
 {
     //static char *print_buf   = calloc(core->internal_buf_size + 1, 1);
 
+    int is_transfered;
     int     ret          = PEPA_ERR_OK;
     ssize_t rx_bytes     = 0;
     ssize_t tx_total     = 0;
@@ -375,7 +491,6 @@ int pepa_one_direction_copy3(pepa_core_t *core,
 
     /* buf_size_use - how many bytes available in the buffer after we reserved and added service information */
     size_t  buf_size_use = buf_size;
-    ssize_t offset       = 0;
 
     /* If message dump is enabled, keep 1 character for \0 */
     if (core->dump_messages) {
@@ -388,43 +503,21 @@ int pepa_one_direction_copy3(pepa_core_t *core,
 
     do {
         ssize_t tx_bytes   = 0;
-        ssize_t tx_current = 0;
 
         iteration++;
         if (do_debug) {
             // llog_n("Iteration: %d", iteration);
         }
 
-        offset = pepa_add_id_and_ticket(core, buf, buf_size);
-
-        /* Read one time, then we will transfer it possibly in pieces */
-        rx_bytes = read(fd_in, buf + offset, buf_size_use - offset);
-
-        if (do_debug) {
-            // llog_n("Iteration: %d, finised read(), there is %d bytes", iteration, rx);
+        if (pepa_id) {
+            pepa_add_id_and_ticket(core, buf, buf_size);
         }
 
+        rx_bytes = pepa_socket_read(core, iteration, fd_in, fd_out,
+                                    buf, buf_size, pepa_id, do_debug, name_in, name_out);
 
-        if (rx_bytes < 0) {
-            if (do_debug) {
-                llog_w("Could not read: from read sock %s [%d]: %s", name_in, fd_in, strerror(errno));
-            }
-            ret = -PEPA_ERR_BAD_SOCKET_READ;
-            goto endit;
-        }
-
-        /* nothing to read on the furst iteraion; it means, this socket is invalid */
-        if ((0 == rx_bytes) && (1 == iteration)) {
-            /* If we can not read on the first iteration, it probably means the fd was closed */
-            ret = -PEPA_ERR_BAD_SOCKET_READ;
-
-            if (do_debug) {
-                llog_e("Could not read on the first iteration: from read sock %s [%d] out socket %s [%d}: %s",
-                             name_in, fd_in, name_out, fd_out, strerror(errno));
-            }
-        }
-
-        if (PEPA_ERR_OK != ret) {
+        if (rx_bytes <= 0) {
+            ret = rx_bytes;
             goto endit;
         }
 
@@ -433,29 +526,15 @@ int pepa_one_direction_copy3(pepa_core_t *core,
            We must print until the whole buffer is printed */
 
         if (core->dump_messages) {
-            pepa_print_buffer(core, buf, rx_bytes + offset, fd_out, name_out, fd_in, name_in);
+            pepa_print_buffer(core, buf, rx_bytes, fd_out, name_out, fd_in, name_in);
         }
 
-        /* Write until the whole received buffer was transferred */
-        do {
-            tx_current  = write(fd_out, buf, (size_t)(rx_bytes + offset - tx_bytes));
-
-            if (tx_current <= 0) {
-                ret = -PEPA_ERR_BAD_SOCKET_WRITE;
-                if (do_debug) {
-                    llog_w("Could not write to write to sock %s [%d]: returned < 0: %s", name_out, fd_out, strerror(errno));
-                }
-                goto endit;
-            }
-
-            tx_bytes += tx_current;
-
-            /* If we still not transfered everything, give the TX socket some time to rest and finish the transfer */
-            if (tx_bytes < (rx_bytes + offset)) {
-                usleep(10);
-            }
-
-        } while (tx_bytes < rx_bytes + offset);
+        // tx_bytes = pepa_socket_write(fd_out, buf, buf_size + offset, do_debug, name_out);
+        tx_bytes = pepa_socket_write(core, fd_out, buf, rx_bytes, do_debug, name_out);
+        if (tx_bytes <= 0) {
+            ret = -PEPA_ERR_BAD_SOCKET_WRITE;
+            goto endit;
+        }
 
         rx_total += rx_bytes;
         tx_total += tx_bytes;
@@ -464,7 +543,9 @@ int pepa_one_direction_copy3(pepa_core_t *core,
         }
 
         /* Run this loop as long as we have data on read socket, but no more that max_iterations */
-    } while (((int32_t)buf_size_use == (rx_bytes + offset)) && (iteration <= max_iterations));
+
+        is_transfered = pepa_is_all_transfered(core, pepa_id, rx_bytes, tx_bytes);
+    } while (is_transfered != 0 && (iteration <= max_iterations));
 
     ret = PEPA_ERR_OK;
 endit:
