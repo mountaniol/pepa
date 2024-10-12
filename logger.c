@@ -11,11 +11,19 @@
 
 /*** INTERNAL STRUCTURES AND DEFINITIONS *****/
 
+queue_t         *q_buffers      = NULL;
+queue_t         *ql             = NULL;
+pthread_t       puller_thread;
+int             logger_level    = LOGGER_REGULAR;
+
+int             logger_on_off   = 0;
+size_t          logger_counter  = 1;
+
 int             num_of_messages = 0;
 pthread_mutex_t cond_mutex      = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t  cond            = PTHREAD_COND_INITIALIZER;
 
-
+#define PRINT_BUF_SZ (512)
 
 typedef struct {
     char *file;
@@ -23,7 +31,36 @@ typedef struct {
     int level;
     char *string;
     size_t len;
+    size_t buf_size;
 } mes_t;
+
+static size_t logger_get_counter(void)
+{
+    return logger_counter++;
+}
+
+
+static void *buffers_get(size_t len)
+{
+    void *buf = NULL;
+
+    if (len < PRINT_BUF_SZ) {
+        buf = queue_pop_right(q_buffers);
+    }
+
+    if (buf) {
+        memset(buf, 0, PRINT_BUF_SZ);
+        return buf;
+    }
+
+    return calloc(PRINT_BUF_SZ, 1);
+}
+
+static int buffers_put(void *buf)
+{
+    TESTP(buf,  -1);
+    return queue_push_left(q_buffers,  buf);
+}
 
 static mes_t *message_alloc(int level, char *string, const size_t len, char *file, size_t line)
 {
@@ -43,16 +80,17 @@ static mes_t *message_alloc(int level, char *string, const size_t len, char *fil
 static void message_free(mes_t *m)
 {
     TESTP_VOID(m);
+    if (m->string && m->len == PRINT_BUF_SZ) {
+        buffers_put(m->string);
+        m->string = NULL;
+    }
+
     if (m->string) {
         free(m->string);
     }
 
     free(m);
 }
-
-queue_t   *ql           = NULL;
-pthread_t puller_thread;
-int       logger_level  = LOGGER_REGULAR;
 
 /**** API *****/
 
@@ -68,10 +106,21 @@ int logger_get_level(void)
 
 
 /* Create logger queue */
-int logger_init_queue(void)
+static int logger_init_queue(void)
 {
     ql = queue_create();
     if (NULL == ql) {
+        slog_error("Can note init printing queue!");
+        return -1;
+    }
+    return 0;
+}
+
+static int logger_init_buffers(void)
+{
+    q_buffers = queue_create();
+    if (NULL == q_buffers) {
+        slog_error("Can note init buffers queue!");
         return -1;
     }
     return 0;
@@ -93,8 +142,26 @@ void logger_push(int level, char *string, size_t len, char *file, const size_t l
     pthread_mutex_unlock(&cond_mutex);
 }
 
+void logger_set_off(void)
+{
+    logger_on_off = 0;
+}
+
+void logger_set_on(void)
+{
+    logger_on_off = 1;
+}
+
+static int logger_is_off(void)
+{
+    return logger_on_off;
+}
+
 static void logger_print_message(mes_t *m)
 {
+    if (logger_is_off()) {
+        usleep(100000);
+    }
     // printf("SEB: [%d] %s\n", m->level, m->string);
 #if 0
 
@@ -181,11 +248,19 @@ int logger_start(void)
 {
     int rc = logger_init_queue();
     if (0 != rc) {
+        slog_error("Can note init printing queue!");
+        return -1;
+    }
+
+    rc = logger_init_buffers();
+    if (0 != rc) {
+        slog_error("Can note init buffers queue!");
         return -1;
     }
 
     rc = pthread_create(&puller_thread, NULL, logger_thread, ql);
     if (0 != rc) {
+        slog_error("Can note create printing thread!");
         return -2;
     }
     return 0;
@@ -200,8 +275,9 @@ __attribute__((format(printf, 4, 5)))
 int llog(int level, char *file, size_t line, const char *format, ...)
 {
     va_list args;
-    int     len;
-    char    *string;
+    int     len     = -1;
+    int     rc      = -1;
+    char    *string = NULL;
 
     if (NULL == ql) {
         abort();
@@ -217,21 +293,38 @@ int llog(int level, char *file, size_t line, const char *format, ...)
     va_end(args);
 
     if (len < 1) {
+        slog_error("Can note calculate string len!");
         return -1;
     }
 
-    string = calloc(len + 1,  1);
+    len += 10;
+
+    if (len < PRINT_BUF_SZ) {
+        // len = PRINT_BUF_SZ;
+        string = buffers_get(len);
+    }
 
     if (NULL == string) {
+        string = calloc(len + 10,  1);
+    } else {
+        len = PRINT_BUF_SZ;
+    }
+
+    if (NULL == string) {
+        slog_error("Can note allocate string!");
         return -2;
     }
 
+    /* Print counter of the message */
+    size_t offset = sprintf(string, "[%lu] ", logger_get_counter());
+
     /* Now print the line */
     va_start(args, format);
-    len = vsnprintf(string, len, format, args);
+    rc = vsnprintf(string + offset, len, format, args);
     va_end(args);
-    if (len < 1) {
+    if (rc < 1) {
         free(string);
+        slog_error("Can note print!");
         return -3;
     }
 

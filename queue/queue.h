@@ -39,7 +39,7 @@ typedef struct _queue_s queue_t;
  * @brief Create a new queue
  * @return a newly allocated and initialized queue
  */
-queue_t *queue_create();
+queue_t *queue_create(void);
 
 /**
  * @brief Set the size of the internal buffer pool

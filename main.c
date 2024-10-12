@@ -11,9 +11,10 @@
 #include "pepa_server.h"
 #include "pepa_state_machine.h"
 #include "logger.h"
+#include "pepa_signal.h"
 
-static void pepa_clean_on_exit(void)
-{
+#if 0 /* SEB */ /* 12.10.2024 */
+void pepa_clean_on_exit(void){
 	pepa_core_t *core = pepa_get_core();
 
 	slog_warn_l("=============================================");
@@ -58,6 +59,7 @@ static void pepa_clean_on_exit(void)
 	slog_warn_l("=============================================");
 	slog_destroy();
 }
+#endif /* SEB */ /* 12.10.2024 */
 
 /* Catch Signal Handler function */
 static void signal_callback_handler(int signum, __attribute__((unused)) siginfo_t *info, __attribute__((unused))void *extra)
@@ -78,9 +80,9 @@ static void signal_callback_handler(int signum, __attribute__((unused)) siginfo_
 		exit(0);
 	}
 }
+#if 0 /* SEB */ /* 12.10.2024 */
 
-static void pepa_set_int_signal_handler(void)
-{
+static void pepa_set_int_signal_handler(void){
 	struct sigaction action;
 
 	sigemptyset(&action.sa_mask);
@@ -90,6 +92,7 @@ static void pepa_set_int_signal_handler(void)
 	action.sa_sigaction = signal_callback_handler;
 	sigaction(SIGINT, &action, NULL);
 }
+#endif /* SEB */ /* 12.10.2024 */
 
 int pepa_go(pepa_core_t *core);
 
@@ -99,6 +102,8 @@ int main(int argi, char *argv[])
 {
 	int rc;
 
+	logger_set_off();
+	logger_set_level(LOGGER_NOISY);
 	rc = logger_start();
 	if (rc) {
 		printf("Could not start PEPA logger\n");
@@ -131,6 +136,7 @@ int main(int argi, char *argv[])
 	pepa_config_slogger(core);
 
 	slog_note_l("Arguments parsed");
+	logger_set_on();
 
 	if (core->daemon) {
 		daemonize(core);
@@ -141,7 +147,7 @@ int main(int argi, char *argv[])
 	}
 	pepa_set_rlimit();
 
-	pepa_set_int_signal_handler();
+	pepa_set_int_signal_handler(signal_callback_handler);
 
 	//rc = pepa_start_threads(core);
 	if (core->monitor.onoff) {

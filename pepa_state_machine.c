@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <stdio.h>
+#include <signal.h>
 
 #include "logger.h"
 #include "slog/src/slog.h"
@@ -11,6 +12,26 @@
 #include "pepa_core.h"
 #include "pepa_socket_common.h"
 #include "pepa_state_machine.h"
+#include "pepa_signal.h"
+
+static void signal_callback_handler(int signum, __attribute__((unused)) siginfo_t *info, __attribute__((unused))void *extra)
+{
+	//pepa_core_t *core = pepa_get_core();
+	printf("Caught signal %d\n", signum);
+	if (signum == SIGINT) {
+		printf("Caught signal SIGINT: %d\n", signum);
+		//pepa_back_to_disconnected_state_new(core);
+		pepa_clean_on_exit();
+		exit(0);
+	}
+
+	if (signum == SIGUSR1) {
+		printf("Caught signal SIGINT: %d\n", signum);
+		//pepa_back_to_disconnected_state_new(core);
+		pepa_clean_on_exit();
+		exit(0);
+	}
+}
 
 void pepa_thread_cancel(const pthread_t pid, const char *name)
 {
@@ -82,6 +103,8 @@ void *pepa_monitor_thread(__attribute__((unused))void *arg)
 	int        i;
 
 //	pepa_set_int_signal_handler();
+
+	pepa_set_int_signal_handler(signal_callback_handler);
 
 	int32_t    rc                = pepa_pthread_init_phase(my_name);
 	if (rc < 0) {

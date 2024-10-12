@@ -105,14 +105,14 @@ LIBHL=./queue/libhl.a
 
 PEPA_O= pepa_config.o pepa3.o pepa_state_machine.o pepa_parser.o main.o pepa_core.o \
 		pepa_server.o pepa_errors.o \
-		pepa_socket_common.o pepa_in_reading_sockets.o logger.o
+		pepa_socket_common.o pepa_in_reading_sockets.o logger.o pepa_signal.o
 PEPA_T=pepa-ng
 
 
 LIBS=-lpthread $(LIBCONFUSE_A) $(LIBHL)
 
 AFL_O=pepa_afl.o pepa3.o pepa_state_machine.o pepa_parser.o pepa_core.o \
-		pepa_server.o pepa_errors.o pepa_socket_common.o pepa_in_reading_sockets.o logger.o
+		pepa_server.o pepa_errors.o pepa_socket_common.o pepa_in_reading_sockets.o logger.o pepa_signal.o
 
 AFL_T=pepa_afl.out
 
@@ -126,7 +126,7 @@ ARS=$(BUFT_AR) $(SLOG_AR)
 	pepa_socket_out.o pepa_socket_shva.o 
 EMU_O=pepa_emulator.o pepa_state_machine.o pepa_parser.o \
 	pepa_core.o pepa_server.o pepa_errors.o \
-	pepa_socket_common.o pepa_in_reading_sockets.o pepa_config.o logger.o
+	pepa_socket_common.o pepa_in_reading_sockets.o pepa_config.o logger.o pepa_signal.o
 
 EMU_T=emu
 

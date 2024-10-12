@@ -16,7 +16,10 @@ enum {
     LOGGER_FATAL
 };
 
-int logger_init_queue(void);
+void logger_set_off(void);
+void logger_set_on(void);
+
+//int logger_init_queue(void);
 int logger_start(void);
 int logger_stop(void);
 void logger_set_level(int level);
