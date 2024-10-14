@@ -1,6 +1,7 @@
 #ifndef _PEPA_CONFIG_H_
 #define _PEPA_CONFIG_H_
 
+#include "pepa_core.h"
 
 /* The copying buffer default size */
 #define COPY_BUF_SIZE_BYTES (64 * 1024)
@@ -47,5 +48,7 @@
 #define SLOG_LEVEL_5 SLOG_LEVEL_WARN
 #define SLOG_LEVEL_6 SLOG_LEVEL_INFO
 #define SLOG_LEVEL_7 SLOG_LEVEL_NOTE
+
+int pepa_read_config(pepa_core_t *core);
 
 #endif /* _PEPA_CONFIG_H_ */

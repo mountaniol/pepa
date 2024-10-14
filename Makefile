@@ -100,12 +100,14 @@ CFLAGS+=-O2
 
 PEPA_O= pepa3.o pepa_state_machine.o pepa_parser.o main.o pepa_core.o \
 		pepa_server.o pepa_errors.o \
-		pepa_socket_common.o pepa_in_reading_sockets.o
+		pepa_socket_common.o pepa_in_reading_sockets.o iniparser.o \
+		pepa_config.o
 		
 PEPA_T=pepa-ng
 
 AFL_O=pepa_afl.o pepa3.o pepa_state_machine.o pepa_parser.o pepa_core.o \
-		pepa_server.o pepa_errors.o pepa_socket_common.o pepa_in_reading_sockets.o
+		pepa_server.o pepa_errors.o pepa_socket_common.o pepa_in_reading_sockets.o \
+		iniparser.o pepa_config.o
 
 AFL_T=pepa_afl.out
 

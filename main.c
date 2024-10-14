@@ -9,6 +9,7 @@
 #include "pepa_parser.h"
 #include "pepa_server.h"
 #include "pepa_state_machine.h"
+#include "pepa_config.h"
 
 static void pepa_clean_on_exit(void)
 {
@@ -115,6 +116,14 @@ int main(int argi, char *argv[])
 		exit(-11);
 	}
 
+	rc = 0;
+    if (NULL != core->config) {
+        rc = pepa_read_config(core);
+    }
+	if (rc) {
+		slog_error_l("Could not read / parse config file %s", core->config);
+		return -1;
+	}
 	pepa_config_slogger(core);
 
 	slog_note_l("Arguments parsed");

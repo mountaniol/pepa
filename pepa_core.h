@@ -99,8 +99,8 @@ typedef struct {
 	uint32_t print_buf_len;
 	int epoll_fd;
 	long int readers_preopen; /**< How many reader connections should by opened before connection to SHVA is opened */
-    int id_val; /**< How many reader connections should by opened before connection to SHVA is opened */
-	int use_id; /**< Should PEPA add to every buffer a unique ID identifying this buffer passed through PEPA? 0 = no, 1 = yes */
+    unsigned int id_val; /**< How many reader connections should by opened before connection to SHVA is opened */
+	unsigned int use_id; /**< Should PEPA add to every buffer a unique ID identifying this buffer passed through PEPA? 0 = no, 1 = yes */
 	int use_ticket; /**< Should PEPA add to every buffer a unique "ticket" this buffer? 0 = no, 1 = yes */
 } pepa_core_t;
 
