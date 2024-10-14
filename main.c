@@ -118,7 +118,7 @@ int main(int argi, char *argv[])
 
 	rc = 0;
     if (NULL != core->config) {
-        rc = pepa_read_config(core);
+		rc = pepa_read_config(core);
     }
 	if (rc) {
 		slog_error_l("Could not read / parse config file %s", core->config);

@@ -794,10 +794,10 @@ static int32_t     pepa_wait_connection(const pepa_core_t *core, const int32_t f
     return fd_read;
 }
 
-#define IN_CONNECTIONS (4)
+// #define IN_CONNECTIONS (4)
 static void pepa_accept_in_connections(pepa_core_t *core)
 {
-    slog_info_l(">>>>> Starting adding %d IN Read sockets to epoll set", IN_CONNECTIONS);
+    slog_info_l(">>>>> Starting adding %ld IN Read sockets to epoll set", core->readers_preopen);
 
     do {
         int32_t     fd_read                = pepa_wait_connection(core, core->sockets.in_listen, "IN");
@@ -808,11 +808,11 @@ static void pepa_accept_in_connections(pepa_core_t *core)
             pepa_in_reading_sockets_close_rm(core, fd_read);
         }
         slog_info_l("Added IN Read socket (%d) to epoll set", fd_read);
-        // } while (core->in_reading_sockets.active < (size_t)core->readers_preopen);
-    } while (core->in_reading_sockets.active < IN_CONNECTIONS);
+        } while (core->in_reading_sockets.active < (int)core->readers_preopen);
+    // } while (core->in_reading_sockets.active < IN_CONNECTIONS);
 
-    // slog_note_l(">>>>> Finished adding %ld IN Read sockets to epoll set", core->readers_preopen);
-    slog_note_l(">>>>> Finished adding %d IN Read sockets to epoll set", IN_CONNECTIONS);
+    slog_note_l(">>>>> Finished adding %ld IN Read sockets to epoll set", core->readers_preopen);
+    // slog_note_l(">>>>> Finished adding %d IN Read sockets to epoll set", IN_CONNECTIONS);
 }
 
 /**
