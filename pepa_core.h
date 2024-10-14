@@ -50,6 +50,7 @@ typedef struct {
 typedef struct {
 	int *sockets; /**< Array of IN reading sockets */
 	int number; /**< Number of allocated slots (not number of active sockets!) */
+	int active;
 } pepa_in_read_sockets_t;
 
 /**

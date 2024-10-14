@@ -29,6 +29,9 @@
 /* Keep here PIDs of IN threads */
 pthread_t  *in_thread_idx;
 uint32_t   number_of_in_threads = 4;
+uint32_t   shva_reader_up = 0;
+uint32_t   shva_writer_up = 0;
+
 
 const char *lorem_ipsum         = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.\0";
 uint64_t   lorem_ipsum_len      = 0;
@@ -311,6 +314,9 @@ void pepa_emulator_shva_reader_thread_clean(void *arg)
 	slog_note("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$");
 	slog_note("$$$$$$$    SHVA READER CLEANUP           $$$$$$$$$");
 
+	shva_reader_up = 0;
+	shva_writer_up = 0;
+
 	int rc = (int)buf_free(cargs->buf);
 	if (rc) {
 		slog_warn_l("Could not free buf_t: %s", buf_error_code_to_string(rc));
@@ -359,6 +365,8 @@ void *pepa_emulator_shva_reader_thread(__attribute__((unused))void *arg)
 		slog_warn_l("SHVA READ: Tried to add shva fd = %d and failed", core->sockets.shva_rw);
 		pthread_exit(NULL);
 	}
+
+	shva_reader_up = 1;
 
 	do {
 		int event_count = epoll_wait(epoll_fd, events, 20, 10);
@@ -443,6 +451,8 @@ void *pepa_emulator_shva_writer_thread(__attribute__((unused))void *arg)
 		if (buf_size < core->emu_min_buf) {
 			buf_size = core->emu_min_buf;
 		}
+
+		shva_writer_up = 1;
 
 // slog_note_l("SHVA WRITE: : Trying to write");
 		if (send_several > 0) {
@@ -625,6 +635,8 @@ void *pepa_emulator_shva_thread(__attribute__((unused))void *arg)
 	reset:
 		pthread_cancel(shva_reader);
 		pthread_cancel(shva_writer);
+		shva_reader_up = 0;
+		shva_writer_up = 0;
 
 		/* Close rw socket */
 		rc = epoll_ctl(epoll_fd, EPOLL_CTL_DEL, sock_listen, NULL);
@@ -704,6 +716,13 @@ void *pepa_emulator_in_thread(__attribute__((unused))void *arg)
 		/* Note: the in_start_connection() function can not fail; it blocking until connection opened */
 		in_socket = in_start_connection();
 		slog_warn_l("%s: Opened connection to IN: fd = %d, port: %d", my_name, in_socket, pepa_find_socket_port(in_socket));
+
+		while (0 == shva_writer_up && 0 == shva_reader_up) {
+			slog_info_l("%s: Witing SHA reader and writer UP", my_name);
+			sleep(1);
+		}
+
+		slog_info_l("%s: SHVA reader and writer are UP, continue", my_name);
 
 		do {
 

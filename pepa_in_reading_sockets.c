@@ -151,6 +151,7 @@ void pepa_in_reading_sockets_add(pepa_core_t *core, const int fd)
 	for (i = 0; i < core->in_reading_sockets.number; i++) {
 		if (EMPTY_SLOT == core->in_reading_sockets.sockets[i]) {
 			core->in_reading_sockets.sockets[i] = fd;
+			core->in_reading_sockets.active++;
 			slog_note_l("IN-READER: Added socket %d to slot %d", core->in_reading_sockets.sockets[i], i);
 			return;
 		}
@@ -186,6 +187,7 @@ void pepa_in_reading_sockets_close_rm(pepa_core_t *core, const int fd)
 						pepa_find_socket_port(core->in_reading_sockets.sockets[i]));
 
 			pepa_reading_socket_close(core->in_reading_sockets.sockets[i], "IN-FORWARD");
+			core->in_reading_sockets.active--;
 			slog_note_l("IN-READER: Closed and remove socket %d", core->in_reading_sockets.sockets[i]);
 			core->in_reading_sockets.sockets[i] = EMPTY_SLOT;
 			return;
