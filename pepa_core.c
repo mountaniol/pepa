@@ -26,6 +26,7 @@ static pepa_core_t *pepa_create_core_t(void)
 
 	/*** Init threads pthread descriptors */
 
+	core->config = NULL;
 	core->sockets.shva_rw = FD_CLOSED;
 	core->sockets.out_listen = FD_CLOSED;
 	core->sockets.out_write = FD_CLOSED;
@@ -46,10 +47,7 @@ static pepa_core_t *pepa_create_core_t(void)
 	core->out_thread.clients = PEPA_OUT_SOCKETS;
 	core->in_thread.clients = PEPA_IN_SOCKETS;
 
-	core->sockets.shva_rw = -1;
-	core->sockets.out_listen = -1;
 	// core->sockets.out_read = -1;
-	core->sockets.in_listen = -1;
 	core->monitor_timeout = MONITOR_TIMEOUT_USEC;
 	core->slog_flags = 0;
 	core->slog_file = NULL;
@@ -66,6 +64,9 @@ static pepa_core_t *pepa_create_core_t(void)
 	core->pid_fd = FD_CLOSED;
 	core->validity = CORE_VALIDITY_MASK;
 
+	core->readers_preopen = -1;
+	core->use_id = 0;
+	core->use_ticket = 0;
 	return core;
 }
 

@@ -20,6 +20,8 @@ void pepa_print_version(void)
 void pepa_show_help(void)
 {
 	printf("Use:\n"
+           "~~~~~~~~~~~ CONFIGURATION FILE (OPTIONAL) ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
+           "--config   | -C       Full name of config file, like /etc/pepa.config\n"
 		   "~~~~~~~~~~~ CONNECTION ADDRESSES AND PORTS (MANDATORY) ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
 		   "--shva     | -s IP:PORT : Address of SHVA server to connect to in form: '1.2.3.4:7887'\n"
 		   "--out      | -o IP:PORT : Address of OUT listening socket, waiting for OUT stream connection, in form '1.2.3.4:9779'\n"
@@ -191,6 +193,7 @@ int pepa_parse_arguments(int argi, char *argv[])
 		/* These options set a flag. */
 		{"help",             no_argument,            0, 'h'},
 		{"shva",             required_argument,      0, 's'},
+        { "config",           required_argument,      0, 'C' },
 		{"out",              required_argument,      0, 'o'},
 		{"in",               required_argument,      0, 'i'},
 		{"inum",             required_argument,      0, 'n'},
@@ -225,8 +228,12 @@ int pepa_parse_arguments(int argi, char *argv[])
 		return (-PEPA_ERR_INVALID_INPUT);
 
 	}
-	while ((opt = getopt_long(argi, argv, "s:o:i:n:l:f:d:b:r:S:B:m:I:phavwcu", long_options, &option_index)) != -1) {
+    while ((opt = getopt_long(argi, argv, "f:s:o:i:n:l:f:d:b:r:S:B:m:I:phavwcu", long_options, &option_index)) != -1) {
 		switch (opt) {
+        case 'C': /* Config file */
+            core->config = strdup(optarg);
+            slog_info_l("Config file: |%s|", core->config);
+            break;
 		case 's': /* SHVA Server address to connect to */
 			core->shva_thread.ip_string = pepa_parse_ip_string_get_ip(optarg);
 			if (NULL == core->shva_thread.ip_string) {
