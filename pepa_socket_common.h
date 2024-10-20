@@ -9,6 +9,14 @@
 
 void set_sig_handler(void);
 
+/* This enum controld whether PEPA adding PEPA ID and / or PEPA ticket to buffers passing from SHVA to OUT */
+enum {
+    PEPA_DINABLE_TICKETS_AND_ID,
+    PEPA_ENABLE_TICKETS_AND_ID,
+    PEPA_ENABLE_TICKETS,
+    PEPA_ENABLE_ID
+};
+
 __attribute__((warn_unused_result))
 int32_t pepa_pthread_init_phase(const char *name);
 void pepa_parse_pthread_create_error(const int32_t rc);
@@ -17,13 +25,38 @@ void pepa_set_tcp_timeout(const int32_t sock);
 void pepa_set_tcp_recv_size(const pepa_core_t *core, const int32_t sock);
 void pepa_set_tcp_send_size(const pepa_core_t *core, const int32_t sock);
 
+/**
+ * @author Sebastian Mountaniol (20/10/2024)
+ * @brief Receive a buffer frim one socket (file descriptor), and send it to another 
+ * @param pepa_core_t* core          PEPA Core structure
+ * @param const int fd_out           Socket File descriptor to write buffer(s)
+ * @param const char* name_out       Name of File descriptor to write (for debug printings)
+ * @param const int fd_in            Socket File descriptor to read buffer(s)
+ * @param const char* name_in        Name of File descriptor to read (for debug printings)
+ * @param char* buf                  Preallocated buffer to use for reading/writing
+ * @param const size_t buf_size      Preallocated buffer size (in bytes)
+ * @param const int do_debug         This flag enables extra debug prints
+ * @param uint64_t* ext_rx           Pointer to statistic RX variable; updated when a buffer received 
+ * @param uint64_t* ext_tx           Pointer to statistic TX variable; updated when a buffer received 
+ * @param const int max_iterations   How many times it should read from RX wnd write to TX socket
+ * @return int                       EOK if everything is OK, a negative error code if one of the sockets is
+ *         degraded and should be closed: -PEPA_ERR_BAD_SOCKET_WRITE if the 'fd_out' socket is degraded,
+ *         -PEPA_ERR_BAD_SOCKET_READ if RX socket is degraded
+ * @details Several 'core' variables change the behavior of this function:
+ * If core->dump_messages is not 0, the received buffer is printed to logger before it transfered
+ * If core->use_ticket is not 0, and TX socket is OUT socket, a ticket will be added to the beginning of the
+ * buffer
+ * If core->use_id is not 0, the core->id_val will be added after the 'ticket' variable (or in the beginning
+ * of the buffer, if 'tickets' are disabled)
+ */
 int pepa_one_direction_copy3(pepa_core_t *core,
-							 const int fd_out, const char *name_out,
-							 const int fd_in, const char *name_in,
-							 char *buf, const size_t buf_size,
-							 const int do_debug,
-							 uint64_t *ext_rx, uint64_t *ext_tx,
-							 const int max_iterations);
+                             const int fd_out, const char *name_out,
+                             const int fd_in, const char *name_in,
+                             char *buf, const size_t buf_size,
+                             const int do_debug,
+                             uint64_t *ext_rx, uint64_t *ext_tx,
+                             const int max_iterations);
+
 
 /**
  * @author Sebastian Mountaniol (12/14/23)

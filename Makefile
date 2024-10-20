@@ -92,6 +92,7 @@ PEPA_DEFINES+=-DPEPA_HOST=\"$(PEPA_HOST_VAL)\"
 #CFLAGS+= -DPEPA_VERSION_GIT=\"$(PEPA_VERSION_GIT_VAL)\"
 CFLAGS+=$(PEPA_DEFINES)
 CFLAGS+=-O2
+# CFLAGS+=-O0
 
 #PEPA_O= pepa3.o pepa_state_machine.o pepa_parser.o main.o pepa_core.o \
 		pepa_server.o pepa_errors.o \

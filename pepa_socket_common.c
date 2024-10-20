@@ -98,6 +98,410 @@ void pepa_set_tcp_send_size(const pepa_core_t *core, const int sock)
 	}
 }
 
+/**
+ * @author Sebastian Mountaniol (20/10/2024)
+ * @brief Test whether a Ticket should be used to buffer
+ * @param pepa_core_t* core  PEPA Core structure
+ * @param int fd_out         TX file descriptor
+ * @return int               1 if a Ticket should be added, 0 otherwise
+ * @details A Ticket should be added, if tickets eabled in the core structure (on the start it is parsed) and
+ *  		if the fd_ou is OUT Write socket
+ */
+static int pepa_use_ticket(const pepa_core_t *core, const int fd_out)
+{
+	if (core->sockets.out_write == fd_out && core->use_ticket) {
+		return 1;
+	}
+	return 0;
+}
+
+/**
+ * @author Sebastian Mountaniol (20/10/2024)
+ * @brief Test whether the PEPA ID should be used to buffer
+ * @param pepa_core_t* core  PEPA Core structure
+ * @param int fd_out         TX file descriptor
+ * @return int               1 if the PEPA ID should be added, 0 otherwise
+ * @details A PEPA ID should be added, if PEPA ID is eabled in the core structure (on the start it is parsed)
+ *  		and if the fd_ou is OUT Write socket
+ */
+static int pepa_use_pepa_id(const pepa_core_t *core, const int fd_out)
+{
+	if (core->sockets.out_write == fd_out && core->use_id) {
+		return 1;
+	}
+	return 0;
+}
+
+
+//#define DEB_BUF (128)
+/* Print message */
+static void pepa_print_buffer(pepa_core_t *core, char *buf, const ssize_t rx,
+                              const int fd_out, const char *name_out,
+                              const int fd_in, const char *name_in)
+{
+    // char    deb_buffer[DEB_BUF];
+	/* offset: offset inside core->print_buffer*/
+    size_t offset        = 0;
+	/* in_buf_offset: offset inside the binary buffer we need to print out */
+    size_t in_buf_offset = 0;
+
+    int    prc           = 0; /** < return value of snprintf */
+
+    /* If there is PEPA ID and Ticket, then print them first to the dedicated buffer */
+
+    /* On the first message we allocate a buffer for printing */
+    if (NULL == core->print_buf) {
+        core->print_buf = calloc(core->print_buf_len, 1);
+    }
+
+    if (NULL == core->print_buf) {
+        // llog_e("Can not allocate printing buffer, asked size is: %u; message was not printed", core->print_buf_len);
+		slog_error_l("Can not allocate printing buffer, asked size is: %u; message was not printed", core->print_buf_len);
+        return;
+    }
+#if 0 /* SEB */ /* 30.09.2024 */
+else {
+        llog_w("Allocated printing buffer of size %u", core->print_buf_len);
+    }
+#endif /* SEB */ /* 30.09.2024 */
+
+    //size_t min_len = ((DEB_BUF - 1) < rx) ? (DEB_BUF - 1) : rx;
+    //memset(deb_buffer, 0, min_len);
+    //memcpy(deb_buffer, buf, min_len);
+    //printf("DEB: buf len = %ld, |%s|\n", rx, deb_buffer);
+
+    /* Print header */
+    offset += snprintf(core->print_buf + offset, core->print_buf_len, "+++ MES: %s [fd:%.2d] -> %s [fd:%.2d], LEN:%zd ",
+                       /* mes num */ name_in, fd_in, name_out, fd_out, rx);
+
+
+    /* If tickets are used, print it */
+	if (pepa_use_ticket(core, fd_out)) {
+        unsigned int ticket;
+        memcpy(&ticket, buf + in_buf_offset, sizeof(unsigned int));
+        offset += snprintf(core->print_buf + offset, 32, "[TICKET: 0X%X] ", ticket);
+        // offset += snprintf(core->print_buf + offset, 32, "[TICKET: %X]", ticket);
+        in_buf_offset += sizeof(unsigned int);
+    }
+
+    /* If Pepa ID is used, print it */
+	if (pepa_use_pepa_id(core, fd_out)) {
+        unsigned int pepa_id;
+        memcpy(&pepa_id, buf + in_buf_offset, sizeof(unsigned int));
+        offset += snprintf(core->print_buf + offset, 32, "[ID: 0X%X] ", pepa_id);
+        in_buf_offset += sizeof(unsigned int);
+    }
+
+    // offset += snprintf(core->print_buf + offset, 1, "%s", 1);
+    core->print_buf[offset] = '|';
+    offset++;
+
+	/* Now we transform the binary buffer into a string form byte by byte */
+    for (ssize_t index = 0; index < (rx  - ((ssize_t) in_buf_offset)); index++) {
+        if (isprint(buf[in_buf_offset + index])) {
+            core->print_buf[offset] = buf[in_buf_offset + index];
+            offset++;
+
+        } else {
+			unsigned int current_char = (unsigned int) buf[index];
+            prc = snprintf(core->print_buf + offset, core->print_buf_len - offset, "<0X%X>", current_char);
+            if (prc < 1) {
+                // llog_e("Can not print non-printable character from, offset of the character: %lu; stopped printing", index);
+				slog_error_l("Can not print non-printable character from, offset of the character: %ld; stopped printing", index);
+                return;
+            }
+
+            offset += prc;
+        }
+    }
+
+    core->print_buf[offset] = '|';
+    offset++;
+    core->print_buf[offset] = '\0';
+
+    /* Print */
+    // llog_d("%s", core->print_buf);
+    // slogn("%s", core->print_buf);
+    char *copy_buf = strndup(core->print_buf, offset + 1);
+    if (copy_buf) {
+        // logger_push(LOGGER_DEBUG, copy_buf, offset, __FILE__, __LINE__);
+		slog_note_l("%s", copy_buf);
+    } else {
+        // llog_e("Could not copy printing buffer!");
+		slog_error_l("Could not copy printing buffer!");
+    }
+
+	
+	free(copy_buf);
+}
+
+/**
+ * @author se (9/24/24)
+ * @brief This function generate a pseudorandom number. This number is not really random but we do not
+ *  	  needreal randomness. We need to generate a unique number for every next buffer. This function is a
+ *  	  very fast and efficient one instead.
+ * @param seed   A previous value of the pseudorandom number
+ * @return unsigned int The next pseudorandom number
+ */
+static unsigned int pepa_gen_ticket(unsigned int seed)
+{
+    return (214013 * seed + 2531011);
+}
+
+/**
+ * 
+ * @author se (9/24/24)
+ * @brief This function adds a ticket and PEPA ID to the beginning of the buffer, if they are
+ *  	  enabled and the destination is OUT 
+ * @param core     Core structure
+ * @param buf      Buffer allocated for sending
+ * @param buf_size Size of the buffer
+ * @param int fd_dst - File descriptor of the destination
+ * @return size_t If a ticket and/or PEPA ID were added, the offset returned is the length of written ticket
+ *  	   and/or PEPA ID. If they both are disabled, 0 will be returned.
+ */
+__attribute__((hot))
+static void pepa_add_id_and_ticket(pepa_core_t *core, char *buf, const size_t buf_size, int fd_dst)
+{
+    size_t              offset = 0;
+    static unsigned int ticket;
+
+	/* Add ticket and/or Pepa ID only to buffer dedicated to OUT socket */
+	if (fd_dst != core->sockets.out_write) {
+		return;
+	}
+
+	if (pepa_use_ticket(core, fd_dst)) {
+        /* If the buffer is too short, we return 0 and do nothing */
+        if (buf_size < offset + sizeof(unsigned int)) {
+            printf("A wrong buf size: buf_size (%lu) < offset (%lu) + sizeof(unsigned int) (%lu)\n",
+                   buf_size, offset, sizeof(unsigned int));
+            sleep(1);
+            abort();
+        }
+
+        ticket = pepa_gen_ticket(ticket);
+        memcpy(buf + offset, &ticket, sizeof(unsigned int));
+        offset += sizeof(unsigned int);
+    }
+
+	if (pepa_use_pepa_id(core, fd_dst)) {
+        /* If the buffer is too short, we return the offset and do nothing */
+        if (buf_size < offset + sizeof(unsigned int)) {
+            // printf("A wrong buf size: buf_size (%lu) < offset (%lu) + sizeof(unsigned int) (%lu)\n", buf_size, offset, sizeof(unsigned int));
+			slog_error_l("A wrong buf size: buf_size (%lu) < offset (%lu) + sizeof(unsigned int) (%lu)\n", buf_size, offset, sizeof(unsigned int));
+            sleep(1);
+            abort();
+        }
+
+        memcpy(buf + offset, &core->id_val, sizeof(int));
+        offset += sizeof(int);
+    }
+}
+
+static ssize_t pepa_socket_read(pepa_core_t *core, int iteration, const int fd_in, const int fd_out,
+                                char *buf, const size_t buf_size, const int do_debug,
+								const char *name_in, const char *name_out)
+{
+    size_t offset        = 0;
+    size_t buf_size_used = buf_size;
+
+    // if (core->dump_messages) {
+    //    buf_size_used--;
+    // }
+
+	if (pepa_use_ticket(core,  fd_out)) {
+        offset += sizeof(unsigned int);
+        buf_size_used -= sizeof(unsigned int);
+    }
+
+	if (pepa_use_pepa_id(core, fd_out)) {
+        offset += sizeof(unsigned int);
+        buf_size_used -= sizeof(unsigned int);
+    }
+
+    /* Read one time, then we will transfer it possibly in pieces */
+    ssize_t rx_bytes = read(fd_in, buf + offset, buf_size_used);
+
+    if (do_debug) {
+        // llog_n("Iteration: %d, finised read(), there is %d bytes", iteration, rx);
+    }
+
+    if (rx_bytes < 0) {
+        if (do_debug) {
+            // llog_w("Could not read: from read sock %s [%d]: %s", name_in, fd_in, strerror(errno));
+			slog_warn_l("Could not read: from read sock %s [%d]: %s", name_in, fd_in, strerror(errno));
+        }
+        return -PEPA_ERR_BAD_SOCKET_READ;
+    }
+
+    /* nothing to read on the very first iteraion; it means, this socket is invalid */
+#if 1 /* SEB */ /* 13.10.2024 */
+    if ((0 == rx_bytes) && (1 == iteration)) {
+        /* If we can not read on the first iteration, it probably means the fd was closed */
+
+        //if (do_debug) {
+        // llog_e("Could not read on the first iteration: from read sock %s [%d] out socket %s [%d]: %s", name_in, fd_in, name_out, fd_out, strerror(errno));
+		slog_error_l("Could not read on the first iteration: from read sock %s [%d] out socket %s [%d]: %s", name_in, fd_in, name_out, fd_out, strerror(errno));
+        //}
+        return -PEPA_ERR_BAD_SOCKET_READ;
+    }
+#endif /* SEB */ /* 13.10.2024 */ 
+
+    return rx_bytes;
+}
+
+__attribute__((hot))
+static ssize_t pepa_socket_write(const int fd_out, char *buf, const size_t rx_bytes,
+                                 const int do_debug, const char *name_out)
+{
+    size_t buf_size_used = rx_bytes;
+    ssize_t tx_bytes = 0;
+
+    /* Write until the whole received buffer was transferred */
+    do {
+        ssize_t tx_current  = write(fd_out, buf + tx_bytes, buf_size_used - tx_bytes);
+
+        if (tx_current <= 0) {
+            if (do_debug) {
+                // llog_w("Could not write to write to sock %s [%d]: returned < 0: %s", name_out, fd_out, strerror(errno));
+				slog_warn_l("Could not write to write to sock %s [%d]: returned < 0: %s", name_out, fd_out, strerror(errno));
+            }
+            return -PEPA_ERR_BAD_SOCKET_WRITE;
+        }
+
+        tx_bytes += tx_current;
+
+        /* If we still not transfered everything, give the TX socket some time to rest and finish the transfer */
+        /* NOTE: The conversion of tx_byte to unsigned is safe here since we tested abive that returning status > 0 */
+        if ((size_t)tx_bytes < buf_size_used) {
+            usleep(10);
+        }
+
+    } while ((size_t)tx_bytes < buf_size_used);
+    return tx_bytes;
+}
+
+__attribute__((hot))
+static int pepa_is_all_transfered(const pepa_core_t *core, const size_t rx_bytes, const size_t tx_bytes, const int fd_out)
+{
+    size_t expected = rx_bytes;
+
+	if (pepa_use_ticket(core, fd_out)) {
+        expected += sizeof(unsigned int);
+    }
+
+	if (pepa_use_ticket(core, fd_out)) {
+        expected += sizeof(unsigned int);
+    }
+
+    if (tx_bytes > expected) {
+        printf("Transfered more bytes than expected: %lu > %lu\n", tx_bytes, expected);
+        abort();
+    }
+
+    if (expected == tx_bytes) {
+        return 0;
+    }
+
+    return 1;
+}
+
+__attribute__((hot))
+int pepa_one_direction_copy3(pepa_core_t *core,
+                             const int fd_out, const char *name_out,
+                             const int fd_in, const char *name_in,
+                             char *buf, const size_t buf_size,
+                             const int do_debug,
+							 uint64_t *ext_rx, uint64_t *ext_tx,
+                             const int max_iterations)
+{
+    //static char *print_buf   = calloc(core->internal_buf_size + 1, 1);
+
+    int     is_transfered;
+    int     ret           = PEPA_ERR_OK;
+    ssize_t rx_bytes      = 0;
+    ssize_t tx_total      = 0;
+    ssize_t rx_total      = 0;
+    int     iteration     = 0;
+
+    /* buf_size_use - how many bytes available in the buffer after we reserved and added service information */
+    //size_t  buf_size_use  = buf_size;
+
+    /* If message dump is enabled, keep 1 character for \0 */
+    //if (core->dump_messages) {
+    //    buf_size_use--;
+    //}
+
+    if (do_debug) {
+        // llog_n("Starrting transfering from %s to %s", name_in, name_out);
+    }
+
+    do {
+        ssize_t tx_bytes   = 0;
+
+        iteration++;
+        if (do_debug) {
+            // llog_n("Iteration: %d", iteration);
+        }
+
+		/* This function adds a Ticket and PEPA ID, if they are enabled AND if the 'fd_out' is writing OUT socket */
+		pepa_add_id_and_ticket(core, buf, buf_size, fd_out);
+
+        rx_bytes = pepa_socket_read(core, iteration, fd_in, fd_out, buf, buf_size, do_debug, name_in, name_out);
+
+        if (rx_bytes <= 0) {
+            ret = rx_bytes;
+            goto endit;
+        }
+
+        /* It is possible we recevived several messages;
+         * the messages are divided by null terminator.
+           We must print until the whole buffer is printed */
+
+        if (core->dump_messages) {
+            pepa_print_buffer(core, buf, rx_bytes, fd_out, name_out, fd_in, name_in);
+        }
+
+        // tx_bytes = pepa_socket_write(fd_out, buf, buf_size + offset, do_debug, name_out);
+        tx_bytes = pepa_socket_write(fd_out, buf, rx_bytes, do_debug, name_out);
+        if (tx_bytes <= 0) {
+            ret = -PEPA_ERR_BAD_SOCKET_WRITE;
+            goto endit;
+        }
+
+        rx_total += rx_bytes;
+        tx_total += tx_bytes;
+        if (do_debug) {
+            // llog_n("Iteration %d done: rx = %d, tx = %d", iteration, rx, tx);
+        }
+
+        /* Run this loop as long as we have data on read socket, but no more that max_iterations */
+
+        is_transfered = pepa_is_all_transfered(core, rx_bytes, tx_bytes, fd_out);
+    } while (is_transfered != 0 && (iteration <= max_iterations));
+
+    ret = PEPA_ERR_OK;
+endit:
+    if (do_debug) {
+        // llog_n("Finished transfering from %s to %s, returning %d, rx = %d, tx = %d, ", name_in, name_out, ret, rx_total, tx_total);
+    }
+
+    if (rx_total > 0) {
+        *ext_rx += (uint64_t)rx_total;
+
+    }
+
+    if (tx_total > 0) {
+        *ext_tx += (uint64_t)tx_total;
+
+    }
+
+    return ret;
+}
+
+
+#if 0 /* SEB */
 /* Find the next occurence of the character 'c' in the buffer 'buf' which len is 'len'; start search from the offset 'offset' */
 /**
  * @author Sebastian Mountaniol (1/28/24)
@@ -109,7 +513,6 @@ void pepa_set_tcp_send_size(const pepa_core_t *core, const int sock)
  * @return int Return the offset of found character; if not found, the size of the buffer returned
  * @details 
  */
-#if 0 /* SEB */
 static int find_next(char *buf, int len, int offset, char c){
 	int now = offset;
 	do {
@@ -230,11 +633,11 @@ static void pepa_print_buffer_old(pepa_core_t *core, char *buf, const ssize_t rx
 }
 #endif
 
+#if 0 /* SEB */ /* 15.10.2024 */
 /* Print message */
 static void pepa_print_buffer(pepa_core_t *core, char *buf, const ssize_t rx,
-								  const int fd_out, const char *name_out,
-								  const int fd_in, const char *name_in)
-{
+							  const int fd_out, const char *name_out,
+							  const int fd_in, const char *name_in){
 	ssize_t offset  = 0;
 	int     prc     = 0; /** < return value of snprintf */
 
@@ -285,8 +688,7 @@ int pepa_one_direction_copy3(pepa_core_t *core,
 							 char *buf, const size_t buf_size,
 							 const int do_debug,
 							 uint64_t *ext_rx, uint64_t *ext_tx,
-							 const int max_iterations)
-{
+							 const int max_iterations){
 	//static char *print_buf   = calloc(core->internal_buf_size + 1, 1);
 
 	int     ret          = PEPA_ERR_OK;
@@ -384,7 +786,7 @@ int pepa_one_direction_copy3(pepa_core_t *core,
 	} while (((int32_t)buf_size_use == rx) && (iteration <= max_iterations));
 
 	ret = PEPA_ERR_OK;
-endit:
+	endit:
 	if (do_debug) {
 		// slog_note_l("Finished transfering from %s to %s, returning %d, rx = %d, tx = %d, ", name_in, name_out, ret, rx_total, tx_total);
 	}
@@ -401,6 +803,7 @@ endit:
 
 	return ret;
 }
+#endif /* SEB */ /* 15.10.2024 */
 
 int32_t pepa_test_fd(const int fd)
 {
