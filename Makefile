@@ -92,7 +92,9 @@ PEPA_DEFINES+=-DPEPA_HOST=\"$(PEPA_HOST_VAL)\"
 #CFLAGS+= -DPEPA_VERSION_GIT=\"$(PEPA_VERSION_GIT_VAL)\"
 CFLAGS+=$(PEPA_DEFINES)
 CFLAGS+=-O2
-# CFLAGS+=-O0
+
+INC= -I./queue/
+LIBHL=./queue/libhl.a
 
 #PEPA_O= pepa3.o pepa_state_machine.o pepa_parser.o main.o pepa_core.o \
 		pepa_server.o pepa_errors.o \
@@ -102,13 +104,14 @@ CFLAGS+=-O2
 PEPA_O= pepa3.o pepa_state_machine.o pepa_parser.o main.o pepa_core.o \
 		pepa_server.o pepa_errors.o \
 		pepa_socket_common.o pepa_in_reading_sockets.o iniparser.o \
-		pepa_config.o
+		pepa_config.o logger.o
 		
 PEPA_T=pepa-ng
 
+LIBS=-lpthread $(LIBHL)
 AFL_O=pepa_afl.o pepa3.o pepa_state_machine.o pepa_parser.o pepa_core.o \
 		pepa_server.o pepa_errors.o pepa_socket_common.o pepa_in_reading_sockets.o \
-		iniparser.o pepa_config.o
+		iniparser.o pepa_config.o logger.o
 
 AFL_T=pepa_afl.out
 
@@ -130,21 +133,25 @@ EMU_T=emu
 all: clean static
 ca: clean pepa emu
 
-pepa: slog buf_t $(PEPA_O)
-	$(GCC) $(CFLAGS) $(DEBUG) $(PEPA_O) $(ARS) -o $(PEPA_T) -lpthread
+pepa: $(queue) slog buf_t $(PEPA_O)
+	$(GCC) $(CFLAGS) $(INC) $(DEBUG) $(PEPA_O) $(ARS) -o $(PEPA_T) $(LIBS)
 
 static: slog buf_t $(PEPA_O)
-	$(GCC) $(CFLAGS) -static $(DEBUG) $(PEPA_O) $(ARS) -o $(PEPA_T) -lpthread
+	$(GCC) $(CFLAGS) $(INC) -static $(DEBUG) $(PEPA_O) $(ARS) -o $(PEPA_T) $(LIBS)
 	
 
 .PHONY:buf_t
 buf_t:
 	make -C buf_t
 
+queue:
+	make -C queue
 .PHONY:emu
-emu: buf_t slog $(EMU_O)
-	$(GCC) $(CFLAGS) $(DEBUG) $(EMU_O) $(ARS) -o $(EMU_T) -lpthread
+emu: buf_t slog $(EMU_O) 
+	$(GCC) $(CFLAGS) $(DEBUG) $(EMU_O) $(ARS) -o $(EMU_T) $(LIBS)
 
+libhl:
+	cd libhl ; autoconf ; ./configure ; make clean all ; cd -
 .PHONY:slog
 slog:
 	make -C slog
@@ -153,6 +160,7 @@ clean:
 	rm -f $(PEPA_T) $(PEPA_O) $(EMU_T) $(EMU_O) $(AFL_T)
 	make -C buf_t clean
 	make -C slog clean
+	make -C queue clean
 
 .PHONY:check
 check:
@@ -225,6 +233,6 @@ fuzzer: $(AFL_PATH)/afl-gcc
 
 %.o:%.c
 	@echo "|>" $@...
-	@$(GCC) -g $(INCLUDE) $(CFLAGS) $(DEBUG) -c -o $@ $<
+	@$(GCC) -g $(INC) $(CFLAGS) $(DEBUG) -c -o $@ $<
 
 
