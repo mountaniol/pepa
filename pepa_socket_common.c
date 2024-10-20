@@ -876,8 +876,22 @@ void pepa_socket_close(const int socket, const char *socket_name)
 			slog_note_l("## Closed socket socket %s : %d, iterations: %d", socket_name, socket, i);
 			return;
 		}
-		usleep(100);
-		slog_error_l("Can not close socket %s, error %d: %s, iteration: %d", socket_name, rc, strerror(errno), i);
+
+		switch (errno) {
+			/* If the error is BADF, we should do nothing, the fd is closed */
+		case EBADF:
+			return;
+			/* The close() operation was interrupted; sleep and retry */
+		case EINTR:
+			usleep(100);
+			continue;
+		case EIO:
+			slog_error_l("Can not close socket %s, error %d: %s, iterations: %d", socket_name, rc, strerror(errno), i);
+			return;
+		default:
+			slog_error_l("Can not close socket %s, error %d: %s, iterations: %d", socket_name, rc, strerror(errno), i);
+			return;
+		}
 	}
 }
 
