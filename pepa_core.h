@@ -31,6 +31,7 @@ typedef struct {
  * @details 
  */
 typedef struct {
+	int shva_listen; /**< This socket is used in Emulator only */
 	int shva_rw;
 	int out_listen;
 	int out_write;

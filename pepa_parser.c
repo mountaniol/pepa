@@ -407,7 +407,7 @@ int pepa_parse_arguments(int argi, char *argv[])
 			}
 
 			core->emu_in_threads = (uint32_t)ret;
-			slog_info_l("Emulator IN threads is set to: %zu", core->emu_min_buf);
+			slog_info_l("Emulator IN threads is set to: %u", core->emu_in_threads);
 		}
 			break;
 		case 'm':

@@ -345,7 +345,6 @@ static int pepa_process_fdx(pepa_core_t *core, const struct epoll_event events_a
                                       /* Max iterations */ 1);
 
         if (PEPA_ERR_OK == rc) {
-            //slog_warn_l("%s: Sent from socket %d", "IN-FORWARD", events[i].data.fd);
             continue;
         }
 
@@ -408,8 +407,8 @@ static int         pepa3_transfer_loop(pepa_core_t *core)
             continue;
         }
 
-        /* Copy the evens array, this way they are not changed when we iterate then several times;
-           When we iterate events AND read / write the file descriptors, the event can be reset, and it is not what we need */
+        /* Copy the evens array, this way they are not changed when we iterate them several times:
+           When we iterate events AND read / write the file descriptors, the event array might be reseted, and it is not what we need */
         memcpy(events_copy, events, sizeof(struct epoll_event) * EVENTS_NUM);
 
         /* Process exceptions */
@@ -420,18 +419,26 @@ static int         pepa3_transfer_loop(pepa_core_t *core)
             break;
         case TE_RESTART:
             /* An error on SHVA or OUT listening sockets occured, all sockets should be restarted */
-            next_state = PST_CLOSE_SOCKETS;
-            break;
+            // next_state = PST_CLOSE_SOCKETS;
+            // break;
+            return PST_CLOSE_SOCKETS;
         case TE_IN_RESTART:
             /* An error on listening IN socket occured, the IN socket should be restarted */
-            next_state = PST_RESTART_IN;
-            break;
+            // next_state = PST_RESTART_IN;
+            // break;
+            return PST_RESTART_IN;
         case TE_IN_REMOVED:
             /* Do nothing, this is a normal situation, one of IN readers was removed */
             /* However do not process file descriptors on this iteration;
                start a new iteration and pn the new iteration the removed socket will not appear in the set */
-            //continue;
-            break;
+
+            /* However, if there 0 IN sockets left, we should restart all sockets */
+            if (core->in_reading_sockets.active < 1) {
+                slog_note_l("No IN reading sockets left (allclosed), we should restart IN and SHVA");
+                return PST_RESTART_IN;
+            }
+            continue;
+            // break;
         default:
             slog_error_l("You should never be here: got status %d", rc);
             abort();
@@ -866,7 +873,8 @@ static int pepa3_restart_in(pepa_core_t *core)
     /* Close and remove from epoll all reading sockets */
     pepa_in_reading_sockets_close_all(core);
 
-    rc = pepa_socket_shutdown_and_close(core->sockets.in_listen, "IN LISTEN");
+    // rc = pepa_socket_shutdown_and_close(core->sockets.in_listen, "IN LISTEN");
+    rc = pape3_close_shva_all(core);
     if (rc) {
         slog_warn_l("Could not close socket SHVA: fd: %d", core->sockets.shva_rw);
     }

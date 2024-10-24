@@ -27,6 +27,7 @@ static pepa_core_t *pepa_create_core_t(void)
 	/*** Init threads pthread descriptors */
 
 	core->config = NULL;
+	core->sockets.shva_listen = FD_CLOSED;
 	core->sockets.shva_rw = FD_CLOSED;
 	core->sockets.out_listen = FD_CLOSED;
 	core->sockets.out_write = FD_CLOSED;

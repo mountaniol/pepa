@@ -13,151 +13,153 @@
 
 static void pepa_clean_on_exit(void)
 {
-	pepa_core_t *core = pepa_get_core();
+    pepa_core_t *core = pepa_get_core();
 
-	slog_warn_l("=============================================");
-	slog_warn_l("=============================================");
-	slog_warn_l("Finishing PEPA");
+    slog_warn_l("=============================================");
+    slog_warn_l("=============================================");
+    slog_warn_l("Finishing PEPA");
 
-	/* Remove PID file */
-	if (NULL != core->pid_file_name) {
-		int rc;
-		slog_warn_l("Removing PID file %s", core->pid_file_name);
-		rc = unlink(core->pid_file_name);
-		if (0 != rc) {
-			slog_error_l("Can not remove PID file: %s: %s", core->pid_file_name, strerror(errno));
-		} else {
-			slog_warn_l("Removed PID file: %s", core->pid_file_name);
-		}
+    /* Remove PID file */
+    if (NULL != core->pid_file_name) {
+        int rc;
+        slog_warn_l("Removing PID file %s", core->pid_file_name);
+        rc = unlink(core->pid_file_name);
+        if (0 != rc) {
+            slog_error_l("Can not remove PID file: %s: %s", core->pid_file_name, strerror(errno));
+        } else {
+            slog_warn_l("Removed PID file: %s", core->pid_file_name);
+        }
 
-		//free(core->pid_file_name);
-	}
+        //free(core->pid_file_name);
+    }
 
-	/* Terminate monithor thread */
-	if (0 != core->monitor.onoff) {
-		slog_warn_l("Terminating the monitor thread");
-		pepa_thread_kill_monitor(core);
-	}
+    /* Terminate monithor thread */
+    if (0 != core->monitor.onoff) {
+        slog_warn_l("Terminating the monitor thread");
+        pepa_thread_kill_monitor(core);
+    }
 
-	/* Close all sockets, if not closed */
-	slog_warn_l("Closing all sockets");
-	pepa3_close_sockets(core);
+    /* Close all sockets, if not closed */
+    slog_warn_l("Closing all sockets");
+    pepa3_close_sockets(core);
 
-	pepa_core_release(core);
+    pepa_core_release(core);
 
-	/* Free buffers */
-	//slog_warn_l("Freeing all buffers");
-	//if (NULL != core->buffer) {
-	//	free(core->buffer);
-	//}
+    /* Free buffers */
+    //slog_warn_l("Freeing all buffers");
+    //if (NULL != core->buffer) {
+    //	free(core->buffer);
+    //}
 
-	/* Close slogger */
-	slog_warn_l("Destroying the logger");
-	slog_warn_l("=============================================");
-	slog_warn_l("=============================================");
-	slog_destroy();
+    /* Close slogger */
+    slog_warn_l("Destroying the logger");
+    slog_warn_l("=============================================");
+    slog_warn_l("=============================================");
+    slog_destroy();
 }
 
 /* Catch Signal Handler function */
 static void signal_callback_handler(int signum, __attribute__((unused)) siginfo_t *info, __attribute__((unused))void *extra)
 {
-	//pepa_core_t *core = pepa_get_core();
-	printf("Caught signal %d\n", signum);
-	if (signum == SIGINT) {
-		printf("Caught signal SIGINT: %d\n", signum);
-		//pepa_back_to_disconnected_state_new(core);
-		pepa_clean_on_exit();
-		exit(0);
-	}
+    //pepa_core_t *core = pepa_get_core();
+    printf("Caught signal %d\n", signum);
+    if (signum == SIGINT) {
+        printf("Caught signal SIGINT: %d\n", signum);
+        //pepa_back_to_disconnected_state_new(core);
+        pepa_clean_on_exit();
+        exit(0);
+    }
 
-	if (signum == SIGUSR1) {
-		printf("Caught signal SIGINT: %d\n", signum);
-		//pepa_back_to_disconnected_state_new(core);
-		pepa_clean_on_exit();
-		exit(0);
-	}
+    if (signum == SIGUSR1) {
+        printf("Caught signal SIGINT: %d\n", signum);
+        //pepa_back_to_disconnected_state_new(core);
+        pepa_clean_on_exit();
+        exit(0);
+    }
+
 }
 
 static void pepa_set_int_signal_handler(void)
 {
-	struct sigaction action;
+    struct sigaction action;
 
-	sigemptyset(&action.sa_mask);
-	action.sa_flags = 0;
+    sigemptyset(&action.sa_mask);
+    action.sa_flags = 0;
 
-	action.sa_flags = SA_SIGINFO | SIGUSR1;
-	action.sa_sigaction = signal_callback_handler;
-	sigaction(SIGINT, &action, NULL);
+    action.sa_flags = SA_SIGINFO | SIGUSR1;
+    action.sa_sigaction = signal_callback_handler;
+    sigaction(SIGINT, &action, NULL);
+    signal(SIGPIPE, SIG_IGN);
 }
 
 int pepa_go(pepa_core_t *core);
 
 int main(int argi, char *argv[])
 {
-	int rc;
+    int rc;
 
-	slog_init("pepa", SLOG_FLAGS_ALL, 0);
-	pepa_print_version();
+    slog_init("pepa", SLOG_FLAGS_ALL, 0);
+    pepa_print_version();
 
-	slog_note_l("Going to init core");
-	rc = pepa_core_init();
-	if (PEPA_ERR_OK != rc) {
-		slog_fatal_l("Can not init core");
-		abort();
-	}
-	slog_note_l("Core inited");
-
-	pepa_core_t *core = pepa_get_core();
-
-	slog_note_l("Going to parse arguments");
-	rc = pepa_parse_arguments(argi, argv);
-	if (rc < 0) {
-		slog_fatal_l("Could not parse arguments: %s", pepa_error_code_to_str(rc));
-		exit(-11);
-	}
-
-	rc = 0;
-    if (NULL != core->config) {
-		rc = pepa_read_config(core);
+    slog_note_l("Going to init core");
+    rc = pepa_core_init();
+    if (PEPA_ERR_OK != rc) {
+        slog_fatal_l("Can not init core");
+        abort();
     }
-	if (rc) {
-		slog_error_l("Could not read / parse config file %s", core->config);
-		return -1;
-	}
-	pepa_config_slogger(core);
+    slog_note_l("Core inited");
 
-	slog_note_l("Arguments parsed");
+    pepa_core_t *core = pepa_get_core();
 
-	if (core->daemon) {
-		daemonize(core);
-		/* Set hight limit of opened files */
-		/* After demonization we must reinit the logger */
-		//slog_init("pepa", SLOG_FLAGS_ALL, 0);
-		//rc = pepa_config_slogger_daemon(core);
-	}
-	pepa_set_rlimit();
+    slog_note_l("Going to parse arguments");
+    rc = pepa_parse_arguments(argi, argv);
+    if (rc < 0) {
+        slog_fatal_l("Could not parse arguments: %s", pepa_error_code_to_str(rc));
+        exit(-11);
+    }
 
-	pepa_set_int_signal_handler();
+    rc = 0;
+    if (NULL != core->config) {
+        rc = pepa_read_config(core);
+    }
+    if (rc) {
+        slog_error_l("Could not read / parse config file %s", core->config);
+        return -1;
+    }
+    pepa_config_slogger(core);
 
-	slog_note_l("Going to start threads");
-	//rc = pepa_start_threads(core);
-	if (core->monitor.onoff) {
-		slog_debug_l("Going to start MONITOR");
-		pepa_thread_start_monitor(core);
-	}
-	rc = pepa_go(core);
-	if (rc < 0) {
-		slog_fatal_l("Could not start threads");
-		exit(-11);
-	}
+    slog_note_l("Arguments parsed");
 
-	while (1) {
-		sleep(60);
-	}
-	//pepa_kill_all_threads(core);
-	//sleep(1);
-	pepa_core_release(core);
-	slog_note_l("PEPA Exit");
-	return (0);
+    if (core->daemon) {
+        daemonize(core);
+        /* Set hight limit of opened files */
+        /* After demonization we must reinit the logger */
+        //slog_init("pepa", SLOG_FLAGS_ALL, 0);
+        //rc = pepa_config_slogger_daemon(core);
+    }
+    pepa_set_rlimit();
+
+    pepa_set_int_signal_handler();
+
+    slog_note_l("Going to start threads");
+    //rc = pepa_start_threads(core);
+    if (core->monitor.onoff) {
+        slog_debug_l("Going to start MONITOR");
+        pepa_thread_start_monitor(core);
+    }
+    rc = pepa_go(core);
+    if (rc < 0) {
+        slog_fatal_l("Could not start threads");
+        exit(-11);
+    }
+
+    while (1) {
+        sleep(60);
+    }
+    //pepa_kill_all_threads(core);
+    //sleep(1);
+    pepa_core_release(core);
+    slog_note_l("PEPA Exit");
+    return (0);
 }
 
