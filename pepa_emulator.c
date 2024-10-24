@@ -24,6 +24,7 @@ emu_t      *emu                 = NULL;
 
                      #define SHUTDOWN_DIVIDER (100003573)
                      #define SHVA_SHUTDOWN_DIVIDER (10000357)
+                     //#define SHVA_SHUTDOWN_DIVIDER (1000035)
                      #define SHOULD_EMULATE_DISCONNECT() (0 == (rand() % SHUTDOWN_DIVIDER))
                      #define SHVA_SHOULD_EMULATE_DISCONNECT() (0 == (rand() % SHVA_SHUTDOWN_DIVIDER))
 
@@ -33,10 +34,6 @@ emu_t      *emu                 = NULL;
 
 /* Keep here PIDs of IN threads */
 pthread_t  *in_thread_idx;
-uint32_t   number_of_in_threads = 4;
-uint32_t   shva_reader_up       = 0;
-uint32_t   shva_writer_up       = 0;
-uint32_t   in_should_restart    = 0;
 
 
 const char *lorem_ipsum         = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.\0";
@@ -604,9 +601,6 @@ static void pepa_emulator_shva_reader_thread_clean(void *arg)
     slog_note("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$");
     slog_note("$$$$$$$    SHVA READER CLEANUP           $$$$$$$$$");
 
-    shva_reader_up = 0;
-    shva_writer_up = 0;
-
     int rc = (int)buf_free(cargs->buf);
     if (rc) {
         slog_warn_l("Could not free buf_t: %s", buf_error_code_to_string(rc));
@@ -669,8 +663,6 @@ static void *pepa_emulator_shva_reader_thread2(__attribute__((unused))void *arg)
             slog_warn_l("[SHVA READ] Tried to add shva fd = %d and failed", core->sockets.shva_rw);
             pthread_exit(NULL);
         }
-
-        shva_reader_up = 1;
 
         emu_set_shva_read_status(emu, ST_WAITING);
 
@@ -959,8 +951,6 @@ static void *pepa_emulator_shva_writer_thread2(void *arg)
                 buf_size = core->emu_min_buf;
             }
 
-            shva_writer_up = 1;
-
             if (send_several > 0) {
                 rc = write(core->sockets.shva_rw, several_messages, several_messages_len);
                 send_several = 0;
@@ -1123,7 +1113,7 @@ static void pepa_emulator_shva_thread_cleanup(__attribute__((unused))void *arg)
     slog_note("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$");
 }
 
-#define EVENTS_NUM (10)
+#define EVENTS_NUM (5)
 /* Create 1 read/write listening socket to emulate SHVA server */
 #if 0 /* SEB */ /* 23/10/2024 */
 static void *pepa_emulator_shva_thread(__attribute__((unused))void *arg){
@@ -1473,68 +1463,87 @@ shva_main_exit:
     pthread_exit(NULL);
 }
 
+#define RW_ITER_READ (10)
+#define RW_ITER_WRITE (2)
 static int pepa_emulator_shva_read(const int fd, size_t *rx, size_t *reads)
 {
+    int         cur   = 0;
+    int         rc;
     pepa_core_t *core = pepa_get_core();
     buf_t       *buf  = buf_new((buf_s64_t)core->emu_max_buf + 1);
 
-    /* Read from socket */
-    *reads += 1;
-    int rc = read(fd, buf->data, core->emu_max_buf);
-    if (rc < 0) {
-        slog_warn_l("[SHVA READ] Read/Write op between sockets failure: %s", strerror(errno));
-        return -1;
+    for (int i = 0; i < RW_ITER_READ; i++) {
+        /* Read from socket */
+        *reads += 1;
+        rc = read(fd, buf->data, core->emu_max_buf);
+        if (rc < 0 && 0 == cur) {
+            slog_warn_l("[SHVA READ] Read/Write op between sockets failure: %s", strerror(errno));
+            return -1;
+        }
+
+        if (0 == rc && 0 == cur) {
+            slog_warn_l("[SHVA READ] Read op returned 0 bytes, an error: %s", strerror(errno));
+            return -2;
+        }
+
+        if (rc < 1 && cur > 0) {
+            return cur;
+        }
+
+        *rx += (uint64_t)rc;
+        cur += rc;
+        if (*reads > 0 && 0 == (*reads % RX_TX_PRINT_DIVIDER)) {
+            slog_debug_l("[SHVA READ] %-7lu reads, bytes: %-7lu, Kb: %-7lu", *reads, *rx, (*rx / 1024));
+        }
     }
 
-    if (0 == rc) {
-        slog_warn_l("[SHVA READ] Read op returned 0 bytes, an error: %s", strerror(errno));
-        return -2;
-    }
-
-    *rx += (uint64_t)rc;
-    if (*reads > 0 && 0 == (*reads % RX_TX_PRINT_DIVIDER)) {
-        slog_debug_l("[SHVA READ] %-7lu reads, bytes: %-7lu, Kb: %-7lu", *reads, *rx, (*rx / 1024));
-    }
-
-    return rc;
+    return cur;
 }
 
 static int pepa_emulator_shva_write(const int fd, size_t *tx, size_t *writes)
 {
+    int         cur   = 0;
     ssize_t     rc;
-    pepa_core_t *core    = pepa_get_core();
+    pepa_core_t *core = pepa_get_core();
 
-    size_t      buf_size = ((size_t)rand() % core->emu_max_buf); //core->emu_max_buf;
-    if (buf_size < core->emu_min_buf) {
-        buf_size = core->emu_min_buf;
+    for (int i = 0; i < RW_ITER_WRITE; i++) {
+        *writes += 1;
+        if (FD_CLOSED == fd) {
+            return 0;
+        }
+
+        size_t      buf_size = ((size_t)rand() % core->emu_max_buf); //core->emu_max_buf;
+        if (buf_size < core->emu_min_buf) {
+            buf_size = core->emu_min_buf;
+        }
+
+        rc = write(fd, lorem_ipsum_buf->data, buf_size);
+
+        if (rc < 0 && 0 == cur) {
+            slog_warn_l("[SHVA WRITE] Could not send buffer to SHVA, error: %s", strerror(errno));
+            return -1;
+        }
+
+        if (0 == rc && 0 == cur) {
+            slog_warn_l("[SHVA WRITE] Send 0 bytes to SHVA, error: %s", strerror(errno));
+            return -2;
+        }
+
+        if (rc < 1 && cur > 0) {
+            return cur;
+        }
+
+        *tx += (uint64_t)rc;
+
+        if (*writes > 0 && 0 == (*writes % RX_TX_PRINT_DIVIDER)) {
+            slog_debug_l("[SHVA WRITE] %-7lu reads, bytes: %-7lu, Kb: %-7lu", *writes, *tx, (*tx / 1024));
+        }
+
+        if (core->emu_timeout > 0) {
+            usleep(core->emu_timeout);
+        }
     }
-
-    shva_writer_up = 1;
-
-    rc = write(fd, lorem_ipsum_buf->data, buf_size);
-
-    if (rc < 0) {
-        slog_warn_l("[SHVA WRITE] Could not send buffer to SHVA, error: %s", strerror(errno));
-        return -1;
-    }
-
-    if (0 == rc) {
-        slog_warn_l("[SHVA WRITE] Send 0 bytes to SHVA, error: %s", strerror(errno));
-        return -2;
-    }
-    *tx += (uint64_t)rc;
-
-    if (*writes > 0 && 0 == (*writes % RX_TX_PRINT_DIVIDER)) {
-        slog_debug_l("[SHVA WRITE] %-7lu reads, bytes: %-7lu, Kb: %-7lu", *writes, *tx, (*tx / 1024));
-    }
-
-    if (core->emu_timeout > 0) {
-        usleep(core->emu_timeout);
-    }
-
-    *writes++;
-
-    return rc;
+    return cur;
 }
 
 #if 0 /* SEB */ /* 24/10/2024 */
@@ -1584,7 +1593,7 @@ static int pepa_emu_shva_accept(int epoll_fd, int sock_listen, pepa_core_t *core
     pepa_set_tcp_recv_size(core, core->sockets.shva_rw);
 
     /* Add writing fd to epoll set */
-    if (0 != epoll_ctl_add(epoll_fd, core->sockets.shva_rw, EPOLLIN | EPOLLRDHUP | EPOLLHUP)) {
+    if (0 != epoll_ctl_add(epoll_fd, core->sockets.shva_rw, EPOLLIN | EPOLLOUT | EPOLLRDHUP | EPOLLHUP)) {
         slog_error_l("[SHVA] Can not add RW socket to epoll set");
         return -1;
     }
@@ -1637,8 +1646,6 @@ static void *pepa_emulator_shva(void *arg)
 
         slog_note_l("[SHVA] Opened listening socket");
 
-        socklen_t addrlen      = sizeof(struct sockaddr);
-
         if (0 != epoll_ctl_add(epoll_fd, sock_listen, EPOLLIN | EPOLLRDHUP | EPOLLHUP)) {
             close(epoll_fd);
             slog_fatal_l("[SHVA] Could not add listening socket to epoll");
@@ -1646,8 +1653,6 @@ static void *pepa_emulator_shva(void *arg)
         }
 
         do {
-            int i;
-
             /* The controlling thread can ask us to wait;
                It supervises all other threads and makes decisions */
             int status = emu_get_shva_main_status(emu);
@@ -1694,7 +1699,7 @@ static void *pepa_emulator_shva(void *arg)
 
             /* If here, it means everything is OK and we have a connection on the listening socket, or a socket is broken */
 
-            for (i = 0; i < event_count; i++) {
+            for (int i = 0; i < event_count; i++) {
 
                 /* The any socket is disconnected - reset all sockets */
                 if (events[i].events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR)) {
@@ -1703,42 +1708,6 @@ static void *pepa_emulator_shva(void *arg)
 
                 /* IN event on listening, we should accept new connection */
                 if (sock_listen == events[i].data.fd && events[i].events == EPOLLIN) {
-#if 0 /* SEB */ /* 24/10/2024 */
-
-                    // slog_warn_l("[SHVA] Listening socket: got connection");
-
-                    /* If we have a RW socket opened, but there is another incoming connection is already established, we ignore this one */
-                    if (FD_CLOSED != core->sockets.shva_rw) {
-                        // slog_error_l("[SHVA] We have RW socket but another connection is detected: we ignore it");
-                        usleep(1000);
-                        continue;
-                    }
-
-                    /* All right, we accept the connection */
-
-                    core->sockets.shva_rw = accept(sock_listen, &s_addr, &addrlen);
-
-                    slog_note_l("[SHVA] ACCEPTED");
-                    if (core->sockets.shva_rw < 0) {
-                        slog_error_l("[SHVA] Could not accept: %s", strerror(errno));
-                        core->sockets.shva_rw = FD_CLOSED;
-                        continue;
-                    }
-
-                    pepa_set_tcp_timeout(core->sockets.shva_rw);
-                    pepa_set_tcp_send_size(core, core->sockets.shva_rw);
-                    pepa_set_tcp_recv_size(core, core->sockets.shva_rw);
-
-                    /* Add writing fd to epoll set */
-                    if (0 != epoll_ctl_add(epoll_fd, core->sockets.shva_rw, EPOLLIN | EPOLLRDHUP | EPOLLHUP)) {
-                        slog_error_l("[SHVA] Can not add RW socket to epoll set");
-                        goto reset;
-                    }
-
-                    /* Ready means we have both listening and RW sockest are ready */
-                    emu_set_shva_main_status(emu,  ST_READY);
-#endif /* SEB */ /* 24/10/2024 */
-
                     rc = pepa_emu_shva_accept(epoll_fd, sock_listen, core);
                 }  /* if (sock_listen == events[i].data.fd && events[i].events == EPOLLIN)*/
 
@@ -1756,15 +1725,31 @@ static void *pepa_emulator_shva(void *arg)
                     }
                 }
 
+#if 0 /* SEB */ /* 24/10/2024 */
+                if (core->sockets.shva_rw == events[i].data.fd && events[i].events == EPOLLOUT) {
+                    rc = pepa_emulator_shva_write(core->sockets.shva_rw, &tx, &writes);
+                    if (rc < 0) {
+                        slog_error_l("[SHVA] Can not write to RW socket, reset sockets");
+                        goto reset;
+                    }
+                }
+#endif /* SEB */ /* 24/10/2024 */ 
 
             } /* if (events[i].events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR)) */
             /* Write to RW socket */
+
+#if 1 /* SEB */ /* 24/10/2024 */
+            /* If no RW socket, continue */
+            if (FD_CLOSED == core->sockets.shva_rw) {
+                continue;
+            }
 
             rc = pepa_emulator_shva_write(core->sockets.shva_rw, &tx, &writes);
             if (rc < 0) {
                 slog_error_l("[SHVA] Can not write to RW socket, reset sockets");
                 goto reset;
             }
+#endif /* SEB */ /* 24/10/2024 */ 
 
         } while (1);
 
@@ -1919,13 +1904,13 @@ static void *pepa_emulator_in_thread(__attribute__((unused))void *arg)
             writes++;
 
             if (rc < 0) {
-                slog_warn_l("%s: Could not send buffer to SHVA, error: %s", my_name, strerror(errno));
+                slog_warn_l("%s: Could not send buffer to SHVA, error: %s (%d)", my_name, strerror(errno), errno);
                 //break;
                 goto reset_socket;
             }
 
             if (0 == rc) {
-                slog_warn_l("%s: Send 0 bytes to SHVA, error: %s", my_name, strerror(errno));
+                slog_warn_l("%s: Send 0 bytes to SHVA, error: %s (%d)", my_name, strerror(errno), errno);
                 // usleep(10000);
                 //break;
                 goto reset_socket;
@@ -2180,7 +2165,7 @@ static void in_st_print(emu_t *emu, char *buf)
     }
 }
 
-#define PRINT_STATUSES (1)
+#define PRINT_STATUSES (0)
 
 static void emu_coltrol_pr_statuses(emu_t *emu)
 {
@@ -2223,7 +2208,8 @@ static void controll_state_machine(emu_t *emu)
     do {
         // char *buf = calloc(1024, 1);
         //int counter = 0;
-        sleep(1);
+        // sleep(1);
+        usleep(50000);
 
         // slog_note_l("[EMU CONTROL]: run");
 
