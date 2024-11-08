@@ -116,6 +116,7 @@ void pepa_in_reading_sockets_allocate(pepa_core_t *core, const int num)
 	
 	core->in_reading_sockets.number = num;
 	core->in_reading_sockets.sockets = (int *)malloc(sizeof(int) * (size_t)num);
+	TESTP_VOID(core->in_reading_sockets.sockets);
 	for (i = 0; i < num; i++) {
 		core->in_reading_sockets.sockets[i] = EMPTY_SLOT;
 	}

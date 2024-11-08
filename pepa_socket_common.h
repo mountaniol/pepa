@@ -52,12 +52,17 @@ void pepa_set_tcp_send_size(const pepa_core_t *core, const int32_t sock);
 int pepa_one_direction_copy3(pepa_core_t *core,
                              const int fd_out, const char *name_out,
                              const int fd_in, const char *name_in,
-                             char *buf, const size_t buf_size,
                              const int do_debug,
                              uint64_t *ext_rx, uint64_t *ext_tx,
                              const int max_iterations);
 
 
+int transfer_data4(pepa_core_t *core,
+                             const int fd_out, const char *name_out,
+                             const int fd_in, const char *name_in,
+                             const int do_debug,
+                             uint64_t *ext_rx, uint64_t *ext_tx,
+                             const int max_iterations);
 /**
  * @author Sebastian Mountaniol (12/14/23)
  * @brief Test file descriptor. If it opened, return PEPA_ERR_OK,

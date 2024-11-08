@@ -255,14 +255,15 @@ static int pepa_process_fdx_shva(pepa_core_t *core, const struct epoll_event eve
 
         /* Read /write from/to socket */
 
+        // transfer_data4
         rc = pepa_one_direction_copy3(core,
+        //rc = transfer_data4(core,
                                       /* Send to : */core->sockets.out_write, "OUT",
                                       /* From: */ core->sockets.shva_rw, "SHVA",
-                                      core->buffer, core->internal_buf_size,
-                                      /*Debug is ON */ 0,
+                                      /*Debug is ON */ 1,
                                       /* RX stat */&core->monitor.shva_rx,
                                       /* TX stat */&core->monitor.out_tx,
-                                      /* Max iterations */ 5);
+                                      /* Max iterations */ /*5*/ 1);
 
         if (PEPA_ERR_OK == rc) {
             //slog_warn_l("%s: Sent from socket %d", "IN-FORWARD", events[i].data.fd);
@@ -335,11 +336,12 @@ static int pepa_process_fdx(pepa_core_t *core, const struct epoll_event events_a
 
         /* Read /write from/to socket */
 
+        // transfer_data4
         rc = pepa_one_direction_copy3(core,
+        //rc = transfer_data4(core,
                                       /* Send to : */core->sockets.shva_rw, "SHVA",
                                       /* From: */ fd, "IN",
-                                      core->buffer, core->internal_buf_size,
-                                      /*Debug is ON */ 0,
+                                      /*Debug is ON */ 1,
                                       /* RX stat */&core->monitor.in_rx,
                                       /* TX stat */&core->monitor.shva_tx,
                                       /* Max iterations */ 1);

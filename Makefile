@@ -24,8 +24,7 @@ endif
 CFLAGS=-Wabsolute-value -Waddress -Waddress-of-packed-member \
 		-Walloc-zero -Walloca -Wbool-compare \
 		-Wbool-operation -Wbuiltin-declaration-mismatch \
-		-Wbuiltin-macro-redefined -Wc11-c2x-compat \
-		-Wcast-function-type  \
+		-Wbuiltin-macro-redefined -Wcast-function-type  \
 		-Wchar-subscripts -Wclobbered -Wcomment  -Wcpp \
 		-Wdangling-else -Wdate-time \
 		-Wdeprecated -Wdesignated-init -Wdiscarded-array-qualifiers \
@@ -76,6 +75,10 @@ CFLAGS=-Wabsolute-value -Waddress -Waddress-of-packed-member \
 # Clang static analyzer
 #CFLAGS += -Xfanalyzer
 
+ifneq ($(astatic),)
+    CFLAGS +=-fanalyzer
+endif
+
 PEPA_VERSION_GIT_VAL=$(shell git log -1 --pretty=format:%h --abbrev=8)
 PEPA_BRANCH_GIT_VAL=$(shell git branch --show-current)
 PEPA_COMP_DATE_VAL=$(shell date +%F/%H-%M-%S)
@@ -91,8 +94,8 @@ PEPA_DEFINES+=-DPEPA_HOST=\"$(PEPA_HOST_VAL)\"
 
 #CFLAGS+= -DPEPA_VERSION_GIT=\"$(PEPA_VERSION_GIT_VAL)\"
 CFLAGS+=$(PEPA_DEFINES)
-# CFLAGS+=-O2
-CFLAGS+=-O0
+CFLAGS+=-O2
+#CFLAGS+=-O0
 
 INC= -I./queue/
 LIBHL=./queue/libhl.a
@@ -105,14 +108,14 @@ LIBHL=./queue/libhl.a
 PEPA_O= pepa3.o pepa_state_machine.o pepa_parser.o main.o pepa_core.o \
 		pepa_server.o pepa_errors.o \
 		pepa_socket_common.o pepa_in_reading_sockets.o iniparser.o \
-		pepa_config.o logger.o
+		pepa_config.o logger.o pepa_ticket.o zhash2.o checksum.o murmur3.o
 		
 PEPA_T=pepa-ng
 
 LIBS=-lpthread $(LIBHL)
 AFL_O=pepa_afl.o pepa3.o pepa_state_machine.o pepa_parser.o pepa_core.o \
 		pepa_server.o pepa_errors.o pepa_socket_common.o pepa_in_reading_sockets.o \
-		iniparser.o pepa_config.o logger.o
+		iniparser.o pepa_config.o logger.o pepa_ticket.o zhash2.o checksum.o murmur3.o
 
 AFL_T=pepa_afl.out
 
@@ -126,7 +129,8 @@ ARS=$(BUFT_AR) $(SLOG_AR)
 	pepa_socket_out.o pepa_socket_shva.o 
 EMU_O=pepa_emulator.o pepa_state_machine.o pepa_parser.o \
 	pepa_core.o pepa_server.o pepa_errors.o \
-	pepa_socket_common.o pepa_in_reading_sockets.o
+	pepa_socket_common.o pepa_in_reading_sockets.o \
+	pepa_ticket.o zhash2.o checksum.o murmur3.o pepa_config.o iniparser.o
 
 EMU_T=emu
 

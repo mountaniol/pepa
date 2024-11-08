@@ -24,23 +24,23 @@ BUF_FUZZER=bfuzzer.out
 # Files to check with splint
 SPLINT_C=buf_t_array.c buf_t.c buf_t.h buf_t_memory.c buf_t_memory.h buf_t_debug.h
 
-all: buf
+all: buf_sent
 	@echo "Version = $(GCCVERSION)"
 	@echo "DEBUG = $(DEBUG)"
 	@echo "CFLAGS = $(CFLAGS)"
 	@echo "Compiler = $(GCC)"
 
-buf: $(BUF_O)
+buf_sent: $(BUF_O)
 	@echo Done
 	$(AR) rcs $(BUF_A) $(BUF_O)
 
 btest: $(BUF_O)
 	$(GCC) $(CFLAGS) -ggdb -DSTANDALONE $(DEBUG) $(BUF_O) buf_t_test.c  -o $(BUF_TEST)
 
-btest_a: buf
+btest_a: buf_sent
 	$(GCC) $(CFLAGS) -ggdb $(DEBUG) buf_t_test.c $(BUF_A) -o $(BUF_TEST)
 
-bfuzz: buf
+bfuzz: buf_sent
 	$(AFL) $(CFLAGS) -ggdb $(DEBUG) buf_t_fuzzer.c $(BUF_A) -o $(BUF_FUZZER)
 
 clean:

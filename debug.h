@@ -19,6 +19,7 @@
 // #ifdef DSYSLOG
 
 
+#define TRY_ABORT_ENABLE (0)
 #define DE(...) do{}while(0)
 #define D(...) do{}while(0)
 #define DD(...) do{}while(0)
@@ -69,5 +70,8 @@
 #define TESTP_ASSERT_MES(x, mes) do {if	(NULL == x) { DE("Pointer %s is NULL: [%s]\n", #x, mes); assert(x != NULL); }} while(0)
 #define TESTP_GO(x, lable) do {if(NULL == x) { DE("Pointer %s is NULL\n", #x); goto lable; } } while(0)
 #define TFREE_SIZE(x,sz) do { if(NULL != x) {memset(x,0,sz);free(x); x = NULL;} else {DE(">>>>>>>> Tried to free_size() NULL: %s (%s +%d)\n", #x, __func__, __LINE__);} }while(0)
+#define TRY_ABORT(x) do{if(TRY_ABORT_ENABLE) {abort();} else {DE("ABORT (disabled)");}}while(0)
+                        
+
 
 #endif /* _DEBUG_H_ */
