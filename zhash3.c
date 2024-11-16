@@ -165,7 +165,7 @@ void zhash_dump(const ztable_t *hash_table, __attribute__((unused))const char *n
 		entry = entries[ii];
 		while (entry) {
 			DDD("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
-			DDD(">>> Entry: %p, ->next: %p, key_int: %lX, key_str: |%s|, key_str_len: %u, val: %p, val_size: %u\n",
+			DDD(">>> Entry: %p, ->next: %p, key_int: %llX, key_str: |%s|, key_str_len: %u, val: %p, val_size: %u\n",
 				entry, entry->next, entry->Key.key_int64, entry->Key.key_str, entry->Key.key_str_len, entry->Val.val, entry->Val.val_size);
 			entry = entry->next;
 		}
@@ -407,7 +407,7 @@ int8_t zhash_insert_by_str(ztable_t *hash_table,
 	char     *key_str_copy;
 	uint64_t key_int64     = zhash_key_int64_from_key_str(key_str, key_str_len);
 
-	DDD("Calculated key_int: %lX\n", key_int64);
+	DDD("Calculated key_int: %llX\n", key_int64);
 	key_str_copy = strndup(key_str, key_str_len);
 	if (NULL == key_str_copy) {
 		DE("Could not duplicate string key");
@@ -439,7 +439,7 @@ __attribute__((warn_unused_result, hot))
 void *zhash_find_by_str(const ztable_t *hash_table, char *key_str, const size_t key_str_len, ssize_t *val_size)
 {
 	uint64_t key_int64 = zhash_key_int64_from_key_str(key_str, key_str_len);
-	DDD("Calculated key_int: %lX\n", key_int64);
+	DDD("Calculated key_int: %llX\n", key_int64);
 	return zhash_find_by_int(hash_table, key_int64, val_size);
 
 }
@@ -703,7 +703,7 @@ ztable_t *zhash_from_buf(const char *buf, const size_t size)
 		memcpy(val, (buf + offset), zent->val_size);
 		offset += zent->val_size;
 
-		DDD("Inserting: zt = %p, zent->key_int64 = %lX, key_str = |%s|, zent->key_str_len = %u, val = %p, zent->val_size = %u\n",
+		DDD("Inserting: zt = %p, zent->key_int64 = %llX, key_str = |%s|, zent->key_str_len = %u, val = %p, zent->val_size = %u\n",
 			zt, zent->key_int64,
 			(NULL != key_str) ? key_str : "NULL",
 			zent->key_str_len, val, zent->val_size);
@@ -771,12 +771,12 @@ int8_t zhash_cmp_zhash(const ztable_t *left, const ztable_t *right)
 			/*** TEST 1: The record from the left not found in the right ***/
 
 			if (NULL == entry_right) {
-				DDD("For left entry no right entry: int key %lX, str entry %s\n",
+				DDD("For left entry no right entry: int key %llX, str entry %s\n",
 					entry_left->Key.key_int64, entry_left->Key.key_str);
 				return 1;
 			}
 
-			DDD(">>> Entry Left: %p, ->next: %p, key_int: %lX, key_str: |%s|\n",
+			DDD(">>> Entry Left: %p, ->next: %p, key_int: %llX, key_str: |%s|\n",
 				entry_left, entry_left->next, entry_left->Key.key_int64, entry_left->Key.key_str);
 
 			DDD(">>> Entry Right: %p, ->next: %p, key_int: %lX, key_str: |%s|\n",
@@ -795,7 +795,7 @@ int8_t zhash_cmp_zhash(const ztable_t *left, const ztable_t *right)
 
 			if (0 != strcmp(entry_left->Key.key_str, entry_right->Key.key_str)) {
 				zentry_t *entry_tmp;
-				DDD("Left->string key len not match Right->string key len : %s != %s ; in key : %lX <--> %lX\n",
+				DDD("Left->string key len not match Right->string key len : %s != %s ; in key : %llX <--> %llX\n",
 					entry_left->Key.key_str,
 					entry_right->Key.key_str,
 					entry_left->Key.key_int64,
@@ -812,7 +812,7 @@ int8_t zhash_cmp_zhash(const ztable_t *left, const ztable_t *right)
 					abort();
 				}
 
-				DD("LEFT : Str Key: %s, Int Key: %lX\n", entry_tmp->Key.key_str, entry_tmp->Key.key_int64);
+				DD("LEFT : Str Key: %s, Int Key: %llX\n", entry_tmp->Key.key_str, entry_tmp->Key.key_int64);
 
 				DD("Goint to search in right zhash by String Key |%s| / len %u\n", entry_right->Key.key_str, entry_right->Key.key_str_len);
 
@@ -822,7 +822,7 @@ int8_t zhash_cmp_zhash(const ztable_t *left, const ztable_t *right)
 					abort();
 				}
 
-				DD("RIGHT: Str Key: %s, Int Key: %lX\n", entry_tmp->Key.key_str, entry_tmp->Key.key_int64);
+				DD("RIGHT: Str Key: %s, Int Key: %llX\n", entry_tmp->Key.key_str, entry_tmp->Key.key_int64);
 
 				return 1;
 			}

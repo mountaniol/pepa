@@ -30,7 +30,11 @@ const char *pepa_error_code_to_str(int32_t code)
 	case PEPA_ERR_CONVERT_ADDR: return "PEPA_ERR_CONVERT_ADDR: Can not convert IP address from string to binary";
 	
 	case PEPA_ERR_BAD_SOCKET_READ: return "PEPA_ERR_BAD_SOCKET_READ: Could not read from socket; this is not because socket is closed";
-	case PEPA_ERR_BAD_SOCKET_WRITE: return "PEPA_ERR_BAD_SOCKET_WRITE: Could not write to socket; this is not because socket is closed";
+    case PEPA_ERR_BAD_SOCKET_WRITE: return "PEPA_ERR_BAD_SOCKET_WRITE: Could not write to socket; this is not because socket is closed";
+    case PEPA_ERR_BAD_SOCKET_LOCAL: return "PEPA_ERR_BAD_SOCKET_LOCAL: Local error on socket, must be reseted";
+    case PEPA_ERR_BAD_SOCKET_REMOTE: return "PEPA_ERR_BAD_SOCKET_REMOTE: Remote error on soket";
+    case PEPA_ERR_BAD_SOCKET_ERROR: return "PEPA_ERR_BAD_SOCKET_ERROR: Unknown error on socket";
+
 	case PEPA_ERR_THREAD_CANNOT_CREATE: return "PEPA_ERR_THREAD_CANNOT_CREATE: Cannot create socket";
 	case PEPA_ERR_THREAD_DEAD: return "PEPA_ERR_THREAD_DEAD: The thread is dead";
 	case PEPA_ERR_THREAD_DETOUCH: return "PEPA_ERR_THREAD_DETOUCH: Cannot detouch new thread";

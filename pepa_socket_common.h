@@ -6,6 +6,7 @@
 
 #include "buf_t/buf_t.h"
 #include "pepa_core.h"
+#include "pepa_ticket_id.h"
 
 void set_sig_handler(void);
 
@@ -17,13 +18,21 @@ enum {
     PEPA_ENABLE_ID
 };
 
+typedef struct {
+    char *buf;
+    size_t buf_room;
+    size_t buf_used;
+    pepa_prebuf_t *prebuf;
+    size_t prebuf_size;
+} buf_and_header_t;
+
 __attribute__((warn_unused_result))
 int32_t pepa_pthread_init_phase(const char *name);
 void pepa_parse_pthread_create_error(const int32_t rc);
 
 void pepa_set_tcp_timeout(const int32_t sock);
-void pepa_set_tcp_recv_size(const pepa_core_t *core, const int32_t sock);
-void pepa_set_tcp_send_size(const pepa_core_t *core, const int32_t sock);
+void pepa_set_tcp_recv_size(const pepa_core_t *core, const int32_t sock, const char *name);
+void pepa_set_tcp_send_size(const pepa_core_t *core, const int32_t sock, const char *name);
 
 /**
  * @author Sebastian Mountaniol (20/10/2024)
@@ -49,6 +58,18 @@ void pepa_set_tcp_send_size(const pepa_core_t *core, const int32_t sock);
  * If core->use_id is not 0, the core->id_val will be added after the 'ticket' variable (or in the beginning
  * of the buffer, if 'tickets' are disabled)
  */
+int pepa_one_direction_copy4(/* 1 */ pepa_core_t *core,
+                             /* 2 */ char *buf,
+                             /* 3 */ const size_t buf_size,
+                             /* 4 */ const int fd_out,
+                             /* 5 */ const char *name_out,
+                             /* 6 */ const int fd_in,
+                             /* 7 */ const char *name_in,
+                             /* 8 */ const int do_debug,
+                             /* 9 */ uint64_t *ext_rx,
+                             /* 10 */ uint64_t *ext_tx,
+                             /* 11 */ const int max_iterations);
+
 int pepa_one_direction_copy3(pepa_core_t *core,
                              const int fd_out, const char *name_out,
                              const int fd_in, const char *name_in,
@@ -58,11 +79,11 @@ int pepa_one_direction_copy3(pepa_core_t *core,
 
 
 int transfer_data4(pepa_core_t *core,
-                             const int fd_out, const char *name_out,
-                             const int fd_in, const char *name_in,
-                             const int do_debug,
-                             uint64_t *ext_rx, uint64_t *ext_tx,
-                             const int max_iterations);
+                   const int fd_out, const char *name_out,
+                   const int fd_in, const char *name_in,
+                   const int do_debug,
+                   uint64_t *ext_rx, uint64_t *ext_tx,
+                   const int max_iterations);
 /**
  * @author Sebastian Mountaniol (12/14/23)
  * @brief Test file descriptor. If it opened, return PEPA_ERR_OK,
@@ -92,10 +113,10 @@ __attribute__((nonnull(1, 2)))
  *  	   code
  */
 int32_t pepa_open_listening_socket(struct sockaddr_in *s_addr,
-								   const buf_t *ip_address,
-								   const uint16_t port,
-								   const int32_t num_of_clients,
-								   const char *caller_name);
+                                   const buf_t *ip_address,
+                                   const uint16_t port,
+                                   const int32_t num_of_clients,
+                                   const char *caller_name);
 
 
 __attribute__((warn_unused_result))

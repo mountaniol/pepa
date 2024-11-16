@@ -120,19 +120,30 @@ void *pepa_monitor_thread(__attribute__((unused))void *arg)
 			if (core->monitor_divider_str[0] == 'M') {
 				divider_str = "Mbytes";
 			}
-			slog_debug("### STATUS: Freq: %u seconds, Units: %s ### SHVA [+%lu | %lu/sec] ---> OUT [+%lu | %lu/sec] ### IN [+%lu | %lu/sec] ---> SHVA [+%lu | %lu/sec]  ###",
+			slog_debug("### STATUS: Freq: %u seconds, Units: %s ### SHVA (%d) [+%lu | %lu/sec] ---> OUT (%d) [+%lu | %lu/sec] ### IN [+%lu | %lu/sec] ---> SHVA (%d) [+%lu | %lu/sec] ||| RW: [SHVA:%lu/%lu | IN: %lu/%lu | OUT: %lu/%lu] EVENTS: %lu FDX: %d ###",
 					   core->monitor_freq, divider_str,
+					   /* SHVA */
+					   core->sockets.shva_rw_operation,
 					   (core->monitor.shva_rx - monitor_prev.shva_rx) / (uint64_t)core->monitor_divider,
 					   ((core->monitor.shva_rx - monitor_prev.shva_rx) / (uint64_t)core->monitor_freq) / (uint64_t)core->monitor_divider,
 
+					   /* OUT */
+					   core->sockets.out_write_operation,
 					   (core->monitor.out_tx - monitor_prev.out_tx) / (uint64_t)core->monitor_divider,
 					   ((core->monitor.out_tx - monitor_prev.out_tx) / (uint64_t)core->monitor_freq) / (uint64_t)core->monitor_divider,
 
+					   /* IN */
 					   (core->monitor.in_rx - monitor_prev.in_rx) / (uint64_t)core->monitor_divider,
 					   ((core->monitor.in_rx - monitor_prev.in_rx) / (uint64_t)core->monitor_freq) / (uint64_t)core->monitor_divider,
 
+					   /* SHVA */
+					   core->sockets.shva_rw_operation,
 					   (core->monitor.shva_tx - monitor_prev.shva_tx) / (uint64_t)core->monitor_divider,
-					   ((core->monitor.shva_tx - monitor_prev.shva_tx) / (uint64_t)core->monitor_freq) / (uint64_t)core->monitor_divider
+					   ((core->monitor.shva_tx - monitor_prev.shva_tx) / (uint64_t)core->monitor_freq) / (uint64_t)core->monitor_divider,
+					   core->monitor.shva_reads, core->monitor.shva_writes, 
+					   core->monitor.in_reads, core->monitor.in_writes, 
+					   core->monitor.out_reads, core->monitor.out_writes,
+					   core->monitor.events, core->monitor.in_fdx
 					  );
 		}
 

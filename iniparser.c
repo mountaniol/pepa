@@ -23,7 +23,7 @@ struct read_ini
  * the end index of the first and last valid (non-whitespace)
  * characters in the string. */
 static void
-trim(char *str, int *begin_ind, int *end_ind)
+trim(const char *str, int *begin_ind, int *end_ind)
 {
 	int b = *begin_ind;
 	int e = *end_ind;
@@ -281,8 +281,8 @@ read_ini(struct read_ini **read_inip,
  * bottleneck (how large can ini files get?) */
 char *
 ini_get_value(struct ini* ini,
-              char *section,
-              char *key)
+              const char *section,
+              const char *key)
 {
     int s, c;
 	for(s=0; s<ini->num_sections; s++)
@@ -298,7 +298,7 @@ ini_get_value(struct ini* ini,
 
 /* pretty print the structure */
 void
-ini_pp(struct ini* ini)
+ini_pp(const struct ini* ini)
 {
 	int s, c;
 	printf("num sections: %d\n", ini->num_sections);

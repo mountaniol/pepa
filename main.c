@@ -4,7 +4,7 @@
 
 #include "slog/src/slog.h"
 #include "pepa_core.h"
-#include "pepa3.h"
+#include "pepa4.h"
 #include "pepa_errors.h"
 #include "pepa_parser.h"
 #include "pepa_server.h"
@@ -41,7 +41,7 @@ static void pepa_clean_on_exit(void)
 
     /* Close all sockets, if not closed */
     slog_warn_l("Closing all sockets");
-    pepa3_close_sockets(core);
+    pepa4_close_sockets(core);
 
     pepa_core_release(core);
 
@@ -92,8 +92,6 @@ static void pepa_set_int_signal_handler(void)
     signal(SIGPIPE, SIG_IGN);
 }
 
-int pepa_go(pepa_core_t *core);
-
 int main(int argi, char *argv[])
 {
     int rc;
@@ -137,21 +135,25 @@ int main(int argi, char *argv[])
         //slog_init("pepa", SLOG_FLAGS_ALL, 0);
         //rc = pepa_config_slogger_daemon(core);
     }
-    pepa_set_rlimit();
+    // pepa_set_rlimit();
 
     pepa_set_int_signal_handler();
 
-    slog_note_l("Going to start threads");
     //rc = pepa_start_threads(core);
     if (core->monitor.onoff) {
         slog_debug_l("Going to start MONITOR");
         pepa_thread_start_monitor(core);
     }
-    rc = pepa_go(core);
+
+    pepa4_transfer_loop2(core);
+
+#if 0 /* SEB */ /* 16/11/2024 */
+    rc = pepa4_go(core);
     if (rc < 0) {
         slog_fatal_l("Could not start threads");
         exit(-11);
     }
+#endif /* SEB */ /* 16/11/2024 */ 
 
     while (1) {
         sleep(60);

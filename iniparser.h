@@ -39,10 +39,10 @@ struct ini* read_ini(struct read_ini **read_inip, char *filename);
 /* Retrieves a value from a section/key combination and returns that
  * as a string. Note the returned value should not be freed. NULL is
  * returned if the section/key combination can not be found. */
-char *ini_get_value(struct ini* ini, char *section, char *key);
+char *ini_get_value(struct ini* ini, const char *section, const char *key);
 
 /* Pretty print a given ini structure. */
-void ini_pp(struct ini* ini);
+void ini_pp(const struct ini* ini);
 
 /* Free memory associated with an ini structure. */
 void destroy_ini(struct ini* ini);

@@ -34,8 +34,10 @@ typedef struct {
 typedef struct {
 	int shva_listen; /**< This socket is used in Emulator only */
 	int shva_rw;
+	int shva_rw_operation;
 	int out_listen;
 	int out_write;
+	int out_write_operation;
 	int in_listen;
 } pepa_sockets_t;
 
@@ -47,11 +49,23 @@ typedef struct {
 	uint64_t out_tx;
 	uint64_t in_rx;
 	uint64_t in_tx;
+
+	uint64_t shva_reads;
+	uint64_t shva_writes;
+	uint64_t out_reads;
+	uint64_t out_writes;
+	uint64_t in_reads;
+	uint64_t in_writes;
+	uint64_t events;
+
+	int in_fdx;
+
 } pepa_stat_t;
 
 typedef struct {
 	int *sockets; /**< Array of IN reading sockets */
 	int number; /**< Number of allocated slots (not number of active sockets!) */
+	int *processing;
 	int active;
 } pepa_in_read_sockets_t;
 
@@ -151,6 +165,6 @@ int32_t pepa_core_unlock(void);
  */
 int32_t pepa_if_abort(void);
 
-int pepa_core_is_valid(pepa_core_t *core);
+int pepa_core_is_valid(const pepa_core_t *core);
 
 #endif /* _PEPA_CORE_H_ */

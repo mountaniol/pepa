@@ -142,7 +142,7 @@ static int pepa_release_core_t(pepa_core_t *core)
 	return 0;
 }
 
-int pepa_core_is_valid(pepa_core_t *core)
+int pepa_core_is_valid(const pepa_core_t *core)
 {
 	if (core->validity == CORE_VALIDITY_MASK) {
 		return 1;

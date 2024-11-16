@@ -100,22 +100,27 @@ CFLAGS+=-O2
 INC= -I./queue/
 LIBHL=./queue/libhl.a
 
+
+COMMON_OBJS= pepa_utils.o iniparser.o pepa_config.o logger.o \
+		pepa_ticket.o zhash2.o checksum.o murmur3.o \
+		pepa_socket_common.o pepa_in_reading_sockets.o \
+		pepa_errors.o pepa_core.o pepa_server.o pepa_parser.o
+
 #PEPA_O= pepa3.o pepa_state_machine.o pepa_parser.o main.o pepa_core.o \
 		pepa_server.o pepa_errors.o \
 		pepa_socket_common.o pepa_socket_in.o \
 		pepa_socket_out.o pepa_socket_shva.o
 
-PEPA_O= pepa3.o pepa_state_machine.o pepa_parser.o main.o pepa_core.o \
-		pepa_server.o pepa_errors.o \
-		pepa_socket_common.o pepa_in_reading_sockets.o iniparser.o \
-		pepa_config.o logger.o pepa_ticket.o zhash2.o checksum.o murmur3.o
-		
+PEPA_O= pepa4.o pepa_state_machine.o main.o $(COMMON_OBJS)
+EMU_O=pepa_emulator.o pepa_state_machine.o $(COMMON_OBJS)
+
 PEPA_T=pepa-ng
+EMU_T=emu
 
 LIBS=-lpthread $(LIBHL)
-AFL_O=pepa_afl.o pepa3.o pepa_state_machine.o pepa_parser.o pepa_core.o \
+AFL_O=pepa_afl.o pepa4.o pepa_state_machine.o pepa_parser.o pepa_core.o \
 		pepa_server.o pepa_errors.o pepa_socket_common.o pepa_in_reading_sockets.o \
-		iniparser.o pepa_config.o logger.o pepa_ticket.o zhash2.o checksum.o murmur3.o
+		iniparser.o pepa_config.o logger.o pepa_ticket.o zhash2.o checksum.o murmur3.o pepa_utils.o
 
 AFL_T=pepa_afl.out
 
@@ -127,12 +132,8 @@ ARS=$(BUFT_AR) $(SLOG_AR)
 	pepa_core.o pepa_server.o pepa_errors.o \
 	pepa_socket_common.o pepa_socket_in.o \
 	pepa_socket_out.o pepa_socket_shva.o 
-EMU_O=pepa_emulator.o pepa_state_machine.o pepa_parser.o \
-	pepa_core.o pepa_server.o pepa_errors.o \
-	pepa_socket_common.o pepa_in_reading_sockets.o \
-	pepa_ticket.o zhash2.o checksum.o murmur3.o pepa_config.o iniparser.o
 
-EMU_T=emu
+
 
 #all: pepa emu
 all: clean static
@@ -171,7 +172,7 @@ clean:
 check:
 	#@echo "+++ $@: USER=$(USER), UID=$(UID), GID=$(GID): $(CURDIR)"
 	@echo ============= 32 bit check =============
-	$(ECH)cppcheck -j2 -q --force  --enable=all --platform=unix32 -I/usr/include/openssl ./*.[ch]
+	$(ECH)cppcheck -j2 -q --force  --enable=warning,style,performance --platform=unix32 -I/usr/include/openssl ./*.[ch]
 	#echo ============= 64 bit check =============
 	#$(ECH)cppcheck -q --force  --enable=all --platform=unix64 -I/usr/include/openssl ./*.[ch]
 
@@ -180,7 +181,7 @@ splint:
 	@echo "+++ $@: USER=$(USER), UID=$(UID), GID=$(GID): $(CURDIR)"
 	#splint -standard -export-local -pred-bool-others -noeffect +matchanyintegral +unixlib -I/usr/include/openssl -D__gnuc_va_list=va_list  ./*.[ch]
 	#splint -standard -export-local -pred-bool-others -noeffect +matchanyintegral +unixlib  ./*.[ch]
-	splint -weak -pred-bool-others +matchanyintegral +unixlib ./*.[ch]
+	splint -weak -pred-bool-others +matchanyintegral +unixlib -forced ./*.[ch]
 
 flaw:
 	flawfinder ./*.[ch] 

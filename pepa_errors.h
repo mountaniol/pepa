@@ -30,6 +30,9 @@ typedef enum {
 	/* Data transfer */
 	PEPA_ERR_BAD_SOCKET_READ,
 	PEPA_ERR_BAD_SOCKET_WRITE,
+	PEPA_ERR_BAD_SOCKET_LOCAL, /* Local error on socket, must be reseted */
+	PEPA_ERR_BAD_SOCKET_REMOTE, /* Remote error on soket */
+	PEPA_ERR_BAD_SOCKET_ERROR, /* Unknown error on socket */
 
 	/* Treads related */
 	PEPA_ERR_THREAD_CANNOT_CREATE,
