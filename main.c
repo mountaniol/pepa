@@ -101,6 +101,7 @@ int main(int argi, char *argv[])
 
     slog_note_l("Going to init core");
     rc = pepa_core_init();
+
     if (PEPA_ERR_OK != rc) {
         slog_fatal_l("Can not init core");
         abort();
@@ -155,11 +156,12 @@ int main(int argi, char *argv[])
     }
 #endif /* SEB */ /* 16/11/2024 */ 
 
-    while (1) {
-        sleep(60);
-    }
+    //while (1) {
+    //    sleep(60);
+    //}
     //pepa_kill_all_threads(core);
     //sleep(1);
+    pepa_thread_kill_monitor(core);
     pepa_core_release(core);
     slog_note_l("PEPA Exit");
     return (0);

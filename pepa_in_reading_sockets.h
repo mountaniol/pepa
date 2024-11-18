@@ -20,6 +20,7 @@ void pepa_in_reading_sockets_allocate(pepa_core_t *core, const int num);
 void pepa_in_reading_sockets_add(pepa_core_t *core, const int fd);
 void pepa_in_reading_sockets_close_rm(pepa_core_t *core, const int fd);
 int pepa_in_find_slot_by_fd(pepa_core_t *core, const int fd);
-int pepa_if_fd_in(pepa_core_t *core, const int fd);
-
+int pepa_if_fd_in(const pepa_core_t *core, const int fd);
+int pepa_in_num_active_sockets(const pepa_core_t *core);
+int pepa_in_dump_sockets(const pepa_core_t *core);
 #endif /* _IN_READING_SOCKETS_H__ */

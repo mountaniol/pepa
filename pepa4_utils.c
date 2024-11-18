@@ -40,7 +40,7 @@ const char *dump_event(const int ev)
         offset = sprintf(str + offset, "%s | ", "EPOLLWAKEUP");
     }
     if (ev & EPOLLEXCLUSIVE) {
-        offset = sprintf(str + offset, "%s | ", "EPOLLEXCLUSIVE");
+        sprintf(str + offset, "%s | ", "EPOLLEXCLUSIVE");
     }
 
     return str;

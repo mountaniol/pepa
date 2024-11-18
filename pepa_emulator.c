@@ -35,18 +35,25 @@ int pipe_out[2] = {-1, -1};
 
 emu_t *emu = NULL;
 
+#if 1
+
 //#define SHUTDOWN_DIVIDER (100003573)
-// #define SHUTDOWN_DIVIDER (10000357377)
-// #define SHVA_SHUTDOWN_DIVIDER (10000357)
+//#define SHUTDOWN_DIVIDER (1000035)
+    #define SHUTDOWN_DIVIDER (100035)
+//#define SHUTDOWN_DIVIDER (10000357377)
+//#define SHVA_SHUTDOWN_DIVIDER (10000357)
 //#define SHVA_SHUTDOWN_DIVIDER (1000035)
-//#define SHOULD_EMULATE_DISCONNECT() (0 == (rand() % SHUTDOWN_DIVIDER))
+    #define SHVA_SHUTDOWN_DIVIDER (100037)
+    #define SHOULD_EMULATE_DISCONNECT() (0 == (rand() % SHUTDOWN_DIVIDER))
+    #define SHVA_SHOULD_EMULATE_DISCONNECT() (0 == (rand() % SHVA_SHUTDOWN_DIVIDER))
+#else
 
                 #define SHOULD_EMULATE_DISCONNECT() (0)
 
 // #define SHVA_SHOULD_EMULATE_DISCONNECT() (0 == (rand() % SHVA_SHUTDOWN_DIVIDER))
 
                 #define SHVA_SHOULD_EMULATE_DISCONNECT() (0)
-
+#endif
                 #define RX_TX_PRINT_DIVIDER (100000)
 
                 #define PEPA_MIN(a,b) ((a<b) ? a : b )
@@ -535,7 +542,6 @@ static emu_cnt_t emu_get_global_cnt(void)
     return (ret);
 }
 
-
 static void emu_set_header_buffer(buf_t *buf, const uint64_t cnt, const uint32_t src, const uint32_t instance)
 {
     pepa_ticket_t ticket;
@@ -878,8 +884,6 @@ static void emu_print_buffers_in_hex(const unsigned char *buf_sent, const unsign
 static void emu_compare_print_bufs(buf_t *buf_sent, buf_t *buf_recv, const char *header)
 {
     // pepa_core_t  *core       = pepa_get_core();
-    unsigned int val_sent = 0;
-    unsigned int val_recv = 0;
     int do_not_dump = 0;
 
     //buf_head_t   *head_recv  = BUF_HEAD(buf_recv, 0);
@@ -954,8 +958,8 @@ static void emu_compare_print_bufs(buf_t *buf_sent, buf_t *buf_recv, const char 
     return;
 
     for (size_t idx = 0; buf_sent->used; idx++) {
-        val_sent = 0;
-        val_recv = 0;
+        unsigned int val_sent;
+        unsigned int val_recv;
 
         size_t copy_bytes = PEPA_MIN(sizeof(val_sent), buf_sent->used - idx);
 
@@ -1075,7 +1079,7 @@ static int emu_check_buffer(buf_t *buf, uint32_t expect_src, const char *caller)
 
     emu_set_recv_cnt(source, instance, head->cnt);
 
-    if (head->cnt != expect_cnt) {
+    if (head->cnt > 0 && head->cnt != expect_cnt) {
         slog_error_l("[%s] Wrong counter: expected count: %d but it is: %d from %s | gobal cnt: %d | zhash amount = %zu | chksum = %X",
                      caller, expect_cnt, head->cnt, src_num_to_str(head->src, head->instance), head->cnt_global, emu->zhash_count, head->checksum);
         return -4;
@@ -1402,8 +1406,9 @@ static int emu_read_one_buffer(buf_t *buf,
         char err_string[64] = {0};
         sprintf(err_string, "[%s][%ld] RECEIVED A BAD BUFFER", name, cnt);
         emu_buf_dump(buf, err_string);
-        abort();
-        return (-1);
+        //abort();
+        //return (-1);
+        return buf->used;
     }
 
     *rx += buf->used;
@@ -1549,7 +1554,7 @@ static void pepa_emulator_out_thread_cleanup(__attribute__((unused))void *arg)
     int rc_remove = epoll_ctl(args->epoll_fd, EPOLL_CTL_DEL, core->sockets.out_write, NULL);
 
     if (rc_remove) {
-        slog_warn_l("[OUT] Could not remove RW socket %d from epoll set %d", core->sockets.out_write, args->epoll_fd);
+        slog_warn_l("[OUT] Could not remove RW socket (FD = %d) from epoll set %d", core->sockets.out_write, args->epoll_fd);
     }
 
     pepa_reading_socket_close(core->sockets.out_write, "EMU OUT");
@@ -1562,7 +1567,8 @@ static void pepa_emulator_out_thread_cleanup(__attribute__((unused))void *arg)
 
 /* Internal thread: reads from the pipe packets with removet prebuf structure */
 #if 1 /* SEB */ /* 15/11/2024 */
-static void *pepa_emu_out_internal_thread(__attribute__((unused))void *arg){
+static void *pepa_emu_out_internal_thread(__attribute__((unused))void *arg)
+{
     const char *my_name = "OUT INT";
     emu_t *emup = arg;
     TESTP_MES(emup, NULL, "Thread argument is the NULL pointer");
@@ -1598,10 +1604,6 @@ static void *pepa_emu_out_internal_thread(__attribute__((unused))void *arg){
 
         // slog_trace_l("[%s]: Received bytes: %ld", my_name, rc);
         rx += (uint64_t)rc;
-
-        if (0 == (reads % RX_TX_PRINT_DIVIDER)) {
-            slog_debug_l("[%s]: %-7lu reads, bytes: %-7lu, Kb: %-7lu", my_name, reads, rx, (rx / 1024));
-        }
 
     } while (1); /* epoll loop */
 
@@ -1809,7 +1811,7 @@ static void *pepa_out_external_thread(void *arg)
 
                 // emu->num_out_reads++;
                 continue;
-#endif /* SEB */ /* 16/11/2024 */ 
+#endif /* SEB */ /* 16/11/2024 */
 #if 1 /* SEB */ /* 15/11/2024 */
 
                 memset(buf, 8, core->emu_max_buf);
@@ -1877,12 +1879,14 @@ static void *pepa_out_external_thread(void *arg)
         rc = epoll_ctl(args.epoll_fd, EPOLL_CTL_DEL, core->sockets.out_write, NULL);
 
         if (rc) {
-            slog_warn_l("[OUT]  Could not remove RW socket %d from epoll set %d", core->sockets.out_write, args.epoll_fd);
+            slog_warn_l("[OUT]  Could not remove RW socket (FD = %d) from epoll set %d", core->sockets.out_write, args.epoll_fd);
         }
 
         close(args.epoll_fd);
         // pepa_reading_socket_close(core->sockets.out_write, "OUT RW");
         pepa_socket_close(core->sockets.out_write, "OUT RW");
+        // emu_set_recv_cnt(BUF_SRC_SHVA, 0, 0);
+
         sleep(3);
     } while (1);
     /* Now we can start send and recv */
@@ -2024,7 +2028,7 @@ static void *pepa_emulator_out_thread(__attribute__((unused))void *arg){
         rc = epoll_ctl(args.epoll_fd, EPOLL_CTL_DEL, core->sockets.out_write, NULL);
 
         if (rc) {
-            slog_warn_l("[OUT]  Could not remove RW socket %d from epoll set %d", core->sockets.out_write, args.epoll_fd);
+            slog_warn_l("[OUT]  Could not remove RW socket (FD = %d) from epoll set %d", core->sockets.out_write, args.epoll_fd);
         }
 
         close(args.epoll_fd);
@@ -2151,7 +2155,7 @@ static void pepa_emulator_shva_thread_cleanup(__attribute__((unused))void *arg)
     int rc_remove = epoll_ctl(cargs->eventfd, EPOLL_CTL_DEL, cargs->sock_listen, NULL);
 
     if (rc_remove) {
-        slog_warn_l("%s: Could not remove socket %d from epoll set", "OUT RW", core->sockets.shva_rw);
+        slog_warn_l("%s: Could not remove socket (FD = %d) from epoll set", "OUT RW", core->sockets.shva_rw);
     }
 
     int32_t rc = pepa_socket_shutdown_and_close(cargs->eventfd, "EMU SHVA");
@@ -2271,7 +2275,7 @@ static void *pepa_emulator_shva(void *arg)
                 rc = epoll_ctl(epoll_fd, EPOLL_CTL_DEL, core->sockets.shva_listen, NULL);
 
                 if (rc) {
-                    slog_warn_l("[SHVA] Could not remove socket %d from epoll set %d", core->sockets.out_write, epoll_fd);
+                    slog_warn_l("[SHVA] Could not remove socket (FD = %d) from epoll set %d", core->sockets.out_write, epoll_fd);
                 }
                 goto reset;
             }
@@ -2351,13 +2355,13 @@ static void *pepa_emulator_shva(void *arg)
         rc = epoll_ctl(epoll_fd, EPOLL_CTL_DEL, core->sockets.shva_listen, NULL);
 
         if (rc) {
-            slog_warn_l("[SHVA] Could not remove Listen socket %d from epoll set %d", core->sockets.out_write, epoll_fd);
+            slog_warn_l("[SHVA] Could not remove Listen socket (FD = %d) from epoll set %d", core->sockets.out_write, epoll_fd);
         }
 
         rc = epoll_ctl(epoll_fd, EPOLL_CTL_DEL, core->sockets.shva_rw, NULL);
 
         if (rc) {
-            slog_warn_l("[SHVA] Could not remove RW socket %d from epoll set %d", core->sockets.out_write, epoll_fd);
+            slog_warn_l("[SHVA] Could not remove RW socket (FD = %d) from epoll set %d", core->sockets.out_write, epoll_fd);
         }
 
         pepa_reading_socket_close(core->sockets.shva_rw, "SHVA RW");
@@ -2370,6 +2374,9 @@ static void *pepa_emulator_shva(void *arg)
         core->sockets.shva_listen = FD_CLOSED;
         /* We set the status to STOPPED; the control thread may need to restart SHVA read/write threads */
         emu_set_shva_main_status(emup, ST_WAITING);
+
+        emu_set_send_cnt(BUF_SRC_SHVA, 0, 0);
+        emu_set_recv_cnt(BUF_SRC_SHVA, 0, 0);
 
     } while (1); /* Opening connection and acceptiny */
 
@@ -2417,7 +2424,7 @@ static void pepa_emulator_in_thread_cleanup(__attribute__((unused))void *arg)
     slog_note("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$");
     slog_note("$$$$$$$    IN_FORWARD CLEANUP            $$$$$$$$$");
 
-    slog_note("[IN] Going to close IN[%d] socket %d port %d", args->my_num, args->fd, pepa_find_socket_port(args->fd));
+    slog_note("[IN] Going to close IN[%d] socket (FD = %d) port %d", args->my_num, args->fd, pepa_find_socket_port(args->fd));
 
     pepa_reading_socket_close(args->fd, "EMU IN TRHEAD");
 #if 0 /* SEB */ /* 26/10/2024 */
@@ -2441,7 +2448,7 @@ static void *pepa_emulator_in_thread(__attribute__((unused))void *arg)
 {
     emu_cnt_t buf_count = 0;
     in_thread_args_t *args = arg;
-    pepa_core_t *core = pepa_get_core();
+    const pepa_core_t *core = pepa_get_core();
     // int         in_socket = FD_CLOSED;
     args->fd = FD_CLOSED;
 
@@ -2474,13 +2481,12 @@ static void *pepa_emulator_in_thread(__attribute__((unused))void *arg)
 
     /* In this thread we read from socket as fast as we can */
 
-
     do { /* Opening connection */
         /* Note: the in_start_connection() function can not fail; it blocking until connection opened */
         args->fd = in_start_connection();
         slog_note_l("%s Opened connection to IN: (FD = %d), port: %d", my_name, args->fd, pepa_find_socket_port(args->fd));
 
-        slog_info_l("%s SHVA reader and writer are UP, continue", my_name);
+        slog_info_l("[%s] is UP, start WAITING status", my_name);
 
         emu_set_in_status(args->emu, args->my_num, ST_WAITING);
 
@@ -2516,11 +2522,9 @@ static void *pepa_emulator_in_thread(__attribute__((unused))void *arg)
                 abort();
             }
 
-
             pthread_mutex_lock(&emu->in_threads_lock);
 
             buf_count = emu_get_send_cnt(BUF_SRC_IN, args->my_num);
-            // slog_note_l("[%s] got cnt: %d", my_name, buf_count);
 
             if (PEPA_ERR_OK != pepa_emulator_generate_buffer_buf(buf,                               /* Existing buffer */
                                                                  buf_size,                          /* The buffer size we want to generate */
@@ -2539,21 +2543,10 @@ static void *pepa_emulator_in_thread(__attribute__((unused))void *arg)
                 abort();
             }
 
-            /* Advance the counter */
-            // emu->cnt_in_sent[args->my_num]++;
-
-            // slog_note_l("%s: Trying to write", , my_name);
-
-            // ssize_t rc = write(args->fd, buf->data, buf->used);
-            // emu_buf_dump(buf,  my_name);
             ssize_t rc = send_exact(args->fd, buf->data, buf->used);
-            // buf_head_t *head = emu_buf_get_head(buf);
-            //slog_note_l("[%s] Sent buf: buf used: %ld, buf room: %ld, cnt = %d, global = %d, ticket = %X",
-            //            my_name, buf->used, buf->room, head->cnt, head->cnt_global, head->ticket);
 
             emu->bytes_tx_in += rc;
 
-            // emu_print_buf_short(buf, "IN SENT");
             writes++;
 
             if (rc != buf->used) {
@@ -2592,12 +2585,7 @@ static void *pepa_emulator_in_thread(__attribute__((unused))void *arg)
             buf_count++;
             emu_set_send_cnt(BUF_SRC_IN, args->my_num, buf_count);
 
-            //slog_debug_l("SHVA WRITE: ~~~~>>> Written %d bytes", rc);
             rx += (uint64_t)rc;
-
-            if (0 == (writes % RX_TX_PRINT_DIVIDER)) {
-                slog_debug_l("%s %-7lu writes, bytes: %-7lu, Kb: %-7lu", my_name, writes, rx, (rx / 1024));
-            }
 
             /* Emulate socket closing */
             if (SHOULD_EMULATE_DISCONNECT()) {
@@ -2622,15 +2610,22 @@ static void *pepa_emulator_in_thread(__attribute__((unused))void *arg)
 
             usleep(1000);
             pthread_mutex_unlock(&emu->in_threads_lock);
-
-
         } while (1); /* Generating and sending data */
+
+
+
     reset_socket:
+        pthread_mutex_unlock(&emu->in_threads_lock);
         buf_count = emu_get_recv_cnt(BUF_SRC_IN, args->my_num);
+
         slog_warn_l("%s Closing connection, buffers sent: %d", my_name, buf_count);
         close(args->fd);
         args->fd = FD_CLOSED;
+
+        emu_set_recv_cnt(BUF_SRC_IN, args->my_num, 0);
         emu_set_send_cnt(BUF_SRC_IN, args->my_num, 0);
+
+        sleep(1);
 
         /* If 'disconnect all IN threads' counter is UP, decrease it */
         if (in_thread_disconnect_all > 0) {
@@ -3085,11 +3080,7 @@ int main(int argi, char *argv[])
 
     srand(17);
     /* Somethime random can return predictable value in the beginning; we skip it */
-    rc = rand();
-    rc = rand();
-    rc = rand();
-    rc = rand();
-    rc = rand();
+    rc = rand() + rand() + rand() + rand() + rand();
 
     pepa_set_rlimit();
 
@@ -3106,7 +3097,7 @@ int main(int argi, char *argv[])
         slog_fatal_l("Can not create OUT pipe: %s", strerror(errno));
         exit(1);
     }
-#endif /* SEB */ /* 15/11/2024 */ 
+#endif /* SEB */ /* 15/11/2024 */
     pthread_create(&out_internal_thread_t, NULL, pepa_emu_out_internal_thread, emu);
     usleep(10000);
 

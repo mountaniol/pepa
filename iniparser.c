@@ -52,7 +52,6 @@ static int
 read_line(struct read_ini *read_ini)
 {
 	int i = 0;
-	int b;
 	int new = 0;
 
 	for(;;)
@@ -67,7 +66,7 @@ read_line(struct read_ini *read_ini)
 		}
 
 		/* read next byte from file */
-		b = getc(read_ini->fin);
+		const int b = getc(read_ini->fin);
 
 		/* if end of file then end */
 		if(b == EOF)
@@ -99,23 +98,22 @@ read_line(struct read_ini *read_ini)
 static struct section *
 parse_section(struct read_ini *read_ini)
 {
-	int new;
 	struct section *section = malloc(sizeof(*section));
 	section->num_configs = 0;
 	section->configs = NULL;
 
 	for(;;)
 	{
-		new = 0;
+		int new_i = 0;
 
 		switch(read_ini->state)
 		{
 		case START:
 		case IN_SECTION:
-			new = read_line(read_ini);
+			new_i = read_line(read_ini);
 			break;
 		case NEW_SECTION:
-			new = 1;
+			new_i = 1;
 			break;
 		case END_OF_FILE:
 			return section;
@@ -124,7 +122,7 @@ parse_section(struct read_ini *read_ini)
 			break;
 		}
 
-		if(new)
+		if(new_i)
 		{
 			int i, x, y, b=0, e=strlen(read_ini->tmp);
 			struct config *cfg;

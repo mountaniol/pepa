@@ -22,7 +22,8 @@ typedef struct {
     char *buf;
     size_t buf_room;
     size_t buf_used;
-    pepa_prebuf_t *prebuf;
+    pepa_prebuf_t prebuf;
+    int send_prebuf;
     size_t prebuf_size;
 } buf_and_header_t;
 
@@ -58,7 +59,7 @@ void pepa_set_tcp_send_size(const pepa_core_t *core, const int32_t sock, const c
  * If core->use_id is not 0, the core->id_val will be added after the 'ticket' variable (or in the beginning
  * of the buffer, if 'tickets' are disabled)
  */
-int pepa_one_direction_copy4(/* 1 */ pepa_core_t *core,
+int pepa_one_direction_copy4(/* 1 */pepa_core_t *core,
                              /* 2 */ char *buf,
                              /* 3 */ const size_t buf_size,
                              /* 4 */ const int fd_out,
@@ -138,6 +139,14 @@ void pepa_socket_close_in_listen(pepa_core_t *core);
 
 int pepa_find_socket_port(const int sock);
 void pepa_reading_socket_close(const int fd, const char *socket_name);
+
+
+int pepa_disconnect_shva(pepa_core_t *core);
+int pepa_disconnect_in_rw(pepa_core_t *core);
+int pepa_disconnect_in_listen(pepa_core_t *core);
+int pepa_disconnect_out_rw(pepa_core_t *core);
+int pepa_disconnect_out_listen(pepa_core_t *core);
+int pepa_disconnect_all_sockets(pepa_core_t *core);
 
 //void pepa_print_pthread_create_error(const int32_t rc);
 #endif /* _PEPA_SOCKET_H__ */

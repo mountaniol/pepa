@@ -16,7 +16,7 @@ int pepa4_restart_sockets(pepa_core_t *core, int start_from);
 int pepa4_close_sockets(pepa_core_t *core);
 void pepa4_close_needed_sockets(pepa_core_t *core, int what);
 
-__attribute__((noreturn))
+//__attribute__((noreturn))
 void  pepa4_transfer_loop2(pepa_core_t *core);
 
 #endif /* _PEPA3_H__ */

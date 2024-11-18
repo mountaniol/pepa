@@ -23,6 +23,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys/epoll.h>
 
 #include "pepa_utils.h"
 #include "pepa_in_reading_sockets.h"
@@ -85,11 +86,11 @@ int if_is_socket_valid(int sock)
         // The socket is not valid
         if (errno == EBADF) {
             // The file descriptor is bad, socket is closed or invalid
-            slog_error_l("Socket is invalid or closed");
+            slog_error_l("Socket is (FD = %d) invalid or closed", sock);
             return -1;
         } else {
             // Some other error occurred
-            slog_error_l("Error checking socket: %s", strerror(errno));
+            slog_error_l("Error checking socket (FD = %d): %s", sock, strerror(errno));
             return -2;
         }
     }
@@ -104,9 +105,9 @@ int if_is_socket_valid(int sock)
     }
     // The socket might have been closed or is in an error state
     if (error != 0) {
-        slog_error_l("Socket error: %s", strerror(error));
+        slog_error_l("Socket error (FD = %d): %s", sock, strerror(error));
     } else {
-        slog_error_l("Failed to get socket error: %s", strerror(errno));
+        slog_error_l("Failed to get socket (FD = %d) error: %s", sock, strerror(errno));
     }
 
     return -3;
@@ -217,10 +218,10 @@ int bytes_available_write(int sockfd)
 
 /*** SOCKET SEND / RECV WRAPPERS ****/
 
-ssize_t send_exact_flags(const int sock_fd, const char *buf, const size_t num_bytes, int flags)
+ssize_t send_exact_flags(const int sock_fd, const void *_buf, const size_t num_bytes, int flags)
 {
-    int available;
-    int sent_retry = 0;
+    const char *buf = _buf;
+    int available = 0;
     size_t total_sent = 0;
 
     size_t waiting_time = SEC_TO_USEC(SEND_WAIT_SEC);
@@ -234,8 +235,8 @@ ssize_t send_exact_flags(const int sock_fd, const char *buf, const size_t num_by
             return -1;
         }
 
-        if (num_bytes > (size_t)available) {
-            usleep(100000);
+        if (num_bytes > (size_t) available) {
+            usleep(1000);
         }
     }
 
@@ -246,7 +247,8 @@ ssize_t send_exact_flags(const int sock_fd, const char *buf, const size_t num_by
     }
 
     while (total_sent < num_bytes) {
-        ssize_t bytes_sent = send(sock_fd, buf + total_sent, num_bytes - total_sent, flags);
+        ssize_t bytes_sent = 0;
+        bytes_sent = send(sock_fd, buf + total_sent, num_bytes - total_sent, flags);
 
         if (bytes_sent < 1) {
             if (errno == EINTR) {
@@ -258,18 +260,15 @@ ssize_t send_exact_flags(const int sock_fd, const char *buf, const size_t num_by
         }
         total_sent += bytes_sent;
     }
-    if (sent_retry > 0) {
-        slog_debug_l("RET: %d, sent %lu bytes, asked to send: %lu", sent_retry, total_sent, num_bytes);
-    }
     return (total_sent);
 }
 
-ssize_t send_exact(const int sock_fd, const char *buf, const size_t num_bytes)
+ssize_t send_exact(const int sock_fd, const void *buf, const size_t num_bytes)
 {
     return send_exact_flags(sock_fd, buf, num_bytes, 0);
 }
 
-ssize_t send_exact_more(const int sock_fd, const char *buf, const size_t num_bytes)
+ssize_t send_exact_more(const int sock_fd, const void *buf, const size_t num_bytes)
 {
     return send_exact_flags(sock_fd, buf, num_bytes, MSG_MORE);
 }
@@ -319,12 +318,12 @@ int check_socket_status(int sockfd)
     }
 
     if (error == 0) {
-        slog_note_l("Socket is operating normally, no errors\n");
+        slog_note_l("Socket (FD = %d) is operating normally, no errors", sockfd);
         return (0);
     }
     // Print the specific error message
     fprintf(stderr, "Socket error: %s\n", strerror(error));
-    slog_error_l("Socket has an error: %s\n", strerror(error));
+    slog_error_l("Socket (FD = %d) has an error: %s", sockfd, strerror(error));
     return (-1);
 }
 
@@ -390,7 +389,7 @@ ssize_t recv_exact(const int sock_fd, char *buf, const size_t buf_size, const si
                 slog_error_l("(FD = %d) recv returned -1, total_received: %zu, asked to receive: %zu, errno = %d, %s", sock_fd, total_received, num_bytes, errno, strerror(errno));
                 int rc = check_socket_status(sock_fd);
                 if (0 == rc) {
-                    slog_note_l("The socket looks normal");
+                    slog_note_l("The socket (FD = %d) looks normal", sock_fd);
                 }
                 return (-1);  // Error occurred
             }
@@ -403,5 +402,53 @@ ssize_t recv_exact(const int sock_fd, char *buf, const size_t buf_size, const si
         total_received += bytes_received;
     }
     return (total_received == num_bytes ? (ssize_t)total_received : -1); // Return -1 if we didn't get the exact bytes
+}
+
+
+#define DUMP_BUF_LEN (1024)
+const char *pepa_dump_event(const int ev)
+{
+    static char str[DUMP_BUF_LEN];
+    int offset = 0;
+
+    if (ev & EPOLLIN) {
+        offset += sprintf(str + offset, "%s ", "EPOLLIN");
+    }
+
+    if (ev & EPOLLOUT) {
+        offset += sprintf(str + offset, "%s | ", "EPOLLOUT");
+    }
+
+    if (ev & EPOLLRDHUP) {
+        offset += sprintf(str + offset, "%s | ", "EPOLLRDHUP");
+    }
+
+    if (ev & EPOLLPRI) {
+        offset += sprintf(str + offset, "%s | ", "EPOLLPRI");
+    }
+
+    if (ev & EPOLLERR) {
+        offset += sprintf(str + offset, "%s | ", "EPOLLERR");
+    }
+
+    if (ev & EPOLLHUP) {
+        offset += sprintf(str + offset, "%s | ", "EPOLLHUP");
+    }
+
+    if (ev & EPOLLET) {
+        offset += sprintf(str + offset, "%s | ", "EPOLLET");
+    }
+
+    if (ev & EPOLLONESHOT) {
+        offset += sprintf(str + offset, "%s | ", "EPOLLONESHOT");
+    }
+    if (ev & EPOLLWAKEUP) {
+        offset += sprintf(str + offset, "%s | ", "EPOLLWAKEUP");
+    }
+    if (ev & EPOLLEXCLUSIVE) {
+        offset += sprintf(str + offset, "%s | ", "EPOLLEXCLUSIVE");
+    }
+
+    return str;
 }
 

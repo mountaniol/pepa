@@ -172,7 +172,7 @@ clean:
 check:
 	#@echo "+++ $@: USER=$(USER), UID=$(UID), GID=$(GID): $(CURDIR)"
 	@echo ============= 32 bit check =============
-	$(ECH)cppcheck -j2 -q --force  --enable=warning,style,performance --platform=unix32 -I/usr/include/openssl ./*.[ch]
+	$(ECH)cppcheck -j1 -q --force  --enable=warning,style,performance --platform=unix32 -I/usr/include/openssl ./*.[ch]
 	#echo ============= 64 bit check =============
 	#$(ECH)cppcheck -q --force  --enable=all --platform=unix64 -I/usr/include/openssl ./*.[ch]
 

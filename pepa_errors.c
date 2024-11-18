@@ -35,6 +35,18 @@ const char *pepa_error_code_to_str(int32_t code)
     case PEPA_ERR_BAD_SOCKET_REMOTE: return "PEPA_ERR_BAD_SOCKET_REMOTE: Remote error on soket";
     case PEPA_ERR_BAD_SOCKET_ERROR: return "PEPA_ERR_BAD_SOCKET_ERROR: Unknown error on socket";
 
+    case PEPA_ERR_SHVA_READ: return "Can not read from SHVA";
+    case PEPA_ERR_SHVA_WRITE: return "Can not write to SHVA";
+
+    case PEPA_ERR_OUT_LISTEN: return "Error on OUT LISTEN socket";
+    case PEPA_ERR_OUT_READ: return "Can not read from OUT RW";
+    case PEPA_ERR_OUT_WRITE: return "Can not write to OUT RW";
+
+    case PEPA_ERR_IN_LISTEN: return "Error on IN listen";
+    case PEPA_ERR_IN_READ: return "Can not read from one of IN read sockets";
+    case PEPA_ERR_IN_WRITE: return "Can not readwrite to one of IN read sockets";
+
+
 	case PEPA_ERR_THREAD_CANNOT_CREATE: return "PEPA_ERR_THREAD_CANNOT_CREATE: Cannot create socket";
 	case PEPA_ERR_THREAD_DEAD: return "PEPA_ERR_THREAD_DEAD: The thread is dead";
 	case PEPA_ERR_THREAD_DETOUCH: return "PEPA_ERR_THREAD_DETOUCH: Cannot detouch new thread";

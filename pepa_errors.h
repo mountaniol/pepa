@@ -34,6 +34,19 @@ typedef enum {
 	PEPA_ERR_BAD_SOCKET_REMOTE, /* Remote error on soket */
 	PEPA_ERR_BAD_SOCKET_ERROR, /* Unknown error on socket */
 
+    /* New class of errors, an error per socket */
+
+    PEPA_ERR_SHVA_READ, /**< Can not read from SHVA */
+	PEPA_ERR_SHVA_WRITE, /**< Can not write to SHVA */
+
+	PEPA_ERR_OUT_LISTEN, /**< Error on OUT LISTEN socket */
+	PEPA_ERR_OUT_READ, /**< Can not read from OUT RW */
+	PEPA_ERR_OUT_WRITE, /**< Can not write to OUT RW */
+
+	PEPA_ERR_IN_LISTEN, /**< Error on IN listen */
+	PEPA_ERR_IN_READ, /**< Can not read from one of IN read sockets */
+	PEPA_ERR_IN_WRITE, /**< Can not readwrite to one of IN read sockets */
+    
 	/* Treads related */
 	PEPA_ERR_THREAD_CANNOT_CREATE,
 	PEPA_ERR_THREAD_DEAD,
