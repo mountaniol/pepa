@@ -1037,14 +1037,6 @@ static int emu_check_buffer(buf_t *buf, uint32_t expect_src, const char *caller)
 
     TESTP_MES(head, -1, "Can not extract head");
 
-    /* Test we got valid header */
-    if (NULL == head) {
-        // slog_error_l("[%s] Can not find head: expected %X but it is %X", caller, (unsigned int)BUF_HEADER_MARK, head->mark);
-        slog_error_l("[%s] Can not find head", caller);
-        emu_print_buf_begin(buf, expect_src);
-        return (-1);
-    }
-
     /* Test source */
     source = head->src;
     instance = head->instance;
@@ -2604,6 +2596,10 @@ static void *pepa_emulator_in_thread(__attribute__((unused))void *arg)
 
             if (core->emu_timeout > 0) {
                 // usleep(core->emu_timeout);
+            }
+
+            if (core->emu_timeout > 0) {
+                usleep(core->emu_timeout);
             }
 
             // sleep(2);

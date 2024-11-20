@@ -565,7 +565,7 @@ static void *processor_thread_in(__attribute__((unused))void *arg)
             continue;
         }
 
-        if (if_is_socket_valid(pr->fd_in)) {
+        if (NO == pepa_util_is_socket_valid(pr->fd_in)) {
             free(pr);
             continue;
         }

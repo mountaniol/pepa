@@ -115,13 +115,114 @@ void pepa_set_tcp_send_size(const pepa_core_t *core, const int sock, const char 
 
 // #define DEB_BUF (128)
 /* Print message */
-static void pepa_print_buffer2(pepa_core_t *core,
+
+static void pepa_prepare_print_buf(pepa_core_t *core)
+{
+    TESTP_ASSERT(core, "Invalid core == NULL");
+
+    if (NULL == core->print_buf) {
+        core->print_buf = calloc(core->print_buf_len, 1);
+    } else {
+        memset(core->print_buf, 'A', core->print_buf_len);
+    }
+
+    TESTP_ASSERT(core->print_buf, "Invalid core->print_buf == NULL; probbaly allocation failed");
+}
+
+
+static void print_hex_32(const char *buffer, size_t size)
+{
+    // Ensure the buffer has enough bytes to interpret as uint32_t values
+    size_t num_elements = size / sizeof(uint32_t);
+
+    for (size_t i = 0; i < num_elements; ++i) {
+        uint32_t value;
+        // Copy 4 bytes from buffer to value
+        memcpy(&value, buffer + i * sizeof(uint32_t), sizeof(uint32_t));
+        printf("%08X ", value);
+
+        if ((i + 1) % 4 == 0) {  // Newline every 4 values (16 bytes) for readability
+            printf("\n");
+        }
+    }
+
+    // Newline if we didn't end on a complete line
+    if (num_elements % 4 != 0) {
+        printf("\n");
+    }
+}
+
+
+#define PRINT_BUF_REST(core, offset) (core->print_buf_len - offset)
+
+static void pepa_print_buffer3(pepa_core_t *core,
                                const buf_and_header_t *bufh,
                                const int fd_out,
                                const char *name_out,
                                const int fd_in,
                                const char *name_in)
 {
+    size_t print_buf_index = 0;
+    size_t index = 0;
+
+    /* If there is PEPA ID and Ticket, then print them first to the dedicated buffer */
+
+    pepa_prepare_print_buf(core);
+
+    /* If there is PEPA ID and Ticket, then print them first to the dedicated buffer */
+    /* Print header */
+    print_buf_index = snprintf(core->print_buf + print_buf_index, PRINT_BUF_REST(core, print_buf_index),
+                               "+++ MES: %s -> %s (FD: %.2d -> %.2d) [LEN RECV:%zu SEND: %zu] ",
+                               /* mes num */ name_in, name_out, fd_in, fd_out, bufh->buf_used, bufh->buf_used + sizeof(pepa_ticket_t));
+
+    /* If tickets are used, print it */
+    if (YES == bufh->send_prebuf) {
+        int rc = snprintf(core->print_buf + print_buf_index, PRINT_BUF_REST(core, print_buf_index), "[PREBUF TICKET: 0X%X] [PREBUF SIZE: %u] [PREBUF ID: 0X%X]",
+                          bufh->prebuf.ticket, bufh->prebuf.pepa_len, bufh->prebuf.pepa_id);
+        print_buf_index += rc;
+    }
+
+    // offset += snprintf(core->print_buf + offset, 1, "%s", 1);
+    core->print_buf[print_buf_index] = '|';
+    print_buf_index++;
+
+    /* Now we transform the binary buffer into a string form byte by byte */
+    for (index = 0; index < bufh->buf_used; index++) {
+
+        if (isprint(bufh->buf[index])) {
+            core->print_buf[print_buf_index] = bufh->buf[index];
+            print_buf_index++;
+            continue;
+        }
+        /* Here: it is not alphanumeric, we should decode ot into a string representation */
+
+        const int printed = snprintf(core->print_buf + print_buf_index, PRINT_BUF_REST(core, print_buf_index), "<%02X>",
+                                     (unsigned char)bufh->buf[index]);
+        if (printed < 1) {
+            slog_error_l("Can not print non-printable character, offset of the character: %zu; stopped printing", index);
+            return;
+        }
+        /* Forrward printing buffer index */
+        print_buf_index += printed;
+    }
+
+    core->print_buf[print_buf_index] = '|';
+    print_buf_index++;
+    core->print_buf[print_buf_index] = '\0';
+
+    slog_note("%s", core->print_buf);
+    // print_hex_32(bufh->buf,  bufh->buf_used);
+
+}
+
+
+#if 0 /* SEB */ /* 20/11/2024 */
+static void pepa_print_buffer2(pepa_core_t *core,
+                               const buf_and_header_t *bufh,
+                               const int fd_out,
+                               const char *name_out,
+                               const int fd_in,
+                               const char *name_in){
     size_t offset = 0;
     /* in_buf_offset: offset inside the binary buffer we need to print out */
     size_t in_buf_offset = 0;
@@ -146,7 +247,7 @@ static void pepa_print_buffer2(pepa_core_t *core,
                        /* mes num */ name_in, fd_in, name_out, fd_out, bufh->buf_used);
 
     /* If tickets are used, print it */
-    if (bufh->send_prebuf) {
+    if (YES == bufh->send_prebuf) {
         int rc = snprintf(core->print_buf + offset, 32, "[TICKET: 0X%X] [ID: 0X%X] ", bufh->prebuf.ticket, bufh->prebuf.pepa_id);
         offset += rc;
         in_buf_offset += rc;
@@ -192,6 +293,7 @@ static void pepa_print_buffer2(pepa_core_t *core,
 
     free(copy_buf);
 }
+#endif /* SEB */ /* 20/11/2024 */
 
 static void pepa_fill_prebuf(const pepa_core_t *core, pepa_prebuf_t *pre)
 {
@@ -201,6 +303,9 @@ static void pepa_fill_prebuf(const pepa_core_t *core, pepa_prebuf_t *pre)
     pre->pepa_id = core->id_val;
 }
 
+#define READ_BUF_REST(bufh) (bufh->buf_room - bufh->buf_used)
+#define READ_BUF_OFFSET(bufh) (bufh->buf + bufh->buf_used)
+
 static int pepa_socket_read3(buf_and_header_t *bufh,
                              const int fd_in,
                              const char *name_in)
@@ -208,25 +313,27 @@ static int pepa_socket_read3(buf_and_header_t *bufh,
     int rc = 0;
 
     /* Test the socket for validity */
-    rc = if_is_socket_valid(fd_in);
-    if (rc) {
+    rc = pepa_util_is_socket_valid(fd_in);
+
+    if (NO == rc) {
         slog_error_l("Socket %s (FD = %d) is invalid: %d", name_in, fd_in, rc);
         return -1;
     }
 
+    bufh->buf_used = 0;
+
     do {
         /* Read one time, then we will transfer it possibly in pieces */
-        rc = read(fd_in, bufh->buf + bufh->buf_used, bufh->buf_room - bufh->buf_used);
+        rc = read(fd_in, READ_BUF_OFFSET(bufh), READ_BUF_REST(bufh));
         if (rc > 0) {
             bufh->buf_used += rc;
         }
     } while (rc < 1 && EINTR == errno);
 
     if (0 == bufh->buf_used) {
-        slog_error_l("Could not read: from read sock %s (fd = %d) (Blocking? %s : %d) : %s",
+        slog_error_l("Could not read: from read sock %s (fd = %d) (Blocking? %s) : %s",
                      name_in, fd_in,
                      utils_socked_blocking_or_not(fd_in),
-                     utils_socked_blocking_or_not_int(fd_in),
                      strerror(errno));
         return -2;
     }
@@ -243,7 +350,7 @@ static ssize_t pepa_socket_write2(const int fd_out, const buf_and_header_t *bufh
     // ssize_t tx_bytes = 0;
 
     /* If prebuf in the structure is not NULL, send it with flag MSG_MORE */
-    if (bufh->send_prebuf) {
+    if (YES == bufh->send_prebuf) {
         //slog_note_l(">>>>> Add prebuf : fd out (FD = %d) %s", fd_out, pepa_detect_socket_name_by_fd(pepa_get_core(), fd_out));
         rc = send_exact_more(fd_out, &bufh->prebuf, sizeof(pepa_prebuf_t));
     }
@@ -315,9 +422,9 @@ int pepa_one_direction_copy4(/* 1 */pepa_core_t *core,
 
     if (fd_out == core->sockets.out_write) {
         pepa_fill_prebuf(core, &bufh.prebuf);
-        bufh.send_prebuf = 1;
+        bufh.send_prebuf = YES;
     } else {
-        bufh.send_prebuf = 0;
+        bufh.send_prebuf = NO;
     }
 
     if (do_debug) {
@@ -342,7 +449,7 @@ int pepa_one_direction_copy4(/* 1 */pepa_core_t *core,
         }
 
         /* Update the length of the buffer we send in the pera prebuf */
-        if (bufh.send_prebuf) {
+        if (YES == bufh.send_prebuf) {
             bufh.prebuf.pepa_len = bufh.buf_used;
         }
 
@@ -360,7 +467,7 @@ int pepa_one_direction_copy4(/* 1 */pepa_core_t *core,
         }
 
         if (core->dump_messages) {
-            pepa_print_buffer2(core, &bufh, fd_out, name_out, fd_in, name_in);
+            pepa_print_buffer3(core, &bufh, fd_out, name_out, fd_in, name_in);
         }
 
         *ext_rx += (uint64_t)bufh.buf_used;

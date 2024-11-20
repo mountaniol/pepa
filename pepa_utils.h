@@ -1,6 +1,7 @@
 #ifndef PEPA_UTILS_H__
 #define PEPA_UTILS_H__
 #include "pepa_core.h"
+#include "pepa_errors.h"
 
 /**
  * @define
@@ -16,9 +17,9 @@
 
 char *pepa_detect_socket_name_by_fd(const pepa_core_t *core, const int fd)  __attribute__((warn_unused_result));
 void pepa_set_fd_operations(pepa_core_t *core, const int fd, const int op);
-int if_is_socket_valid(int sock)  __attribute__((warn_unused_result));
+pepa_bool_t pepa_util_is_socket_valid(int sock)  __attribute__((warn_unused_result));
 int set_socket_blocking_mode(int sockfd)  __attribute__((warn_unused_result));
-int utils_socked_blocking_or_not_int(int socket_fd)  __attribute__((warn_unused_result));
+pepa_bool_t utils_is_socket_blocking(int socket_fd)  __attribute__((warn_unused_result));
 const char *utils_socked_blocking_or_not(int socket_fd)  __attribute__((warn_unused_result));
 int bytes_available_read(int sockfd)  __attribute__((warn_unused_result));
 int bytes_available_write(int sockfd)  __attribute__((warn_unused_result));

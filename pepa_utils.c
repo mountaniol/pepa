@@ -79,7 +79,7 @@ void pepa_set_fd_operations(pepa_core_t *core, const int fd, const int op)
     }
 }
 
-int if_is_socket_valid(int sock)
+pepa_bool_t pepa_util_is_socket_valid(int sock)
 {
     int flags = fcntl(sock, F_GETFL, 0);
     if (flags == -1) {
@@ -87,11 +87,11 @@ int if_is_socket_valid(int sock)
         if (errno == EBADF) {
             // The file descriptor is bad, socket is closed or invalid
             slog_error_l("Socket is (FD = %d) invalid or closed", sock);
-            return -1;
+            return NO;
         } else {
             // Some other error occurred
             slog_error_l("Error checking socket (FD = %d): %s", sock, strerror(errno));
-            return -2;
+            return NO;
         }
     }
 
@@ -101,7 +101,7 @@ int if_is_socket_valid(int sock)
 
     if (ret == 0 && error == 0) {
         // Socket is still valid and connected
-        return 0;
+        return YES;
     }
     // The socket might have been closed or is in an error state
     if (error != 0) {
@@ -110,7 +110,7 @@ int if_is_socket_valid(int sock)
         slog_error_l("Failed to get socket (FD = %d) error: %s", sock, strerror(errno));
     }
 
-    return -3;
+    return NO;
 }
 
 /*** TESTTING SOCKET SIZES ****/
@@ -160,13 +160,13 @@ const char *utils_socked_blocking_or_not(int socket_fd)
     }
 }
 
-int utils_socked_blocking_or_not_int(int socket_fd)
+pepa_bool_t utils_is_socket_blocking(int socket_fd)
 {
     int flags = fcntl(socket_fd, F_GETFL, 0);
     if (flags & O_NONBLOCK) {
-        return 0;
+        return YES;
     }
-    return 0;
+    return NO;
 }
 
 int bytes_available_read(int sockfd)

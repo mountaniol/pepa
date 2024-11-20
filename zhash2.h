@@ -76,7 +76,7 @@ void zhash_insert_by_str(ztable_t *hash_table, const char *key, void *val);
  * @return void* Pointer to data kept in the hash table, NULL if not found
  * @details The found entry will be not released
  */
-void *zhash_find_by_str(ztable_t *hash_table, char *key);
+void *zhash_find_by_str(ztable_t *hash_table, const char *key);
 
 /**
  * @author Sebastian Mountaniol (23/08/2020)
@@ -87,7 +87,7 @@ void *zhash_find_by_str(ztable_t *hash_table, char *key);
  * @return void* Data kept in hash table, NULL if not found
  * @details This function removes the found entry from the hash and returns data to caller
  */
-void *zhash_extract_by_str(ztable_t *hash_table, char *key);
+void *zhash_extract_by_str(ztable_t *hash_table, const char *key);
 
 /**
  * @author Sebastian Mountaniol (23/08/2020)

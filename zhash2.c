@@ -34,7 +34,7 @@ static ztable_t *zcreate_hash_table_with_size(size_t size_index)
 	return (hash_table);
 }
 
-static size_t zgenerate_hash_by_str(ztable_t *hash_table, const char *key)
+static size_t zgenerate_hash_by_str(const ztable_t *hash_table, const char *key)
 {
 	size_t size;
 	size_t hash;
@@ -48,7 +48,7 @@ static size_t zgenerate_hash_by_str(ztable_t *hash_table, const char *key)
 	return (hash);
 }
 
-static size_t zgenerate_hash_by_int(ztable_t *hash_table, u_int32_t key)
+static size_t zgenerate_hash_by_int(const ztable_t *hash_table, u_int32_t key)
 {
 	size_t size;
 	size_t hash;
@@ -176,7 +176,7 @@ void zhash_insert_by_int(ztable_t *hash_table, u_int32_t key, void *val)
 	}
 }
 
-void *zhash_find_by_str(ztable_t *hash_table, char *key)
+void *zhash_find_by_str(ztable_t *hash_table, const char *key)
 {
 	size_t   hash;
 	zentry_t *entry;
@@ -202,7 +202,7 @@ void *zhash_find_by_int(ztable_t *hash_table, u_int32_t key)
 	return (entry ? entry->val : NULL);
 }
 
-void *zhash_extract_by_str(ztable_t *hash_table, char *key)
+void *zhash_extract_by_str(ztable_t *hash_table, const char *key)
 {
 	size_t   size;
 	size_t   hash;

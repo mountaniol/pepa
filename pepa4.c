@@ -16,6 +16,7 @@
 #include "pepa_in_reading_sockets.h"
 #include "pepa_utils.h"
 #include "queue.h"
+#include "pepa_errors.h"
 
 enum pepa4_go_states2 {
     START_START = 2000, /**< Start state, executed once  */
@@ -40,6 +41,42 @@ enum pepa4_errors {
     TE_IN_RESTART, /**< IN sockets need full restart */
     TE_IN_REMOVED, /**< On of IN listening sockets was removed */
 };
+
+
+/**
+ * @author Sebastian Mountaniol (1/17/24)
+ * @brief The first step of the state machine. Allocate all
+ *  	  needded structures, create epoll file descriptor
+ * @param pepa_core_t* core  Core object
+ * @return int The next state machine state
+ */
+static void pepa4_start(pepa_core_t *core)
+{
+    slog_note_l("/// BEGIN: START PHASE ///");
+    core->buffer = calloc(core->internal_buf_size, 1);
+
+    if (NULL == core->buffer) {
+        slog_error_l("Can not allocate a transfering buffer, stopped");
+        slog_error_l("/// ERROR: START PHASE ///");
+        abort();
+    }
+
+    slog_note_l("Allocated internal buffer: %p size: %u", core->buffer, core->internal_buf_size);
+    core->epoll_fd = epoll_create1(EPOLL_CLOEXEC);
+
+    if (core->epoll_fd < 0) {
+        slog_error_l("Can not create eventfd file descriptor, stopped");
+        free(core->buffer);
+        slog_error_l("/// ERROR: START PHASE ///");
+        abort();
+    }
+
+    /* TODO: Instead of 1024 make it configurable */
+    pepa_in_reading_sockets_allocate(core, PEPA_IN_SOCKETS);
+
+    slog_note_l("Finished 'start' phase");
+    slog_note_l("/// FINISH: START PHASE ///");
+}
 
 static void pepa_remove_socket_from_epoll(pepa_core_t *core, const int fd, const char *fd_name, const char *file, const int line)
 {
@@ -244,8 +281,8 @@ static int32_t pepa_in_accept_new_connection(pepa_core_t *core)
  *  		multiple and overloaded IN sockets,
  *  		the SHVA processing cab be degraded
  */
-static int pepa_process_fdx_shva(pepa_core_t *core, const struct epoll_event events_array[], const int event_count)
-{
+#if 0 /* SEB */ /* 20/11/2024 */
+static int pepa_process_fdx_shva(pepa_core_t *core, const struct epoll_event events_array[], const int event_count){
     int32_t rc = PEPA_ERR_OK;
     int32_t i;
 
@@ -309,6 +346,7 @@ static int pepa_process_fdx_shva(pepa_core_t *core, const struct epoll_event eve
     }
     return PEPA_ERR_OK;
 }
+#endif /* SEB */ /* 20/11/2024 */
 
 static int pepa_process_fdx_shva2(pepa_core_t *core)
 {
@@ -532,6 +570,8 @@ void pepa4_transfer_loop2(pepa_core_t *core)
     struct epoll_event events[EVENTS_NUM];
     struct epoll_event events_copy[EVENTS_NUM];
 
+    pepa4_start(core);
+
     pepa4_restart_sockets(core, START_START);
 
     slog_note_l("/// BEGIN: TRANSFER PHASE ///");
@@ -706,40 +746,6 @@ static void pepa4_in_open_listen_socket(pepa_core_t *core)
 /*** State Machine functions ***/
 /*********************************/
 
-
-/**
- * @author Sebastian Mountaniol (1/17/24)
- * @brief The first step of the state machine. Allocate all
- *  	  needded structures, create epoll file descriptor
- * @param pepa_core_t* core  Core object
- * @return int The next state machine state
- */
-static void pepa4_start(pepa_core_t *core)
-{
-    slog_note_l("/// BEGIN: START PHASE ///");
-    core->buffer = calloc(core->internal_buf_size, 1);
-
-    if (NULL == core->buffer) {
-        slog_error_l("Can not allocate a transfering buffer, stopped");
-        slog_error_l("/// ERROR: START PHASE ///");
-        abort();
-    }
-    core->epoll_fd = epoll_create1(EPOLL_CLOEXEC);
-
-    if (core->epoll_fd < 0) {
-        slog_error_l("Can not create eventfd file descriptor, stopped");
-        free(core->buffer);
-        slog_error_l("/// ERROR: START PHASE ///");
-        abort();
-    }
-
-    /* TODO: Instead of 1024 make it configurable */
-    pepa_in_reading_sockets_allocate(core, PEPA_IN_SOCKETS);
-
-    slog_note_l("Finished 'start' phase");
-    slog_note_l("/// FINISH: START PHASE ///");
-}
-
 /**
  * @author Sebastian Mountaniol (1/17/24)
  * @brief Close all sockets and remove them from the epoll set
@@ -789,12 +795,12 @@ static int pepa4_start_out_listen(pepa_core_t *core)
 
     /* Looks like the listening socket is opened? */
     if (FD_CLOSED != core->sockets.out_listen) {
-        if (0 == if_is_socket_valid(core->sockets.out_listen)) {
+        if (YES == pepa_util_is_socket_valid(core->sockets.out_listen)) {
             slog_note_l("/// FINISH: OUT LISTEN PHASE (Socket is OK) ///");
             return 0;
         }
 
-        if (if_is_socket_valid(core->sockets.out_listen)) {
+        if (NO == pepa_util_is_socket_valid(core->sockets.out_listen)) {
             pepa_remove_socket_from_epoll(core, core->sockets.out_listen, "OUT WRITE", __FILE__, __LINE__);
             pepa_reading_socket_close(core->sockets.out_listen, "OUT WRITE");
             core->sockets.out_listen = FD_CLOSED;
@@ -823,7 +829,7 @@ static int pepa4_start_out_rw(pepa_core_t *core)
 
     /* Looks like the listening socket is opened? */
     if (FD_CLOSED != core->sockets.out_write) {
-        if (0 == if_is_socket_valid(core->sockets.out_write)) {
+        if (YES == pepa_util_is_socket_valid(core->sockets.out_write)) {
             slog_note_l("/// FINISH: OUT RW PHASE (socket is OK) (FD = %d) ///", core->sockets.out_write);
             return 0;
         }
@@ -956,7 +962,7 @@ int pepa4_restart_sockets(pepa_core_t *core, int next_state)
     do {
         switch (next_state) {
             case START_START:
-                pepa4_start(core);
+                //pepa4_start(core);
                 next_state = START_OUT_LISTEN;
                 break;
 

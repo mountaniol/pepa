@@ -339,7 +339,7 @@ static zentry_t *zhash_find_entry_by_int(const ztable_t *hash_table, const uint6
  * @details 
  */
 __attribute__((warn_unused_result, pure, nonnull(1)))
-static void *zhash_entry_find_by_str(const ztable_t *hash_table, char *key_str, const size_t key_str_len)
+static void *zhash_entry_find_by_str(const ztable_t *hash_table, const char *key_str, const size_t key_str_len)
 {
 	uint64_t key_int64 = zhash_key_int64_from_key_str(key_str, key_str_len);
 	DDD("Calculated key_int: %lX\n", key_int64);
@@ -436,7 +436,7 @@ void *zhash_find_by_int(const ztable_t *hash_table, uint64_t key_int64, ssize_t 
 
 /* TODO: Convert string to int64 key and search by int64 key */
 __attribute__((warn_unused_result, hot))
-void *zhash_find_by_str(const ztable_t *hash_table, char *key_str, const size_t key_str_len, ssize_t *val_size)
+void *zhash_find_by_str(const ztable_t *hash_table, const char *key_str, const size_t key_str_len, ssize_t *val_size)
 {
 	uint64_t key_int64 = zhash_key_int64_from_key_str(key_str, key_str_len);
 	DDD("Calculated key_int: %llX\n", key_int64);
@@ -508,7 +508,7 @@ bool zhash_exists_by_int(const ztable_t *hash_table, const uint64_t key_int64)
 }
 
 __attribute__((warn_unused_result, pure, hot))
-bool zhash_exists_by_str(ztable_t *hash_table, const char *key_str, size_t key_str_len)
+bool zhash_exists_by_str(const ztable_t *hash_table, const char *key_str, size_t key_str_len)
 {
 	const uint64_t key_int64 = zhash_key_int64_from_key_str(key_str, strnlen(key_str, key_str_len));
 	return zhash_exists_by_int(hash_table, key_int64);

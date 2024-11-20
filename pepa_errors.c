@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdint.h>
 #include "pepa_errors.h"
 
 const char *pepa_error_code_to_str(int32_t code)

@@ -7,6 +7,7 @@
 #include "buf_t/buf_t.h"
 #include "pepa_core.h"
 #include "pepa_ticket_id.h"
+#include "pepa_errors.h"
 
 void set_sig_handler(void);
 
@@ -23,7 +24,7 @@ typedef struct {
     size_t buf_room;
     size_t buf_used;
     pepa_prebuf_t prebuf;
-    int send_prebuf;
+    pepa_bool_t send_prebuf;
     size_t prebuf_size;
 } buf_and_header_t;
 
