@@ -300,11 +300,12 @@ static void pepa_print_buffer2(pepa_core_t *core,
 }
 #endif /* SEB */ /* 20/11/2024 */
 
+static unsigned int ticket = 17;
+
 static void pepa_fill_prebuf(const pepa_core_t *core, pepa_prebuf_t *pre)
 {
-    static unsigned int ticket = 17;
-
-    pre->ticket = pepa_gen_ticket(ticket);
+    ticket = pepa_gen_ticket(ticket);
+    pre->ticket = ticket;
     pre->pepa_id = core->id_val;
 }
 
@@ -345,8 +346,21 @@ static int pepa_socket_read3(buf_and_header_t *bufh,
     return PEPA_ERR_OK;
 }
 
+#define STR_PREBUF_SIZE (1024)
+static const char *prebuf_to_string(buf_and_header_t *bufh, size_t *size_bytes)
+{
+    static char str[STR_PREBUF_SIZE];
+    const int ret = snprintf(str, STR_PREBUF_SIZE, "%0X-%u-%0X-", bufh->prebuf.ticket, bufh->prebuf.pepa_len, bufh->prebuf.pepa_id);
+    if (ret < 0) {
+        slog_fatal_l("Can not create prebuf as string");
+        abort();
+    }
+    *size_bytes = ret;
+    return str;
+}
+
 __attribute__((hot))
-static ssize_t pepa_socket_write2(const int fd_out, const buf_and_header_t *bufh, const char *name_out)
+static ssize_t pepa_socket_write2(const int fd_out, buf_and_header_t *bufh, const char *name_out)
 {
     ssize_t rc = 0;
     TESTP_ASSERT(bufh, "bufh is NULL");
@@ -357,7 +371,10 @@ static ssize_t pepa_socket_write2(const int fd_out, const buf_and_header_t *bufh
     /* If prebuf in the structure is not NULL, send it with flag MSG_MORE */
     if (YES == bufh->send_prebuf) {
         //slog_note_l(">>>>> Add prebuf : fd out (FD = %d) %s", fd_out, pepa_detect_socket_name_by_fd(pepa_get_core(), fd_out));
-        rc = send_exact_more(fd_out, &bufh->prebuf, sizeof(pepa_prebuf_t));
+        //rc = send_exact_more(fd_out, &bufh->prebuf, sizeof(pepa_prebuf_t));
+        size_t size = 0;
+        const char *str = prebuf_to_string(bufh, &size);
+        rc = send_exact_more(fd_out, str, size);
     }
 
     if (rc < 0) {
