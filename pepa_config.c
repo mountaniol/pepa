@@ -7,6 +7,7 @@
 #include "iniparser.h"
 #include "pepa_config.h"
 #include "pepa_core.h"
+#include "pepa_types.h"
 
 /**
  * @author se (9/17/24) 
@@ -42,42 +43,20 @@ int pepa_read_config(pepa_core_t *core)
         return -1;
     }
 
-    value = ini_get_value(ini, "config", "id");
-
-    if (value) {
-        slog_note_l("Parsing %s", value);
-
-        rc = sscanf(value, "%x", &core->use_id);
-
-        if (0 == rc) {
-            slog_error_l("Could not convert %s to int", value);
-        }
-    }
-
-    value = ini_get_value(ini, "config", "id_val");
+    value = ini_get_value(ini, "config", "pepa_id");
     if (value) {
         slog_note_l("Parsing %s", value);
         rc = sscanf(value, "%X", &core->id_val);
         if (0 == rc) {
             slog_error_l("Could not convert %s to int", value);
         }
+        core->use_id = YES;
     }
 
-    value = ini_get_value(ini, "config", "ticket");
-    if (value) {
-        slog_note_l("Parsing %s", value);
-        rc = sscanf(value, "%d", &core->use_ticket);
-        if (0 == rc) {
-            slog_error_l("Could not convert %s to int", value);
-        }
-
-    } 
-
     printf("CONFIG: readers: %ld\n", core->readers_preopen);
-    printf("CONFIG: add PEPA id to every buffer = %s\n", core->use_id ? "YES" : "NO");
+    printf("CONFIG: add PEPA id to every buffer = %s\n", (YES == core->use_id) ? "YES" : "NO");
     printf("CONFIG: PEPA id value = %X\n", (unsigned int)core->id_val);
-    printf("CONFIG: add a ticket to every buffer = %s\n", core->use_ticket ? "YES" : "NO");
-
+    
     return 0;
 }
 

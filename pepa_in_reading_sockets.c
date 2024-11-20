@@ -84,7 +84,7 @@ void pepa_in_reading_sockets_close_all(pepa_core_t *core)
         return;
     }
 
-    if (0 == pepa_core_is_valid(core)) {
+    if (NO == pepa_core_is_valid(core)) {
         slog_error_l("Core structure is invalid");
         return;
     }
@@ -135,7 +135,7 @@ void pepa_in_reading_sockets_free(pepa_core_t *core)
 {
     slog_note_l("IN-READER: Starting IN read sockets closing and cleaning");
     TESTP_VOID(core);
-    if (!pepa_core_is_valid(core)) {
+    if (NO == pepa_core_is_valid(core)) {
         slog_error_l("Core structure is invalid");
         return;
     }
@@ -163,7 +163,7 @@ void pepa_in_reading_sockets_allocate(pepa_core_t *core, const int num)
     slog_note_l("IN-READER: Starting IN read sockets array allocation");
     TESTP_VOID(core);
 
-    if (0 == pepa_core_is_valid(core)) {
+    if (NO == pepa_core_is_valid(core)) {
         slog_error_l("Core structure is invalid");
         abort();
     }
@@ -194,7 +194,7 @@ void pepa_in_reading_sockets_add(pepa_core_t *core, const int fd)
     int i;
     slog_note_l("IN-READER: Starting addition of a new IN read socket (FD = %d) to array", fd);
     TESTP_VOID(core);
-    if (!pepa_core_is_valid(core)) {
+    if (NO == pepa_core_is_valid(core)) {
         slog_error_l("Core structure is invalid");
         return;
     }
@@ -231,7 +231,7 @@ void pepa_in_reading_sockets_close_rm(pepa_core_t *core, const int fd)
 {
     int i;
     TESTP_VOID(core);
-    if (!pepa_core_is_valid(core)) {
+    if (NO == pepa_core_is_valid(core)) {
         slog_error_l("Core structure is invalid");
         return;
     }
@@ -263,7 +263,7 @@ int pepa_in_find_slot_by_fd(pepa_core_t *core, const int fd)
 {
     int idx;
     TESTP_ASSERT(core, "core is NULL");
-    if (!pepa_core_is_valid(core)) {
+    if (NO == pepa_core_is_valid(core)) {
         slog_error_l("Core structure is invalid");
         abort();
     }
@@ -290,7 +290,7 @@ int pepa_if_fd_in(const pepa_core_t *core, const int fd)
 {
     int i;
     TESTP_ASSERT(core, "core is NULL");
-    if (!pepa_core_is_valid(core)) {
+    if (NO == pepa_core_is_valid(core)) {
         slog_error_l("Core structure is invalid");
         return -1;
     }
@@ -321,7 +321,7 @@ int pepa_in_dump_sockets(const pepa_core_t *core)
 {
     int i;
     TESTP_ASSERT(core, "core is NULL");
-    if (!pepa_core_is_valid(core)) {
+    if (NO == pepa_core_is_valid(core)) {
         slog_error_l("Core structure is invalid");
         return -1;
     }

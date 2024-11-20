@@ -428,7 +428,7 @@ int pepa_parse_arguments(int argi, char *argv[])
 			break;
 		case 'a':
 			/* Set abort flag*/
-			core->abort_flag = 1;
+			core->abort_flag = YES;
 			break;
 		case 'f':
 			/* Log file name */
@@ -445,7 +445,7 @@ int pepa_parse_arguments(int argi, char *argv[])
 			break;
 		case 'p':
 			/* Disable terminal printings */
-			core->slog_print = 0;
+			core->slog_print = NO;
 			slog_info_l("Log display is disabled");
 			break;
 		case 'l':
@@ -504,10 +504,10 @@ int pepa_parse_arguments(int argi, char *argv[])
 			core->daemon = 1;
 			break;
 		case 'c':
-			core->slog_color = 1;
+			core->slog_color = YES;
 			break;
 		case 'u':
-			core->dump_messages = 1;
+			core->dump_messages = YES;
 			break;
 		default:
 			printf("Unknown argument: %c\n", opt);
@@ -560,11 +560,11 @@ void pepa_config_slogger(const pepa_core_t *core)
 		strcpy(cfg.sFilePath, core->slog_dir);
 	}
 
-	if (0 == core->slog_print) {
+	if (NO == core->slog_print) {
 		cfg.nToScreen = 0;
 	}
 
-	if (0 != core->slog_color) {
+	if (YES == core->slog_color) {
 		cfg.eColorFormat = SLOG_COLORING_TAG;
 	}
 

@@ -53,7 +53,7 @@ static pepa_core_t *pepa_create_core_t(void)
 	core->slog_flags = 0;
 	core->slog_file = NULL;
 	core->slog_dir = NULL;
-	core->slog_print = 1;
+	core->slog_print = YES;
 	core->monitor_divider = 1;
 	core->emu_max_buf = 1024;
 	core->emu_min_buf = 1;
@@ -66,15 +66,14 @@ static pepa_core_t *pepa_create_core_t(void)
 	core->validity = CORE_VALIDITY_MASK;
 
 	core->readers_preopen = -1;
-	core->use_id = 0;
-	core->use_ticket = 0;
+	core->use_id = NO;
 	return core;
 }
 
 static int pepa_release_core_t(pepa_core_t *core)
 {
 	TESTP(core, -1);
-	if (!pepa_core_is_valid(core)) {
+	if (NO == pepa_core_is_valid(core)) {
 		slog_fatal("Core is invalid, can not release it");
 		return -1;
 	}
@@ -142,12 +141,12 @@ static int pepa_release_core_t(pepa_core_t *core)
 	return 0;
 }
 
-int pepa_core_is_valid(const pepa_core_t *core)
+pepa_bool_t pepa_core_is_valid(const pepa_core_t *core)
 {
 	if (core->validity == CORE_VALIDITY_MASK) {
-		return 1;
+		return YES;
 	}
-	return 0;
+	return NO;
 }
 
 /****** API FUNCTIONS *******/
@@ -175,7 +174,7 @@ pepa_core_t *pepa_get_core(void)
 	return g_pepa_core;
 }
 
-int32_t pepa_if_abort(void)
+pepa_bool_t pepa_if_abort(void)
 {
 	if (NULL == g_pepa_core) {
 		return PEPA_ERR_OK;

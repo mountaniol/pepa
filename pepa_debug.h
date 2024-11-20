@@ -5,6 +5,6 @@
 #include "pepa_core.h"
 #include "buf_t/buf_t.h"
 
-#define PEPA_TRY_ABORT() do{if(pepa_if_abort()) {slogf("Abort in %s +%d\n", __FILE__, __LINE__);abort();} } while(0)
+#define PEPA_TRY_ABORT() do{if(YES == pepa_if_abort()) {slogf("Abort in %s +%d\n", __FILE__, __LINE__);abort();} } while(0)
 
 #endif /* _PEPA_DEBUG_H__ */

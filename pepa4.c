@@ -17,6 +17,7 @@
 #include "pepa_utils.h"
 #include "queue.h"
 #include "pepa_errors.h"
+#include "pepa_types.h"
 
 enum pepa4_go_states2 {
     START_START = 2000, /**< Start state, executed once  */
@@ -952,7 +953,7 @@ int pepa4_restart_sockets(pepa_core_t *core, int next_state)
     slog_note_l("===============================================================================================");
     slog_note(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
     TESTP(core, -1);
-    if (!pepa_core_is_valid(core)) {
+    if (NO == pepa_core_is_valid(core)) {
         slog_error_l("Core structure is invalid");
         return -1;
     }

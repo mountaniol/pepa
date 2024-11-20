@@ -8,6 +8,7 @@
 
 #include "buf_t/buf_t.h"
 #include "pepa_ticket_id.h"
+#include "pepa_types.h"
 
 /* Just a default mask */
 #define CORE_VALIDITY_MASK ((uint32_t) 0xC04E0707)
@@ -83,9 +84,9 @@ typedef struct {
 	int slog_flags; /* Keep slog logger verbosity level*/
 	char *slog_file; /* Keep slog output file name; if given, log will be saved there */
 	char *slog_dir; /* Keep slog output file in this directory */
-	int slog_print; /* Show slog output on terminal */
-	int slog_color; /* Output on terminal should use color or not (by defailt: no) */
-	int dump_messages; /* Output on terminal should use color or not (by defailt: no) */
+	pepa_bool_t slog_print; /* Show slog output on terminal */
+	pepa_bool_t slog_color; /* Output on terminal should use color or not (by defailt: no) */
+	pepa_bool_t dump_messages; /* Output on terminal should use color or not (by defailt: no) */
 	int monitor_divider; /* Divide monitor output (vytes) by this diveder */
 	char monitor_divider_str[1]; /* Monitor divider as a string: B for bytess, K for kilobytes, M for megabytes */
 	unsigned int emu_timeout; /* Timeout in microseconds between buffer sendings from emulator; defailt is 0 */
@@ -99,11 +100,10 @@ typedef struct {
 	thread_vars_t out_thread; /**< Configuration of OUT thread */
 	thread_vars_t monitor_thread; /**< Configuration of OUT thread */
 
-
 	unsigned int monitor_freq; /* How often (in seconds) print out statistics from the monitor; by default every 5 seconds */
 	pepa_in_read_sockets_t in_reading_sockets; /**< Reading sockets opened when accept new connections */
 	uint32_t internal_buf_size; /**< Size of buffer used to pass packages, by defaiult COPY_BUF_SIZE bytes, see pepa_config.h */
-	int32_t abort_flag; /**< Abort flag, if enabled, PEPA file abort on errors; for debug only */
+	pepa_bool_t abort_flag; /**< Abort flag, if enabled, PEPA file abort on errors; for debug only */
 	pepa_sockets_t sockets;
 	int32_t monitor_timeout; /**< How many microseconds to sleep between tests in microseconds */
 	pepa_stat_t monitor;
@@ -116,8 +116,7 @@ typedef struct {
 	int epoll_fd;
 	long int readers_preopen; /**< How many reader connections should by opened before connection to SHVA is opened */
     pepa_id_t id_val; /**< How many reader connections should by opened before connection to SHVA is opened */
-	unsigned int use_id; /**< Should PEPA add to every buffer a unique ID identifying this buffer passed through PEPA? 0 = no, 1 = yes */
-	int use_ticket; /**< Should PEPA add to every buffer a unique "ticket" this buffer? 0 = no, 1 = yes */
+	pepa_bool_t use_id; /**< Should PEPA add to every buffer a unique ID identifying this buffer passed through PEPA? 0 = no, 1 = yes */
 } pepa_core_t;
 
 /**
@@ -163,8 +162,8 @@ int32_t pepa_core_unlock(void);
  * @return int32_t Abort flag
  * @details 
  */
-int32_t pepa_if_abort(void);
+pepa_bool_t pepa_if_abort(void);
 
-int pepa_core_is_valid(const pepa_core_t *core);
+pepa_bool_t pepa_core_is_valid(const pepa_core_t *core);
 
 #endif /* _PEPA_CORE_H_ */

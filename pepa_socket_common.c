@@ -164,6 +164,11 @@ static void pepa_print_buffer3(pepa_core_t *core,
 {
     size_t print_buf_index = 0;
     size_t index = 0;
+    size_t should_send = bufh->buf_used;
+
+    if (YES == bufh->send_prebuf) {
+        should_send += sizeof(pepa_ticket_t);
+    }
 
     /* If there is PEPA ID and Ticket, then print them first to the dedicated buffer */
 
@@ -173,7 +178,7 @@ static void pepa_print_buffer3(pepa_core_t *core,
     /* Print header */
     print_buf_index = snprintf(core->print_buf + print_buf_index, PRINT_BUF_REST(core, print_buf_index),
                                "+++ MES: %s -> %s (FD: %.2d -> %.2d) [LEN RECV:%zu SEND: %zu] ",
-                               /* mes num */ name_in, name_out, fd_in, fd_out, bufh->buf_used, bufh->buf_used + sizeof(pepa_ticket_t));
+                               /* mes num */ name_in, name_out, fd_in, fd_out, bufh->buf_used, should_send);
 
     /* If tickets are used, print it */
     if (YES == bufh->send_prebuf) {
@@ -371,7 +376,7 @@ static ssize_t pepa_socket_write2(const int fd_out, const buf_and_header_t *bufh
 }
 
 __attribute__((hot))
-static int pepa_is_all_transfered2(const size_t rx_bytes, const size_t tx_bytes)
+static pepa_bool_t pepa_is_all_transfered2(const size_t rx_bytes, const size_t tx_bytes)
 {
     if (tx_bytes > rx_bytes) {
         slog_fatal_l("Transfered more bytes than expected: %lu > %lu\n", tx_bytes, rx_bytes);
@@ -379,10 +384,10 @@ static int pepa_is_all_transfered2(const size_t rx_bytes, const size_t tx_bytes)
     }
 
     if (rx_bytes == tx_bytes) {
-        return (0);
+        return YES;
     }
 
-    return (1);
+    return NO;
 }
 
 __attribute__((hot))
@@ -420,7 +425,7 @@ int pepa_one_direction_copy4(/* 1 */pepa_core_t *core,
         abort();
     }
 
-    if (fd_out == core->sockets.out_write) {
+    if (fd_out == core->sockets.out_write && YES == core->use_id) {
         pepa_fill_prebuf(core, &bufh.prebuf);
         bufh.send_prebuf = YES;
     } else {
@@ -466,7 +471,7 @@ int pepa_one_direction_copy4(/* 1 */pepa_core_t *core,
             goto endit;
         }
 
-        if (core->dump_messages) {
+        if (YES == core->dump_messages) {
             pepa_print_buffer3(core, &bufh, fd_out, name_out, fd_in, name_in);
         }
 
@@ -482,7 +487,7 @@ int pepa_one_direction_copy4(/* 1 */pepa_core_t *core,
 
         is_transfered = pepa_is_all_transfered2(bufh.buf_used, tx_bytes);
 
-    } while (is_transfered != 0 && (iteration <= max_iterations));
+    } while (NO == is_transfered && (iteration <= max_iterations));
 
     ret = PEPA_ERR_OK;
 endit:

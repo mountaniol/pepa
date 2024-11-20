@@ -1657,7 +1657,7 @@ static int pepa3_end(pepa_core_t *core)
 int pepa_go(pepa_core_t *core)
 {
     TESTP(core, -1);
-    if (!pepa_core_is_valid(core)) {
+    if (NO == pepa_core_is_valid(core)) {
         slog_error_l("Core structure is invalid");
         return -1;
     }
