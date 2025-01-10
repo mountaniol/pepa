@@ -166,6 +166,10 @@ static int pepa_process_exceptions2(pepa_core_t *core, const struct epoll_event 
             if (FD_IS_IN == pepa_if_fd_in(core, fd)) {
                 pepa_remove_socket_from_epoll(core, fd, "IN", __FILE__, __LINE__);
                 pepa_in_reading_sockets_close_rm(core, fd);
+                /* If no more IN RW sockets are left, we need to reset all sockets */
+                if (pepa_in_num_active_sockets(core) < 1) {
+                    return REINIT_IN_RW;
+                }
                 return PEPA_ERR_OK;
             }
 
@@ -200,6 +204,10 @@ static int pepa_process_exceptions2(pepa_core_t *core, const struct epoll_event 
             if (core->sockets.out_listen == fd) {
                 slog_warn_l("OUT socket: local side of the OUT listen is broken");
                 return REINIT_OUT_LISTEN;
+                /* If no more IN RW sockets are left, we need to reset all sockets */
+                if (pepa_in_num_active_sockets(core) < 1) {
+                    return REINIT_IN_RW;
+                }
             }
 
             /* Else: it is one of IN reading sockets, we should remove it */
@@ -674,7 +682,7 @@ static int32_t pepa4_out_wait_connection(__attribute__((unused))
     slog_info_l("ACCEPTED CONNECTION: (FD = %d)", fd_read);
     pepa_set_tcp_timeout(fd_read);
     // pepa_set_tcp_send_size(core, fd_read, "OUT");
-    slog_note_l("Socket (FD = %d) now it is %s",fd_read, utils_socked_blocking_or_not(fd_read));
+    slog_note_l("Socket (FD = %d) now it is %s", fd_read, utils_socked_blocking_or_not(fd_read));
     return fd_read;
 }
 
@@ -755,7 +763,8 @@ static void pepa4_in_open_listen_socket(pepa_core_t *core)
  * @details 
  */
 #if 1 /* SEB */ /* 18/11/2024 */
-int pepa4_close_sockets(pepa_core_t *core){
+int pepa4_close_sockets(pepa_core_t *core)
+{
     int rc;
 
     /* Remove sockets from the the epoll set */
@@ -1056,8 +1065,13 @@ void pepa4_close_needed_sockets(pepa_core_t *core, const int what)
             pepa_disconnect_out_rw(core);
 
             break;
-        case REINIT_IN_RW:
+        case REINIT_IN_RW: /* All IN RW are disconnected: reset all sockets */
             slog_note_l("Reset is: REINIT_IN_RW");
+            pepa_disconnect_out_listen(core);
+            pepa_disconnect_in_rw(core);
+            pepa_disconnect_shva(core);
+            pepa_disconnect_out_rw(core);
+
             /* Do nothing */
             break;
         case REINIT_IN_LISTEN:

@@ -130,8 +130,8 @@ static void pepa_prepare_print_buf(pepa_core_t *core)
 }
 
 
-static void print_hex_32(const char *buffer, size_t size)
-{
+#if 0 /* SEB */ /* 10/01/2025 */
+static void print_hex_32(const char *buffer, size_t size){
     // Ensure the buffer has enough bytes to interpret as uint32_t values
     size_t num_elements = size / sizeof(uint32_t);
 
@@ -151,6 +151,7 @@ static void print_hex_32(const char *buffer, size_t size)
         printf("\n");
     }
 }
+#endif /* SEB */ /* 10/01/2025 */
 
 
 #define PRINT_BUF_REST(core, offset) (core->print_buf_len - offset)

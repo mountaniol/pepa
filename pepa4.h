@@ -4,12 +4,12 @@
 #include "pepa_core.h"
 
 enum {
-    REINIT_SHVA_RW = 3000,
-    REINIT_OUT_RW,
-    REINIT_OUT_LISTEN,
-    REINIT_ALL = REINIT_OUT_LISTEN,
-    REINIT_IN_RW,
-    REINIT_IN_LISTEN,
+    REINIT_SHVA_RW = 3000, /* We need to reinit the SHVA socket and all dependent components */
+    REINIT_OUT_RW, /* We need to reinit the OUT Read-Write socket and all dependent components */
+    REINIT_OUT_LISTEN, /* We need to reinit the OUT Listening socket and all dependent components */
+    REINIT_ALL = REINIT_OUT_LISTEN, /* We need to reinit all the sockets and all dependent components */
+    REINIT_IN_RW, /* We need to reinit an IN Read-Write socket and all dependent components */
+    REINIT_IN_LISTEN, /* We need to reinit the IN Listening socket and all dependent components */
 };
 
 int pepa4_restart_sockets(pepa_core_t *core, int start_from);
