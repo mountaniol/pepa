@@ -19,7 +19,10 @@ DEBUG=-DDEBUG3
 PEPA_O=main.o
 PEPA_T=pepa
 
-all: pepa
+all:
+	@echo "This branch is outdated. Use branch pepa-ng-4: 'git switch  pepa-ng-4'"
+
+_all: pepa
 
 pepa: $(PEPA_O)
 	$(GCC) $(CFLAGS) -ggdb $(DEBUG) $(PEPA_O) -o $(PEPA_T) -lpthread
