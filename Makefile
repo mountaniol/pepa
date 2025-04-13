@@ -3,6 +3,7 @@
 
 #GCC=clang-10
 GCC=gcc
+#GCC=gcc-10
 
 ifneq ($(compiler),)
 	GCC=$(compiler)
@@ -66,7 +67,7 @@ CFLAGS=-Wabsolute-value -Waddress -Waddress-of-packed-member \
 		# -Wredundant-decls -Wpedantic -Wbad-function-cast -Wformat-nonliteral \
 		# -Wsign-conversion -Wconversion -Wcast-qual
 
-#CFLAGS=-Wall -Wextra -O2
+CFLAGS+=-Wall -Wextra -O2
 #DEBUG=-DDEBUG3
 #DEBUG+=-ggdb
 # Static GCC-10 analyzer
@@ -171,10 +172,10 @@ clean:
 
 .PHONY:check
 check:
-	#@echo "+++ $@: USER=$(USER), UID=$(UID), GID=$(GID): $(CURDIR)"
-	@echo ============= 32 bit check =============
-	$(ECH)cppcheck -j1 -q --force  --enable=warning,style,performance --platform=unix32 -I/usr/include/openssl ./*.[ch]
-	#echo ============= 64 bit check =============
+	# @echo ============= 32 bit check =============
+	# $(ECH)cppcheck -j1 -q --force  --enable=warning,style,performance --platform=unix32 -I/usr/include/openssl ./*.[ch]
+	echo ============= 64 bit check =============
+	$(ECH)cppcheck -j1 -q --force  --enable=warning,style,performance --platform=unix64 -I/usr/include/openssl ./*.[ch]
 	#$(ECH)cppcheck -q --force  --enable=all --platform=unix64 -I/usr/include/openssl ./*.[ch]
 
 .PHONY:splint
@@ -182,7 +183,7 @@ splint:
 	@echo "+++ $@: USER=$(USER), UID=$(UID), GID=$(GID): $(CURDIR)"
 	#splint -standard -export-local -pred-bool-others -noeffect +matchanyintegral +unixlib -I/usr/include/openssl -D__gnuc_va_list=va_list  ./*.[ch]
 	#splint -standard -export-local -pred-bool-others -noeffect +matchanyintegral +unixlib  ./*.[ch]
-	splint -weak -pred-bool-others +matchanyintegral +unixlib -forced ./*.[ch]
+	splint -weak -pred-bool-others +matchanyintegral +unixlib ./*.[ch]
 
 flaw:
 	flawfinder ./*.[ch] 

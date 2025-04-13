@@ -1,5 +1,7 @@
 #include "iniparser.h"
 
+#include "debug.h"
+
 enum States {
     START,
     NEW_SECTION,
@@ -92,6 +94,7 @@ static struct section *parse_section(struct read_ini *read_ini)
         return NULL;
     }
     struct section *section = malloc(sizeof(*section));
+    TESTP(section, NULL);
     section->num_configs = 0;
     section->configs = NULL;
 
@@ -144,7 +147,8 @@ static struct section *parse_section(struct read_ini *read_ini)
                 char c = read_ini->tmp[i];
                 if (c == ':' || c == '=') break;
             }
-            x = b; y = i;
+            x = b;
+            y = i;
             trim(read_ini->tmp, &x, &y);
             read_ini->tmp[y + 1] = '\0';
             cfg->key = strdup(&read_ini->tmp[x]);
@@ -175,7 +179,6 @@ static struct section *parse_section(struct read_ini *read_ini)
 
 static struct ini *parse_ini(struct read_ini *read_ini)
 {
-
     if (NULL == read_ini) {
         return NULL;
     }
@@ -183,14 +186,15 @@ static struct ini *parse_ini(struct read_ini *read_ini)
     struct ini *ini = malloc(sizeof(*ini));
     char finished = 0;
 
+    TESTP(ini, NULL);
+
     ini->num_sections = 0;
     ini->sections = NULL;
 
     while (!finished) {
         switch (read_ini->state) {
             case START:
-            case NEW_SECTION:
-            {
+            case NEW_SECTION: {
                 /* read a section */
                 struct section *section = parse_section(read_ini);
 
@@ -223,15 +227,11 @@ static struct ini *parse_ini(struct read_ini *read_ini)
 struct ini *read_ini(struct read_ini **read_inip, char *filename)
 {
     struct ini *ini;
-    struct read_ini *read_ini = *read_inip;
+    struct read_ini *read_ini = NULL;
+    TESTP(read_inip, NULL);
+    TESTP(filename, NULL);
 
-    if (NULL == filename) {
-        return NULL;
-    }
-
-    if (NULL == read_inip) {
-        return NULL;
-    }
+    read_ini = *read_inip;
 
     if (!read_ini) {
         read_ini = malloc(sizeof(*read_ini));
@@ -239,6 +239,8 @@ struct ini *read_ini(struct read_ini **read_inip, char *filename)
     } else {
         free(read_ini->tmp);
     }
+
+    TESTP(read_ini, NULL);
 
     read_ini->filename = filename;
     read_ini->current_line = 0;
@@ -264,7 +266,9 @@ char *ini_get_value(struct ini *ini,
 {
     int s, c;
     for (s = 0; s < ini->num_sections; s++) {
-        if (strcmp(section, ini->sections[s]->name) == 0) for (c = 0; c < ini->sections[s]->num_configs; c++) if (strcmp(key, ini->sections[s]->configs[c]->key) == 0) return ini->sections[s]->configs[c]->value;
+        if (strcmp(section, ini->sections[s]->name) == 0)
+            for (c = 0; c < ini->sections[s]->num_configs; c++)
+                if (strcmp(key, ini->sections[s]->configs[c]->key) == 0) return ini->sections[s]->configs[c]->value;
     }
 
     return NULL;
@@ -286,14 +290,37 @@ void ini_pp(const struct ini *ini)
 
 void destroy_ini(struct ini *ini)
 {
+    TESTP_VOID(ini);
+
+    if (NULL == ini->sections) {
+        free(ini);
+        return;
+    }
+
     int s, c;
     for (s = 0; s < ini->num_sections; s++) {
-        for (c = 0; c < ini->sections[s]->num_configs; c++) {
-            free(ini->sections[s]->configs[c]->key);
-            free(ini->sections[s]->configs[c]->value);
+        if (NULL == ini->sections[s]) {
+            continue;
         }
-        free(ini->sections[s]->name);
-        free(ini->sections[s]->configs);
+        for (c = 0; ini->sections[s]->num_configs; c++) {
+            if (ini->sections[s]->configs[c]->key) {
+                free(ini->sections[s]->configs[c]->key);
+                ini->sections[s]->configs[c]->key = NULL;
+            }
+            if (ini->sections[s]->configs[c]->value) {
+                free(ini->sections[s]->configs[c]->value);
+                ini->sections[s]->configs[c]->value = NULL;
+            }
+        }
+        if (ini->sections[s]->name) {
+            free(ini->sections[s]->name);
+            ini->sections[s]->name = NULL;
+        }
+
+        if (ini->sections[s]->configs) {
+            free(ini->sections[s]->configs);
+            ini->sections[s]->configs = NULL;
+        }
     }
 
     free(ini->sections);

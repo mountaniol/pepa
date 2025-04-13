@@ -115,6 +115,7 @@ void pepa_in_reading_sockets_close_all(pepa_core_t *core)
             core->in_reading_sockets.sockets[i] = EMPTY_SLOT;
         }
     }
+    
     slog_note_l("IN-READER: Finished closing and removing sockets: %d slots", core->in_reading_sockets.number);
 }
 
@@ -170,11 +171,24 @@ void pepa_in_reading_sockets_allocate(pepa_core_t *core, const int num)
 
     core->in_reading_sockets.number = num;
     core->in_reading_sockets.sockets = (int *)calloc(sizeof(int) * (size_t)num, 1);
+    
+    if(NULL == core->in_reading_sockets.sockets) {
+        core->in_reading_sockets.number = 0;
+        return;
+    }
+
     core->in_reading_sockets.processing = (int *)calloc(sizeof(int) * (size_t)num, 1);
-    TESTP_VOID(core->in_reading_sockets.sockets);
+
+    if (NULL == core->in_reading_sockets.processing) {
+        free(core->in_reading_sockets.sockets);
+        core->in_reading_sockets.sockets = NULL;
+        core->in_reading_sockets.number = 0;
+    }
+
     for (i = 0; i < num; i++) {
         core->in_reading_sockets.sockets[i] = EMPTY_SLOT;
     }
+
     slog_note_l("IN-READER: Finished IN read sockets array allocation: allocated %d socket slots", num);
 }
 

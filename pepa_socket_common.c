@@ -178,12 +178,12 @@ static void pepa_print_buffer3(pepa_core_t *core,
     /* If there is PEPA ID and Ticket, then print them first to the dedicated buffer */
     /* Print header */
     print_buf_index = snprintf(core->print_buf + print_buf_index, PRINT_BUF_REST(core, print_buf_index),
-                               "+++ MES: %s -> %s (FD: %.2d -> %.2d) [LEN RECV:%zu SEND: %zu] ",
+                               "+++ MES: %s -> %s (FD: %08d -> %08d) [LEN RECV:%08zu SEND: %08zu] ",
                                /* mes num */ name_in, name_out, fd_in, fd_out, bufh->buf_used, should_send);
 
     /* If tickets are used, print it */
     if (YES == bufh->send_prebuf) {
-        int rc = snprintf(core->print_buf + print_buf_index, PRINT_BUF_REST(core, print_buf_index), "[PREBUF TICKET: 0X%X] [PREBUF SIZE: %u] [PREBUF ID: 0X%X]",
+        int rc = snprintf(core->print_buf + print_buf_index, PRINT_BUF_REST(core, print_buf_index), "[PREBUF TICKET: 0X%08X] [PREBUF SIZE: %u] [PREBUF ID: 0X%08X]",
                           bufh->prebuf.ticket, bufh->prebuf.pepa_len, bufh->prebuf.pepa_id);
         print_buf_index += rc;
     }
@@ -817,7 +817,6 @@ int pepa_disconnect_in_rw(pepa_core_t *core)
 
 int pepa_disconnect_in_listen(pepa_core_t *core)
 {
-    int rc;
     if (FD_CLOSED != core->sockets.in_listen) {
         pepa_remove_socket_from_epoll(core, core->sockets.in_listen, "IN LISTEN", __FILE__, __LINE__);
     }
@@ -826,7 +825,7 @@ int pepa_disconnect_in_listen(pepa_core_t *core)
     pepa_in_reading_sockets_close_all(core);
 
     if (FD_CLOSED != core->sockets.in_listen) {
-        rc = pepa_socket_shutdown_and_close(core->sockets.in_listen, "IN LISTEN");
+        const int rc = pepa_socket_shutdown_and_close(core->sockets.in_listen, "IN LISTEN");
         if (rc) {
             slog_warn_l("Could not close socket SHVA (FD = %d)", core->sockets.in_listen);
         }

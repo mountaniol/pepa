@@ -63,7 +63,7 @@ int8_t checksum_buf_to_32_bit(const char *buf_input, const size_t buf_input_size
 int8_t checksum_buf_to_16_bit(const char *buf_input, const size_t buf_input_size, void *output_16)
 {
 	uint32_t result;
-	uint32_t output_32;
+	uint32_t output_32 = 0;
 	const uint16_t *output_16_p = (uint16_t *)&output_32;
 	result = checksum_buf_to_32_bit(buf_input, buf_input_size, &output_32);
 
@@ -78,7 +78,7 @@ int8_t checksum_buf_to_16_bit(const char *buf_input, const size_t buf_input_size
 int8_t checksum_buf_to_8_bit(const char *buf_input, const size_t buf_input_size, void *output_8)
 {
 	uint32_t result;
-	uint32_t output_32;
+	uint32_t output_32 = 0;
 	const uint8_t  *output_8_p = (uint8_t  *)&output_32;
 	result = checksum_buf_to_32_bit(buf_input, buf_input_size, &output_32);
 

@@ -1,18 +1,17 @@
 #define _GNU_SOURCE
+#include "pepa_emulator.h"
+
+#include <errno.h>
 #include <pthread.h>
+#include <sys/epoll.h>
+#include <sys/ioctl.h>
 #include <sys/param.h>
 #include <unistd.h> /* For read() */
-#include <sys/epoll.h>
-#include <errno.h>
-#include <sys/ioctl.h>
 
-#include "murmur3.h"
-#include "zhash2.h"
-#include "pepa_emulator.h"
 #include "buf_t/buf_t.h"
+#include "murmur3.h"
 #include "pepa_config.h"
 #include "pepa_core.h"
-#include "slog/src/slog.h"
 #include "pepa_errors.h"
 #include "pepa_parser.h"
 #include "pepa_server.h"
@@ -20,6 +19,8 @@
 #include "pepa_state_machine.h"
 #include "pepa_ticket_id.h"
 #include "pepa_utils.h"
+#include "slog/src/slog.h"
+#include "zhash2.h"
 
 static void emu_compare_sent_and_received_buffers(emu_t *emu, buf_t *buf_recv);
 
@@ -32,31 +33,30 @@ static int enable_shva_tx = 1;
 #define PEPA_OUT_W (1)
 int pipe_out[2] = {-1, -1};
 
-
 emu_t *emu = NULL;
 
 #if 1
 
-//#define SHUTDOWN_DIVIDER (100003573)
-//#define SHUTDOWN_DIVIDER (1000035)
-    #define SHUTDOWN_DIVIDER (100035)
-//#define SHUTDOWN_DIVIDER (10000357377)
-//#define SHVA_SHUTDOWN_DIVIDER (10000357)
-//#define SHVA_SHUTDOWN_DIVIDER (1000035)
-    #define SHVA_SHUTDOWN_DIVIDER (100037)
-    #define SHOULD_EMULATE_DISCONNECT() (0 == (rand() % SHUTDOWN_DIVIDER))
-    #define SHVA_SHOULD_EMULATE_DISCONNECT() (0 == (rand() % SHVA_SHUTDOWN_DIVIDER))
+// #define SHUTDOWN_DIVIDER (100003573)
+// #define SHUTDOWN_DIVIDER (1000035)
+#define SHUTDOWN_DIVIDER (100035)
+// #define SHUTDOWN_DIVIDER (10000357377)
+// #define SHVA_SHUTDOWN_DIVIDER (10000357)
+// #define SHVA_SHUTDOWN_DIVIDER (1000035)
+#define SHVA_SHUTDOWN_DIVIDER (100037)
+#define SHOULD_EMULATE_DISCONNECT() (0 == (rand() % SHUTDOWN_DIVIDER))
+#define SHVA_SHOULD_EMULATE_DISCONNECT() (0 == (rand() % SHVA_SHUTDOWN_DIVIDER))
 #else
 
-                #define SHOULD_EMULATE_DISCONNECT() (0)
+#define SHOULD_EMULATE_DISCONNECT() (0)
 
 // #define SHVA_SHOULD_EMULATE_DISCONNECT() (0 == (rand() % SHVA_SHUTDOWN_DIVIDER))
 
-                #define SHVA_SHOULD_EMULATE_DISCONNECT() (0)
+#define SHVA_SHOULD_EMULATE_DISCONNECT() (0)
 #endif
-                #define RX_TX_PRINT_DIVIDER (100000)
+#define RX_TX_PRINT_DIVIDER (100000)
 
-                #define PEPA_MIN(a,b) ((a<b) ? a : b )
+#define PEPA_MIN(a, b) ((a < b) ? a : b)
 
 /* Keep here PIDs of IN threads */
 
@@ -94,7 +94,6 @@ static const char *st_to_str(int st)
 
 static int emu_t_free(emu_t *emu)
 {
-
     TESTP(emu, -1);
 
     pthread_mutex_lock(&emu->lock);
@@ -132,7 +131,6 @@ static emu_t *emu_t_allocate(int num_of_in, pepa_core_t *core)
         emu_local->cnt_in_sent[idx] = (idx + 1) * 1000;
         emu_local->cnt_in_recv[idx] = 0;
     }
-
 
     if (NULL == emu_local->in_ids || NULL == emu_local->in_stat) {
         slog_error_l("Can not allocate emu_t: emu->in_ids = %p, emu->in_stat = %p",
@@ -284,7 +282,8 @@ static void emu_set_all_in(emu_t *emu, const int status)
 static void emu_set_all_in_state_to_state(emu_t *emu, const int from, const int to)
 {
     for (size_t idx = 0; idx < emu->in_number; idx++) {
-        if (from == emu_get_in_status(emu, idx)) {}
+        if (from == emu_get_in_status(emu, idx)) {
+        }
         emu_set_in_status(emu, idx, to);
     }
 }
@@ -310,7 +309,6 @@ static int emu_if_in_any_have_status(emu_t *emu, const int status)
     return (0);
 }
 
-
 /*** SIGNALS ****/
 
 static void pthread_block_signals(const char *name)
@@ -329,7 +327,7 @@ static void close_emulatior(void)
 }
 
 /* Catch Signal Handler function */
-static void signal_callback_handler(int signum, __attribute__((unused)) siginfo_t *info, __attribute__((unused))void *extra)
+static void signal_callback_handler(int signum, __attribute__((unused)) siginfo_t *info, __attribute__((unused)) void *extra)
 {
     printf("Caught signal %d\n", signum);
     if (signum == SIGINT) {
@@ -504,7 +502,7 @@ static size_t emu_random_buf_size(void)
 {
     pepa_core_t *core = pepa_get_core();
 
-    size_t buf_size = ((size_t)rand() % core->emu_max_buf); //core->emu_max_buf;
+    size_t buf_size = ((size_t)rand() % core->emu_max_buf);  // core->emu_max_buf;
     buf_size += sizeof(buf_head_t);
 
     if (buf_size > core->emu_max_buf) {
@@ -586,7 +584,7 @@ static uint64_t emu_calc_checksum(buf_t *buf)
 {
     emu_checksum_t checksum = 0;
     const char *data = emu_buf_get_data(buf);
-    //buf_head_t *head = emu_buf_get_head(buf);
+    // buf_head_t *head = emu_buf_get_head(buf);
     TESTP(data, 0);
 
     ssize_t data_len = emu_buf_get_data_len(buf);
@@ -597,10 +595,10 @@ static uint64_t emu_calc_checksum(buf_t *buf)
 
     // MurmurHash3_x86_128_to_64(data, data_len, 0, &checksum);
     checksum = simple_checksum(data, data_len);
-    //slog_note_l("Calculated the checksum: data len = %ld, data offset = %ld, checksum: %X clobal cnt = %d, ticket = %X",
-    //            data_len, emu_buf_data_offset(buf), checksum, head->cnt_global, head->ticket);
+    // slog_note_l("Calculated the checksum: data len = %ld, data offset = %ld, checksum: %X clobal cnt = %d, ticket = %X",
+    //             data_len, emu_buf_data_offset(buf), checksum, head->cnt_global, head->ticket);
     //
-    // slog_error_l("Header checksums is wrong: calculated: %lX != received: %lX, global counter = %ld, ticket = %X",
+    //  slog_error_l("Header checksums is wrong: calculated: %lX != received: %lX, global counter = %ld, ticket = %X",
     //			 checksum, head->checksum, head->cnt_global, head->ticket);
     return (checksum);
 }
@@ -620,7 +618,7 @@ static int emu_calc_header_checksum(buf_t *buf)
 
     // MurmurHash3_x86_32(buf_data_start, buf_data_len, 0, &checksum);
 
-#if 0 /* SEB */ /* 26/10/2024 */
+#if 0 /* SEB */  /* 26/10/2024 */
     for (size_t idx = start; idx < (size_t)buf->used; idx++) {
         // head->checksum ^= buf->data[idx];
         head->checksum += buf->data[idx];
@@ -629,7 +627,7 @@ static int emu_calc_header_checksum(buf_t *buf)
     return (0);
 }
 
-#if 0 /* SEB */ /* 12/11/2024 */
+#if 0 /* SEB */  /* 12/11/2024 */
 static size_t emu_calc_buf_data_start(pepa_core_t *core){
     size_t offset = 0;
     if (core->use_ticket) {
@@ -671,7 +669,6 @@ static void emu_print_char_buf_hex(const char *buf, size_t buf_len)
     memset(buffer, 0, 256);
 
     for (size_t idx = 0; idx < print_items; idx++) {
-
         memcpy(&val, buf + offset_data, sizeof(unsigned int));
         offset_pr += sprintf(buffer + offset_pr, "%X ", val);
         offset_data += sizeof(unsigned int);
@@ -698,7 +695,6 @@ static void emu_print_buf_begin(const buf_t *buf, int src)
     }
 
     for (size_t idx = 0; idx < print_items; idx++) {
-
         memcpy(&val, buf->data + offset_data, sizeof(unsigned int));
         offset_pr += sprintf(buffer + offset_pr, "%X ", val);
         offset_data += sizeof(unsigned int);
@@ -784,7 +780,7 @@ static emu_cnt_t emu_get_recv_cnt(int source, int instance)
         cnt = emu->cnt_shva_recv;
     }
 
-    //slog_note_l("GET RECV counter %d for %s", cnt, src_num_to_str(source, instance));
+    // slog_note_l("GET RECV counter %d for %s", cnt, src_num_to_str(source, instance));
 
     return (cnt);
 }
@@ -798,7 +794,7 @@ static void emu_set_recv_cnt(int source, int instance, emu_cnt_t cnt)
     if (BUF_SRC_SHVA == source) {
         emu->cnt_shva_recv = cnt;
     }
-    //slog_note_l("SET RECV counter %d for %s", cnt, src_num_to_str(source, instance));
+    // slog_note_l("SET RECV counter %d for %s", cnt, src_num_to_str(source, instance));
 }
 
 static emu_cnt_t emu_get_send_cnt(int source, int instance)
@@ -812,7 +808,7 @@ static emu_cnt_t emu_get_send_cnt(int source, int instance)
         cnt = emu->cnt_shva_sent;
     }
 
-    //slog_note_l("GET SENT counter %d for %s", cnt, src_num_to_str(source, instance));
+    // slog_note_l("GET SENT counter %d for %s", cnt, src_num_to_str(source, instance));
     return (cnt);
 }
 
@@ -824,7 +820,7 @@ static void emu_set_send_cnt(int source, int instance, emu_cnt_t cnt)
 
     if (BUF_SRC_SHVA == source) {
         emu->cnt_shva_sent = cnt;
-        //slog_note_l("SET SENT counter %d for %s", cnt, src_num_to_str(source, instance));
+        // slog_note_l("SET SENT counter %d for %s", cnt, src_num_to_str(source, instance));
     }
 }
 
@@ -845,9 +841,9 @@ static void emu_print_buffers_in_hex(const unsigned char *buf_sent, const unsign
             printf("%08X ", value_sent);
         } else {
             printf("[%08x/%08x/] ", value_sent, value_recv);
-            //printf("[SENT = %X != RECV = %X | offset = %lu / %lu] ", value_sent, value_recv, index * sizeof(uint32_t), buf_len);
-            //printf("\n\n");
-            // return;
+            // printf("[SENT = %X != RECV = %X | offset = %lu / %lu] ", value_sent, value_recv, index * sizeof(uint32_t), buf_len);
+            // printf("\n\n");
+            //  return;
         }
 
         if ((index + 1) % 12 == 0) {  // Newline every 4 values for readability
@@ -857,7 +853,6 @@ static void emu_print_buffers_in_hex(const unsigned char *buf_sent, const unsign
 
     // Print any remaining bytes as hexadecimal characters
     if (remaining_bytes > 0) {
-
         printf("\nRemaining bytes:\n");
         for (size_t index = 0; index < remaining_bytes; ++index) {
             size_t offset = num_uint32 * sizeof(uint32_t) + index;
@@ -875,7 +870,7 @@ static void emu_print_buffers_in_hex(const unsigned char *buf_sent, const unsign
                 printf("\n");
             }
 
-            //printf("%02X ", (unsigned char)buf_sent[num_uint32 * sizeof(uint32_t) + index]);
+            // printf("%02X ", (unsigned char)buf_sent[num_uint32 * sizeof(uint32_t) + index]);
         }
     }
     printf("\n\n");
@@ -886,10 +881,10 @@ static void emu_compare_print_bufs(buf_t *buf_sent, buf_t *buf_recv, const char 
     // pepa_core_t  *core       = pepa_get_core();
     int do_not_dump = 0;
 
-    //buf_head_t   *head_recv  = BUF_HEAD(buf_recv, 0);
+    // buf_head_t   *head_recv  = BUF_HEAD(buf_recv, 0);
     buf_head_t *head_recv = emu_buf_get_head(buf_recv);
     TESTP_VOID(head_recv);
-    //buf_head_t   *head_sent  = BUF_HEAD(buf_sent, 0);
+    // buf_head_t   *head_sent  = BUF_HEAD(buf_sent, 0);
     buf_head_t *head_sent = emu_buf_get_head(buf_sent);
     TESTP_VOID(head_sent);
 
@@ -973,7 +968,7 @@ static void emu_compare_print_bufs(buf_t *buf_sent, buf_t *buf_recv, const char 
             break;
         }
 
-#if 0 /* SEB */ /* 02/11/2024 */
+#if 0 /* SEB */  /* 02/11/2024 */
         if (data_sent[idx] == data_recv[idx]) {
             printf("%02X ", (unsigned int)data_sent[idx]);
         } else {
@@ -1007,7 +1002,7 @@ static void emu_compare_sent_and_received_buffers(emu_t *emu, buf_t *buf_recv)
     // slog_note_l("Compared sent and saved in zhash");
 }
 
-#if 0 /* SEB */ /* 02/11/2024 */
+#if 0 /* SEB */  /* 02/11/2024 */
 static void emu_print_buf_short(buf_t *buf, const char *caller){
     // buf_head_t *head = BUF_HEAD(buf, 0);
     buf_head_t *head = emu_buf_get_head(buf);
@@ -1080,7 +1075,7 @@ static int emu_check_buffer(buf_t *buf, uint32_t expect_src, const char *caller)
     /* Update the 'recv' counter */
     // emu_set_recv_cnt(source, instance, head->cnt);
 
-    //slog_note_l("Set new counter: %d", head->cnt);
+    // slog_note_l("Set new counter: %d", head->cnt);
 
     /* Test received len vs expected */
 
@@ -1153,11 +1148,9 @@ static uint32_t emu_construct_pattern(uint32_t src, uint32_t instance)
 
     abort();
 
-
-    //return (((src & 0xFFFF) << 16) | (instance & 0xFFFF));
+    // return (((src & 0xFFFF) << 16) | (instance & 0xFFFF));
 }
-__attribute__((unused))
-static int emu_check_buffer_pattern(const buf_t *buf, uint32_t src, uint32_t instance)
+__attribute__((unused)) static int emu_check_buffer_pattern(const buf_t *buf, uint32_t src, uint32_t instance)
 {
     uint32_t pattern = emu_construct_pattern(src, instance);
     const uint32_t *data_32 = (const uint32_t *)buf->data;
@@ -1192,7 +1185,7 @@ static int32_t pepa_emulator_generate_buffer_buf(buf_t *buf, const size_t buffer
 
     // const size_t head_size     = sizeof(buf_head_t);
 
-    const size_t required_room = buffer_size; // + head_size;
+    const size_t required_room = buffer_size;  // + head_size;
 
     /* If not enough room in the buf_t, increase it */
     if (buf->room < (buf_s64_t)required_room) {
@@ -1262,7 +1255,7 @@ static int32_t emu_test_header(const buf_head_t *head, const char *name)
     return (ret);
 }
 
-#if 0 /* SEB */ /* 15/11/2024 */
+#if 0 /* SEB */  /* 15/11/2024 */
 static void print_hex_32(const char *buffer, size_t size){
     // Ensure the buffer has enough bytes to interpret as uint32_t values
     size_t num_elements = size / sizeof(uint32_t);
@@ -1284,7 +1277,7 @@ static void print_hex_32(const char *buffer, size_t size){
     }
 }
 #endif /* SEB */ /* 15/11/2024 */
-#if 0 /* SEB */ /* 02/11/2024 */
+#if 0 /* SEB */  /* 02/11/2024 */
 
 static void emu_finish_read_head(buf_t *buf){
     size_t read_more = sizeof()
@@ -1343,13 +1336,13 @@ static int emu_read_one_buffer(buf_t *buf,
 
     // slog_note_l("[%s][%ld] buffer data is %p, head is %p, diff is %ld", name, cnt, buf->data, head, ((char *)head - buf->data));
 
-    //if (head->mark != BUF_HEADER_MARK) {
+    // if (head->mark != BUF_HEADER_MARK) {
     if (0 != emu_test_header(head, name)) {
         slog_error_l("[%s][%ld] Received a wrong header", name, cnt);
         emu_print_buf_begin(buf, src_id);
-        //slog_error_l("[%s][%ld] HEAD DUMP", name, cnt);
-        //print_hex_32((char *)head, sizeof(head));
-        //slog_error_l("[%s][%ld] //HEAD DUMP", name, cnt);
+        // slog_error_l("[%s][%ld] HEAD DUMP", name, cnt);
+        // print_hex_32((char *)head, sizeof(head));
+        // slog_error_l("[%s][%ld] //HEAD DUMP", name, cnt);
 
         return (-1);
     }
@@ -1359,7 +1352,6 @@ static int emu_read_one_buffer(buf_t *buf,
     *reads += 1;
 
     /*** END BUF_HEADER ***/
-
 
     /*** BEGIN BUFFER BODY ***/
     /* Receive the rest of the buffer */
@@ -1398,8 +1390,8 @@ static int emu_read_one_buffer(buf_t *buf,
         char err_string[64] = {0};
         sprintf(err_string, "[%s][%ld] RECEIVED A BAD BUFFER", name, cnt);
         emu_buf_dump(buf, err_string);
-        //abort();
-        //return (-1);
+        // abort();
+        // return (-1);
         return buf->used;
     }
 
@@ -1444,17 +1436,17 @@ static int emu_gen_and_send(const int fd,
         /* Get the last 'sent' counter*/
         emu_cnt_t buf_count = emu_get_send_cnt(buf_src, instance);
 
-        if (PEPA_ERR_OK != pepa_emulator_generate_buffer_buf(buf, /* Existing buffer */
-                                                             buf_size, /* The buffer size we want to generate */
+        if (PEPA_ERR_OK != pepa_emulator_generate_buffer_buf(buf,       /* Existing buffer */
+                                                             buf_size,  /* The buffer size we want to generate */
                                                              buf_count, /* Counter */
-                                                             buf_src, /* Source == IN */
-                                                             instance)/* IN Instance number */) {
+                                                             buf_src,   /* Source == IN */
+                                                             instance) /* IN Instance number */) {
             slog_error_l("[%s] Can not generate buffer", name);
             abort();
         }
 
         /* Test the buffer before send it */
-#if 0 /* SEB */ /* 13/11/2024 */
+#if 0 /* SEB */  /* 13/11/2024 */
         rc = emu_check_buffer(buf, buf_src, "TEST BEFORE SEND");
         if (rc) {
             slog_fatal_l("The generated buffer is wrong");
@@ -1499,13 +1491,12 @@ static int emu_gen_and_send(const int fd,
 
         // slog_note_l("[%s] Send buffer, len: %ld", name, buf->used);
 
-        //if (buf_src == BUF_SRC_SHVA) {
-        //    emu_buf_dump(buf,  "SHA SENT");
-        // }
+        // if (buf_src == BUF_SRC_SHVA) {
+        //     emu_buf_dump(buf,  "SHA SENT");
+        //  }
     }
     return (cur);
 }
-
 
 static int32_t out_start_connection(void)
 {
@@ -1535,7 +1526,7 @@ typedef struct {
     emu_t *emu;
 } out_thread_args_t;
 
-static void pepa_emulator_out_thread_cleanup(__attribute__((unused))void *arg)
+static void pepa_emulator_out_thread_cleanup(__attribute__((unused)) void *arg)
 {
     // int         *event_fd = (int *)arg;
     out_thread_args_t *args = arg;
@@ -1559,7 +1550,7 @@ static void pepa_emulator_out_thread_cleanup(__attribute__((unused))void *arg)
 
 /* Internal thread: reads from the pipe packets with removet prebuf structure */
 #if 1 /* SEB */ /* 15/11/2024 */
-static void *pepa_emu_out_internal_thread(__attribute__((unused))void *arg)
+static void *pepa_emu_out_internal_thread(__attribute__((unused)) void *arg)
 {
     const char *my_name = "OUT INT";
     emu_t *emup = arg;
@@ -1580,7 +1571,6 @@ static void *pepa_emu_out_internal_thread(__attribute__((unused))void *arg)
 
     slog_note_l("[%s] Going to allocate a new buf_t, size: %lu", my_name, core->emu_max_buf + 1);
     buf_t *buf = buf_new((buf_s64_t)core->emu_max_buf + 1);
-
 
     /* Entering the running loop */
     do {
@@ -1610,7 +1600,7 @@ static int pepa_emulator_out_read_buf(const int fd, size_t *rx, size_t *reads)
     int cur = 0;
     int rc = -5;
 
-    //for (size_t idx = 0; idx < 5; idx++) {
+    // for (size_t idx = 0; idx < 5; idx++) {
     *reads = *reads + 1;
     buf_t *buf = buf_new(0);
     rc = emu_read_one_buffer(buf, fd, rx, reads, BUF_SRC_SHVA, "OUT READ");
@@ -1661,8 +1651,8 @@ static void *pepa_out_external_thread(void *arg)
     int32_t event_count;
     int32_t i;
 
-    //uint64_t reads = 0;
-    // uint64_t rx = 0;
+    // uint64_t reads = 0;
+    //  uint64_t rx = 0;
 
     char *buf = malloc(core->emu_max_buf);
     TESTP_ASSERT(buf, "Can not allocate buffer");
@@ -1699,7 +1689,6 @@ static void *pepa_out_external_thread(void *arg)
 
         /* Entering the running loop */
         do {
-
             int status = emu_get_out_status(emup);
 
             switch (status) {
@@ -1714,7 +1703,7 @@ static void *pepa_out_external_thread(void *arg)
                     break;
             }
 
-            //pthread_create(&internal_thread_id, NULL, pepa_emu_out_internal_thread, arg);
+            // pthread_create(&internal_thread_id, NULL, pepa_emu_out_internal_thread, arg);
 
             event_count = epoll_wait(args.epoll_fd, events, 1, 1000);
 
@@ -1735,7 +1724,6 @@ static void *pepa_out_external_thread(void *arg)
             }
 
             for (i = 0; i < event_count; i++) {
-
                 const int fd = events[i].data.fd;
                 const int evs = events[i].events;
 
@@ -1753,10 +1741,9 @@ static void *pepa_out_external_thread(void *arg)
                     continue;
                 }
 
-
                 /* Read from socket */
-                //if (evs & EPOLLIN) {
-                //do {
+                // if (evs & EPOLLIN) {
+                // do {
                 /* Very unlikely we get in here */
                 if (fd != core->sockets.out_write) {
                     slog_fatal_l("[%s] Received a epoll event but the event fd (%d) !=  out_write (%d)",
@@ -1788,9 +1775,8 @@ static void *pepa_out_external_thread(void *arg)
 
                 /* Recevie main buffer */
 
-
-                //slog_note_l("BEFORE READING BUF");
-#if 0 /* SEB */ /* 16/11/2024 */
+                // slog_note_l("BEFORE READING BUF");
+#if 0 /* SEB */  /* 16/11/2024 */
                 rc = pepa_emulator_out_read_buf(core->sockets.out_write,
                                                 (size_t *)&emup->bytes_rx_out_external,
                                                 (size_t *)&emu->num_out_reads);
@@ -1804,7 +1790,7 @@ static void *pepa_out_external_thread(void *arg)
                 // emu->num_out_reads++;
                 continue;
 #endif /* SEB */ /* 16/11/2024 */
-#if 1 /* SEB */ /* 15/11/2024 */
+#if 1 /* SEB */  /* 15/11/2024 */
 
                 memset(buf, 8, core->emu_max_buf);
                 rc = recv_exact(core->sockets.out_write, buf, prebuf.pepa_len, prebuf.pepa_len, __func__, __LINE__);
@@ -1818,14 +1804,13 @@ static void *pepa_out_external_thread(void *arg)
 
                 emup->bytes_rx_out_external += rc;
 
-
                 // slog_note_l("[%s]: Received bytes: %ld", my_name, rc);
 
                 /* Write the buffer to the pipe */
 
-                //slog_note_l("BEFORE WRITING TO OIN-INT");
+                // slog_note_l("BEFORE WRITING TO OIN-INT");
                 rc = write(pipe_out[PEPA_OUT_W], buf, prebuf.pepa_len);
-                //slog_note_l("AFTER  WRITING TO OIN-INT");
+                // slog_note_l("AFTER  WRITING TO OIN-INT");
 
                 if (rc < 0) {
                     slog_error_l("[%s]: Can not send buffer to the pipe", my_name);
@@ -1865,7 +1850,7 @@ static void *pepa_out_external_thread(void *arg)
         } while (1); /* epoll loop */
     closeit:
 
-        //pthread_cancel(internal_thread_id);
+        // pthread_cancel(internal_thread_id);
         emu_set_out_status(emup, ST_WAITING);
 
         rc = epoll_ctl(args.epoll_fd, EPOLL_CTL_DEL, core->sockets.out_write, NULL);
@@ -1888,10 +1873,8 @@ stop_out_thread:
     pthread_exit(NULL);
 }
 
-
-
 /* Create 1 read socket to emulate OUT connection */
-#if 0  /* SEB */ /* 10/11/2024 */
+#if 0 /* SEB */  /* 10/11/2024 */
 static void *pepa_emulator_out_thread(__attribute__((unused))void *arg){
     emu_t *emu = arg;
     TESTP_MES(emu, NULL, "Thread argument is the NULL pointer");
@@ -2047,7 +2030,6 @@ typedef struct {
     emu_t *emu;
 } shva_rw_thread_clean_t;
 
-
 /** SHVA ***/
 
 #define EVENTS_NUM (1)
@@ -2058,7 +2040,7 @@ static int pepa_emulator_shva_read(const int fd, size_t *rx, size_t *reads)
     int cur = 0;
     int rc = -5;
 
-    //for (size_t idx = 0; idx < 5; idx++) {
+    // for (size_t idx = 0; idx < 5; idx++) {
     *reads += 1;
     buf_t *buf = buf_new(0);
     rc = emu_read_one_buffer(buf, fd, rx, reads, BUF_SRC_IN, "SHVA READ");
@@ -2073,7 +2055,7 @@ static int pepa_emulator_shva_read(const int fd, size_t *rx, size_t *reads)
 
     cur += rc;
 
-#if 0 /* SEB */ /* 13/11/2024 */
+#if 0 /* SEB */  /* 13/11/2024 */
     rc = emu_check_buffer(buf, BUF_SRC_IN, "SHVA");
     if (0 != rc) {
         slog_error_l("BAD BUFFER");
@@ -2136,7 +2118,7 @@ static int pepa_emu_shva_accept(int epoll_fd, int sock_listen, pepa_core_t *core
     return (0);
 }
 
-static void pepa_emulator_shva_thread_cleanup(__attribute__((unused))void *arg)
+static void pepa_emulator_shva_thread_cleanup(__attribute__((unused)) void *arg)
 {
     shva_rw_thread_clean_t *cargs = (shva_rw_thread_clean_t *)arg;
     pepa_core_t *core = pepa_get_core();
@@ -2166,12 +2148,12 @@ static void *pepa_emulator_shva(void *arg)
 {
     volatile int iter = 0;
     size_t rx = 0;
-    //size_t tx = 0;
+    // size_t tx = 0;
     size_t reads = 0;
     // size_t writes = 0;
     emu_t *emup = arg;
 
-    //pthread_t tid = pthread_self();
+    // pthread_t tid = pthread_self();
 
     TESTP_MES(emup, NULL, "SHVA: Argument is NULL");
 
@@ -2181,7 +2163,7 @@ static void *pepa_emulator_shva(void *arg)
     int32_t rc = -1;
 
     struct sockaddr_in s_addr;
-    //int                    sock_listen = FD_CLOSED;
+    // int                    sock_listen = FD_CLOSED;
 
     emu_set_shva_main_status(emup, ST_STARTING);
 
@@ -2215,7 +2197,6 @@ static void *pepa_emulator_shva(void *arg)
             }
         } while (core->sockets.shva_listen < 0); /* Opening listening soket */
 
-
         // core->sockets.shva_listen = sock_listen;
 
         slog_note_l("[SHVA] Opened listening socket");
@@ -2247,7 +2228,6 @@ static void *pepa_emulator_shva(void *arg)
 
             /* No events, exited by timeout */
             if (0 == event_count) {
-
                 /* Emulate socket closing */
                 if (SHVA_SHOULD_EMULATE_DISCONNECT()) {
                     // slog_debug_l("SHVA: EMULATING DISCONNECT");
@@ -2275,7 +2255,6 @@ static void *pepa_emulator_shva(void *arg)
             /* If here, it means everything is OK and we have a connection on the listening socket, or a socket is broken */
 
             for (int i = 0; i < event_count; i++) {
-
                 const int fd = events[i].data.fd;
                 uint32_t evs = events[i].events;
 
@@ -2290,7 +2269,7 @@ static void *pepa_emulator_shva(void *arg)
                     rc = pepa_emu_shva_accept(epoll_fd, core->sockets.shva_listen, core);
                     slog_note_l("Reading socket is connected");
                     continue;
-                }  /* if (sock_listen == events[i].data.fd && events[i].events == EPOLLIN)*/
+                } /* if (sock_listen == events[i].data.fd && events[i].events == EPOLLIN)*/
 
                 /* If no RW socket, continue */
                 if (FD_CLOSED == core->sockets.shva_rw) {
@@ -2300,13 +2279,13 @@ static void *pepa_emulator_shva(void *arg)
 
                 /* On event on RW socket, read */
                 if ((core->sockets.shva_rw == fd) && (evs & EPOLLIN)) {
-                    //slog_note_l("SHVA [thread ID = %lu]:::: receiving buf, iter: %d, event_count: %d, i: %d",
-                    //            (unsigned long)tid, iter, event_count, i);
+                    // slog_note_l("SHVA [thread ID = %lu]:::: receiving buf, iter: %d, event_count: %d, i: %d",
+                    //             (unsigned long)tid, iter, event_count, i);
 
                     while (bytes_available_read(core->sockets.shva_rw) > 1000) {
-                        //slog_note_l("[SHVA] READ: SOCKET READ AVAL  : %d", bytes_available_read(core->sockets.shva_rw));
+                        // slog_note_l("[SHVA] READ: SOCKET READ AVAL  : %d", bytes_available_read(core->sockets.shva_rw));
                         rc = pepa_emulator_shva_read(core->sockets.shva_rw, (size_t *)&emup->bytes_rx_shva, &reads);
-                        //slog_note_l("[SHVA] AFTER READ");
+                        // slog_note_l("[SHVA] AFTER READ");
                         if (rc < 1) {
                             slog_error_l("[SHVA] Can not read from RW socket, reset sockets");
                             goto reset;
@@ -2329,7 +2308,7 @@ static void *pepa_emulator_shva(void *arg)
             /* This flag can be tunred on / off for isolated debug */
             if (enable_shva_tx) {
                 size_t writes;
-                //slog_note_l("[SHVA] WRITE, SOCKET WRITE AVAL: %d", bytes_available_write (core->sockets.shva_rw));
+                // slog_note_l("[SHVA] WRITE, SOCKET WRITE AVAL: %d", bytes_available_write (core->sockets.shva_rw));
                 rc = pepa_emulator_shva_write(core->sockets.shva_rw, (size_t *)&emup->bytes_tx_shva, &writes);
                 emu->num_shva_writes++;
                 if (rc < 0) {
@@ -2406,10 +2385,9 @@ typedef struct {
     emu_t *emu;
     buf_t *buf;
 
-}
-in_thread_args_t;
+} in_thread_args_t;
 
-static void pepa_emulator_in_thread_cleanup(__attribute__((unused))void *arg)
+static void pepa_emulator_in_thread_cleanup(__attribute__((unused)) void *arg)
 {
     in_thread_args_t *args = arg;
 
@@ -2419,7 +2397,7 @@ static void pepa_emulator_in_thread_cleanup(__attribute__((unused))void *arg)
     slog_note("[IN] Going to close IN[%d] socket (FD = %d) port %d", args->my_num, args->fd, pepa_find_socket_port(args->fd));
 
     pepa_reading_socket_close(args->fd, "EMU IN TRHEAD");
-#if 0 /* SEB */ /* 26/10/2024 */
+#if 0 /* SEB */  /* 26/10/2024 */
     int rc = buf_free(args->buf);
     if (rc) {
         slog_error_l("Can't free buf_t");
@@ -2435,8 +2413,7 @@ static void pepa_emulator_in_thread_cleanup(__attribute__((unused))void *arg)
 uint32_t in_thread_disconnect_all = 0;
 
 /* Create 1 read/write listening socket to emulate SHVA server */
-__attribute__((noreturn))
-static void *pepa_emulator_in_thread(__attribute__((unused))void *arg)
+__attribute__((noreturn)) static void *pepa_emulator_in_thread(__attribute__((unused)) void *arg)
 {
     emu_cnt_t buf_count = 0;
     in_thread_args_t *args = arg;
@@ -2458,8 +2435,7 @@ static void *pepa_emulator_in_thread(__attribute__((unused))void *arg)
 
     // const int32_t *my_num     = (int32_t *)arg;
     char my_name[32] = {
-        0
-    };
+        0};
 
     uint64_t writes = 0;
     uint64_t rx = 0;
@@ -2518,11 +2494,11 @@ static void *pepa_emulator_in_thread(__attribute__((unused))void *arg)
 
             buf_count = emu_get_send_cnt(BUF_SRC_IN, args->my_num);
 
-            if (PEPA_ERR_OK != pepa_emulator_generate_buffer_buf(buf,                               /* Existing buffer */
-                                                                 buf_size,                          /* The buffer size we want to generate */
-                                                                 buf_count,    /* Counter */
-                                                                 BUF_SRC_IN,                        /* Source == IN */
-                                                                 args->my_num)/* IN Instance number */) {
+            if (PEPA_ERR_OK != pepa_emulator_generate_buffer_buf(buf,        /* Existing buffer */
+                                                                 buf_size,   /* The buffer size we want to generate */
+                                                                 buf_count,  /* Counter */
+                                                                 BUF_SRC_IN, /* Source == IN */
+                                                                 args->my_num) /* IN Instance number */) {
                 slog_error_l("Error when buffer generated");
                 abort();
             }
@@ -2553,7 +2529,7 @@ static void *pepa_emulator_in_thread(__attribute__((unused))void *arg)
 
             if (rc < 0) {
                 slog_error_l("%s Could not send buffer to SHVA, error: %s (%d)", my_name, strerror(errno), errno);
-                //break;
+                // break;
                 rc = buf_free(buf);
                 if (rc) {
                     slog_error_l("Can not free buf_t");
@@ -2564,7 +2540,7 @@ static void *pepa_emulator_in_thread(__attribute__((unused))void *arg)
             if (0 == rc) {
                 slog_error_l("%s Send 0 bytes to SHVA, error: %s (%d)", my_name, strerror(errno), errno);
                 // usleep(10000);
-                //break;
+                // break;
                 rc = buf_free(buf);
                 if (rc) {
                     slog_error_l("Can not free buf_t");
@@ -2594,9 +2570,9 @@ static void *pepa_emulator_in_thread(__attribute__((unused))void *arg)
                 // break;
             }
 
-            if (core->emu_timeout > 0) {
-                // usleep(core->emu_timeout);
-            }
+            // if (core->emu_timeout > 0) {
+            //  usleep(core->emu_timeout);
+            //}
 
             if (core->emu_timeout > 0) {
                 usleep(core->emu_timeout);
@@ -2607,8 +2583,6 @@ static void *pepa_emulator_in_thread(__attribute__((unused))void *arg)
             usleep(1000);
             pthread_mutex_unlock(&emu->in_threads_lock);
         } while (1); /* Generating and sending data */
-
-
 
     reset_socket:
         pthread_mutex_unlock(&emu->in_threads_lock);
@@ -2634,11 +2608,9 @@ in_stop:
     pthread_exit(NULL);
 }
 
-
 /***********************************************************************************************************/
 /**** REIMPLEMENTATION ****/
 /***********************************************************************************************************/
-
 
 /*** The OUT Thread ***/
 
@@ -2779,7 +2751,7 @@ static void *emu_monitor(void *arg)
                   emup->num_shva_writes,
                   emup->num_shva_reads);
 
-#if 0 /* SEB */ /* 15/11/2024 */
+#if 0 /* SEB */  /* 15/11/2024 */
         slog_note("MONITOR: BYTES [IN tx: %d] [OUT-EXT rx: %d tx: %d] OUT-IN [rx: %d tx: %d] SHVA [rx: %d tx: %d]",
                   emup->bytes_tx_in,
                   emup->bytes_rx_out_external,
@@ -2789,7 +2761,6 @@ static void *emu_monitor(void *arg)
                   emup->bytes_rx_shva,
                   emup->bytes_tx_shva);
 #endif /* SEB */ /* 15/11/2024 */
-
 
     } while (1);
     return (NULL);
@@ -2832,33 +2803,40 @@ static void emu_control_pr_statuses(emu_t *emu)
 
     in_st_print(emu, buf);
 
-    slog_note_l("\n[EMU CONTROL]: out         = %s\n"
-                "[EMU CONTROL]: shva socket = %s\n"
-                "[EMU CONTROL]: shva read   = %s\n"
-                "[EMU CONTROL]: shva write  = %s\n"
-                "%s"
-                "[EMU CONTROL]: all IN NO?  = %d\n",
-                st_to_str(st_out),
-                st_to_str(st_shva_socket),
-                st_to_str(st_shva_read),
-                st_to_str(st_shva_write),
-                buf,
-                emu_if_in_all_have_status(emu, ST_NO));
+    slog_note_l(
+        "\n[EMU CONTROL]: out         = %s\n"
+        "[EMU CONTROL]: shva socket = %s\n"
+        "[EMU CONTROL]: shva read   = %s\n"
+        "[EMU CONTROL]: shva write  = %s\n"
+        "%s"
+        "[EMU CONTROL]: all IN NO?  = %d\n",
+        st_to_str(st_out),
+        st_to_str(st_shva_socket),
+        st_to_str(st_shva_read),
+        st_to_str(st_shva_write),
+        buf,
+        emu_if_in_all_have_status(emu, ST_NO));
     free(buf);
 }
 
 #define L_TRACE_ENABLE (0)
-#define L_TRACE() do{ if(L_TRACE_ENABLE)slog_note_l("[EMU CONTROL] Line Debug: Line %d",  __LINE__); }while(0)
+#define L_TRACE()                                                                       \
+    do {                                                                                \
+        if (L_TRACE_ENABLE) slog_note_l("[EMU CONTROL] Line Debug: Line %d", __LINE__); \
+    } while (0)
 
 #define POST_SLEEP_TIME (50000)
-#define POST_SLEEP() do{usleep(POST_SLEEP_TIME);}while(0)
+#define POST_SLEEP()             \
+    do {                         \
+        usleep(POST_SLEEP_TIME); \
+    } while (0)
 
 static int controll_state_machine(emu_t *emu)
 {
     start_monitor_thread(emu);
     do {
         // char *buf = calloc(1024, 1);
-        //int counter = 0;
+        // int counter = 0;
         // sleep(1);
         usleep(50000);
         if (emu->should_exit) {
@@ -2873,16 +2851,15 @@ static int controll_state_machine(emu_t *emu)
         // slog_note_l("[EMU CONTROL]: run");
 
         int st_out = emu_get_out_status(emu);
-        //slog_note_l("[EMU CONTROL]: got statuses: 1");
+        // slog_note_l("[EMU CONTROL]: got statuses: 1");
 
         int st_shva_socket = emu_get_shva_main_status(emu);
-        //slog_note_l("[EMU CONTROL]: got statuses: 2");
+        // slog_note_l("[EMU CONTROL]: got statuses: 2");
 
         // int st_shva_read   = emu_get_shva_read_status(emu);
-        //slog_note_l("[EMU CONTROL]: got statuses: 3");
+        // slog_note_l("[EMU CONTROL]: got statuses: 3");
 
         // int st_shva_write  = emu_get_shva_write_status(emu);
-
 
         emu_control_pr_statuses(emu);
 
@@ -2891,10 +2868,10 @@ static int controll_state_machine(emu_t *emu)
             slog_note_l("[EMU CONTROL] Starting OUT thread: ST_NO -> ST_WAITING");
             start_out_thread(emu);
             POST_SLEEP();
-            //continue;
+            // continue;
         }
 
-        //slog_note_l("[EMU CONTROL] Line Debug: Line %d",  __LINE__);
+        // slog_note_l("[EMU CONTROL] Line Debug: Line %d",  __LINE__);
 
         // slog_note_l("[EMU CONTROL]: 1");
 
@@ -2911,7 +2888,7 @@ static int controll_state_machine(emu_t *emu)
             slog_note_l("[EMU CONTROL] Starting SHVA main (socket) thread: ST_NO -> ST_WAITING");
             start_shva(emu);
             POST_SLEEP();
-            //continue;
+            // continue;
         }
 
         /* We DO NOT start here SHVA READ / WRITE; we start them only after INs are running */
@@ -2921,7 +2898,6 @@ static int controll_state_machine(emu_t *emu)
         /* If SHVA socket(s) are degraded, the Socket thread closes them and set statys RESET.
            We should restart both SHVA READ and WRITE threads, and also IN threads, and reset the Socket thread status */
         if (ST_RESET == st_shva_socket) {
-
             /* Reload IN threads */
             kill_in_threads(emu);
             POST_SLEEP();
@@ -2945,7 +2921,7 @@ static int controll_state_machine(emu_t *emu)
         /* OUT is WAITING, and SHVA is RUNNING: the OUT was restarted, set all SHVA threads to WAITING */
 
         if (ST_WAITING == st_out && ST_RUNNING == st_shva_socket) {
-            //slog_note_l("[EMU CONTROL] Starting running of OUT: ST_WAITING -> ST_RUNNING");
+            // slog_note_l("[EMU CONTROL] Starting running of OUT: ST_WAITING -> ST_RUNNING");
             emu_set_shva_main_status(emu, ST_WAITING);
             POST_SLEEP();
         }
@@ -2953,7 +2929,7 @@ static int controll_state_machine(emu_t *emu)
         /* 1. OUT thread is waiting and SHVA read is waiting: start OUT */
 
         if (ST_WAITING == st_out && ST_WAITING == st_shva_socket) {
-            //slog_note_l("[EMU CONTROL] Starting running of OUT: ST_WAITING -> ST_RUNNING");
+            // slog_note_l("[EMU CONTROL] Starting running of OUT: ST_WAITING -> ST_RUNNING");
             emu_set_out_status(emu, ST_RUNNING);
             POST_SLEEP();
         }
@@ -2961,7 +2937,7 @@ static int controll_state_machine(emu_t *emu)
         /* 2. OUT thread is running and SHVA socket is waiting: start SHVA socket, we are ready */
 
         if (ST_RUNNING == st_out && ST_WAITING == st_shva_socket) {
-            //slog_note_l("[EMU CONTROL] Starting running of SHVA main: ST_WAITING -> ST_RUNNING");
+            // slog_note_l("[EMU CONTROL] Starting running of SHVA main: ST_WAITING -> ST_RUNNING");
             emu_set_shva_main_status(emu, ST_RUNNING);
             POST_SLEEP();
             // continue;
@@ -2989,7 +2965,7 @@ static int controll_state_machine(emu_t *emu)
     L_TRACE();
 }
 
-#if 0 /* SEB */ /* 27/10/2024 */
+#if 0 /* SEB */  /* 27/10/2024 */
 static int emu_rand(int min, int max){
     int val;
     do {
@@ -3000,10 +2976,10 @@ static int emu_rand(int min, int max){
 }
 #endif /* SEB */ /* 27/10/2024 */
 
-//#define MAX_SLEEP (120)
-//#define MIN_SLEEP (10)
+// #define MAX_SLEEP (120)
+// #define MIN_SLEEP (10)
 /* Randonly close sockets */
-#if 0 /* SEB */ /* 25/10/2024 */
+#if 0 /* SEB */  /* 25/10/2024 */
 static void emu_saboteur(void *arg){
     pepa_core_t *core = arg;
     int sleep_time = emu_rand(MIN_SLEEP, MAX_SLEEP);
@@ -3069,14 +3045,17 @@ int main(int argi, char *argv[])
 
     pepa_config_slogger(core);
     lorem_ipsum_len = strlen(lorem_ipsum);
-    //lorem_ipsum_buf = buf_new((buf_s64_t)core->emu_max_buf);
-    //pepa_emulator_generate_buffer_buf(lorem_ipsum_buf, core->emu_max_buf);
+    // lorem_ipsum_buf = buf_new((buf_s64_t)core->emu_max_buf);
+    // pepa_emulator_generate_buffer_buf(lorem_ipsum_buf, core->emu_max_buf);
 
     emu_set_int_signal_handler();
 
     srand(17);
     /* Somethime random can return predictable value in the beginning; we skip it */
     rc = rand() + rand() + rand() + rand() + rand();
+    if (rc < 1) {
+        slog_error_l("Well, it is < 0");
+    }
 
     pepa_set_rlimit();
 

@@ -177,7 +177,7 @@ pepa_core_t *pepa_get_core(void)
 pepa_bool_t pepa_if_abort(void)
 {
 	if (NULL == g_pepa_core) {
-		return PEPA_ERR_OK;
+		return YES;
 	}
 
 	return g_pepa_core->abort_flag;

@@ -316,7 +316,7 @@ int llog(int level, char *file, size_t line, const char *format, ...)
     }
 
     /* Print counter of the message */
-    size_t offset = sprintf(string, "[%lu] ", logger_get_counter());
+    size_t offset = sprintf(string, "[%zu] ", logger_get_counter());
 
     /* Now print the line */
     va_start(args, format);
