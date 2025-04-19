@@ -3,7 +3,7 @@
 
 #GCC=clang-10
 GCC=gcc
-#GCC=gcc-10
+#GCC=gcc-13
 
 ifneq ($(compiler),)
 	GCC=$(compiler)

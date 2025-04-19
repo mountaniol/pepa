@@ -351,7 +351,7 @@ static int pepa_socket_read3(buf_and_header_t *bufh,
 static const char *prebuf_to_string(buf_and_header_t *bufh, size_t *size_bytes)
 {
     static char str[STR_PREBUF_SIZE];
-    const int ret = snprintf(str, STR_PREBUF_SIZE, "%0X-%u-%0X-", bufh->prebuf.ticket, bufh->prebuf.pepa_len, bufh->prebuf.pepa_id);
+    const int ret = snprintf(str, STR_PREBUF_SIZE, "%.8X-%.8u-%.8X-", bufh->prebuf.ticket, bufh->prebuf.pepa_len, bufh->prebuf.pepa_id);
     if (ret < 0) {
         slog_fatal_l("Can not create prebuf as string");
         abort();
